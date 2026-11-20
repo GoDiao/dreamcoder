@@ -1,4 +1,4 @@
-import detailedIcon from '../../../electron/build/app-icon-flat.svg'
+import detailedIcon from '../../../electron/build/app-icon-tile.svg'
 import smallIcon from '../../../electron/build/app-icon-small.svg'
 
 const DETAIL_MIN = 40

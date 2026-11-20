@@ -108,7 +108,8 @@ function generate() {
   const app = readMaster('app-icon.svg')
   const small = readMaster('app-icon-small.svg')
   const tray = readMaster('tray-icon.svg')
-  const windowsTile = tileOnly(app)
+  const tile = tileOnly(app)
+  write(path.join(buildDir, 'app-icon-tile.svg'), new TextEncoder().encode(`${tile}\n`))
 
   const appPng = render(app, 1024)
   write(path.join(buildDir, 'app-icon.png'), appPng)
@@ -120,7 +121,7 @@ function generate() {
     path.join(iconsDir, 'icon.ico'),
     packIco(ICO_SIZES.map((size) => ({
       size,
-      png: render(size <= ICO_SMALL_MAX ? small : windowsTile, size),
+      png: render(size <= ICO_SMALL_MAX ? small : tile, size),
     }))),
   )
 

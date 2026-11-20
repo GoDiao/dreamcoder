@@ -64,6 +64,10 @@ describe('generate-icons', () => {
     expect(alphaAt(tile, 103, 0, 102)).toBe(0)
   })
 
+  it('keeps the in-app tile in step with the finished master', () => {
+    expect(master('app-icon-tile.svg')).toBe(`${tileOnly(master('app-icon.svg'))}\n`)
+  })
+
   it('ships every tray image the app loads', () => {
     for (const name of ['tray.png', 'tray@2x.png', 'trayTemplate.png', 'trayTemplate@2x.png']) {
       expect(existsSync(path.join(buildDir, 'icons', name))).toBe(true)

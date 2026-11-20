@@ -5,17 +5,17 @@
       <stop offset="1" stop-color="#13192b"/>
     </linearGradient>
     <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#fff" stop-opacity="0.5"/>
+      <stop offset="0" stop-color="#fff" stop-opacity="0.32"/>
       <stop offset="0.3" stop-color="#fff" stop-opacity="0"/>
       <stop offset="1" stop-color="#fff" stop-opacity="0.08"/>
     </linearGradient>
     <radialGradient id="glow" gradientUnits="userSpaceOnUse" cx="641" cy="409" r="440">
-      <stop offset="0" stop-color="#ffe6b8" stop-opacity="0.26"/>
-      <stop offset="0.45" stop-color="#ffe6b8" stop-opacity="0.091"/>
+      <stop offset="0" stop-color="#ffe6b8" stop-opacity="0.15"/>
+      <stop offset="0.45" stop-color="#ffe6b8" stop-opacity="0.052"/>
       <stop offset="1" stop-color="#ffe6b8" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="bloom" gradientUnits="userSpaceOnUse" cx="641" cy="409" r="130">
-      <stop offset="0" stop-color="#ffe6b8" stop-opacity="0.32"/>
+      <stop offset="0" stop-color="#ffe6b8" stop-opacity="0.18"/>
       <stop offset="1" stop-color="#ffe6b8" stop-opacity="0"/>
     </radialGradient>
     <linearGradient id="prompt" x1="0" y1="0" x2="0.35" y2="1">

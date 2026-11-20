@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import detailedIcon from '../../../electron/build/app-icon-flat.svg'
+import detailedIcon from '../../../electron/build/app-icon-tile.svg'
 import smallIcon from '../../../electron/build/app-icon-small.svg'
 import { DreamCoderIcon } from './DreamCoderIcon'
 
