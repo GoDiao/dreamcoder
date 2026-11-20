@@ -1197,6 +1197,31 @@ function describeMemoryFile(file: MemoryFileInfo): string {
   return `Contents of ${file.path}${description}:\n\n${content}`
 }
 
+export async function getEmptyAutoMemoryNotice(
+  memoryFiles: MemoryFileInfo[],
+): Promise<string | null> {
+  if (
+    !isAutoMemoryEnabled() ||
+    getFeatureValue_CACHED_MAY_BE_STALE('tengu_moth_copse', false)
+  ) {
+    return null
+  }
+
+  const emptyNotice =
+    'Your MEMORY.md is currently empty. When you save new memories, they will appear here.'
+  const entry = memoryFiles.find(file => file.type === 'AutoMem')
+  if (entry) {
+    return entry.content.trim() ? null : emptyNotice
+  }
+
+  try {
+    await getFsImplementation().stat(getAutoMemEntrypoint())
+    return null
+  } catch (error) {
+    return getErrnoCode(error) === 'ENOENT' ? emptyNotice : null
+  }
+}
+
 export const getClaudeMds = (
   memoryFiles: MemoryFileInfo[],
   filter?: (type: MemoryType) => boolean,
