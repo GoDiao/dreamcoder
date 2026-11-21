@@ -14,6 +14,7 @@ import type { Input as FileReadInput } from '../tools/FileReadTool/FileReadTool.
 import {
   FILE_READ_TOOL_NAME,
   FILE_UNCHANGED_STUB,
+  readTruncatedRange,
 } from '../tools/FileReadTool/prompt.js'
 import { FILE_WRITE_TOOL_NAME } from '../tools/FileWriteTool/prompt.js'
 import type { Message } from '../types/message.js'
@@ -427,6 +428,7 @@ export function extractReadFilesFromMessages(
             // overwrite the real entry with stub text.
             !content.content.startsWith(FILE_UNCHANGED_STUB)
           ) {
+            const truncated = readTruncatedRange(content.content)
             // Remove system-reminder blocks from the content
             const processedContent = content.content.replace(
               /<system-reminder>[\s\S]*?<\/system-reminder>/g,
@@ -447,8 +449,9 @@ export function extractReadFilesFromMessages(
               cache.set(readFilePath, {
                 content: fileContent,
                 timestamp,
-                offset: undefined,
+                offset: truncated ? 1 : undefined,
                 limit: undefined,
+                ...(truncated && { truncated }),
               })
             }
           }
@@ -479,11 +482,13 @@ export function extractReadFilesFromMessages(
             try {
               const { content: diskContent } =
                 readFileSyncWithMetadata(editFilePath)
+              const truncated = cache.get(editFilePath)?.truncated
               cache.set(editFilePath, {
                 content: diskContent,
                 timestamp: getFileModificationTime(editFilePath),
                 offset: undefined,
                 limit: undefined,
+                ...(truncated && { truncated }),
               })
             } catch (e: unknown) {
               if (!isFsInaccessible(e)) {

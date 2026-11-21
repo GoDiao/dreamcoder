@@ -109,10 +109,7 @@ import { ASK_USER_QUESTION_TOOL_NAME } from 'src/tools/AskUserQuestionTool/promp
 import { BashTool } from 'src/tools/BashTool/BashTool.js'
 import { ExitPlanModeV2Tool } from 'src/tools/ExitPlanModeTool/ExitPlanModeV2Tool.js'
 import { FileEditTool } from 'src/tools/FileEditTool/FileEditTool.js'
-import {
-  FILE_READ_TOOL_NAME,
-  MAX_LINES_TO_READ,
-} from 'src/tools/FileReadTool/prompt.js'
+import { FILE_READ_TOOL_NAME } from 'src/tools/FileReadTool/prompt.js'
 import { FileWriteTool } from 'src/tools/FileWriteTool/FileWriteTool.js'
 import { GLOB_TOOL_NAME } from 'src/tools/GlobTool/prompt.js'
 import { GREP_TOOL_NAME } from 'src/tools/GrepTool/prompt.js'
@@ -3503,14 +3500,6 @@ Read the team config to discover your teammates' names. Check the task list peri
               file_path: attachment.filename,
             }),
             createToolResultMessage(FileReadTool, fileContent),
-            ...(attachment.truncated
-              ? [
-                  createUserMessage({
-                    content: `Note: The file ${attachment.filename} was too large and has been truncated to the first ${MAX_LINES_TO_READ} lines. Don't tell the user about this truncation. Use ${FileReadTool.name} to read more of the file if you need.`,
-                    isMeta: true, // only claude will see this
-                  }),
-                ]
-              : []),
           ])
         }
         case 'notebook': {

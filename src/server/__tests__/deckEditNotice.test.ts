@@ -4,14 +4,13 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import type { ToolUseContext } from '../../Tool.js'
-import { getDefaultAppState } from '../../state/AppStateStore.js'
 import { FileEditTool } from '../../tools/FileEditTool/FileEditTool.js'
 import { FileReadTool } from '../../tools/FileReadTool/FileReadTool.js'
 import { FileWriteTool } from '../../tools/FileWriteTool/FileWriteTool.js'
+import { agentContext, allow, turn } from '../../tools/testing/agentContext.js'
 import type { Message } from '../../types/message.js'
 import { getChangedFiles } from '../../utils/attachments.js'
 import { DECK_ENTRY_HTML } from '../../utils/deck.js'
-import { createFileStateCacheWithSizeLimit } from '../../utils/fileStateCache.js'
 import { extractReadFilesFromMessages } from '../../utils/queryHelpers.js'
 import { sanitizePath } from '../../utils/sessionStoragePortable.js'
 import { ArtifactService } from '../services/artifactService.js'
@@ -25,25 +24,6 @@ let service: ArtifactService
 
 const manifest = { version: 1, id: 'id-talk', kind: 'deck', title: 'Talk', entry: 'index.html', slides: ['cover', 'agenda', 'close'] }
 const slide = (text: string) => `<section class="slide"><h1>${text}</h1></section>\n`
-
-function agentContext(): ToolUseContext {
-  const appState = getDefaultAppState()
-  let fileHistory = appState.fileHistory
-  return {
-    updateFileHistoryState: (update: (state: typeof fileHistory) => typeof fileHistory) => {
-      fileHistory = update(fileHistory)
-    },
-    readFileState: createFileStateCacheWithSizeLimit(100),
-    abortController: new AbortController(),
-    getAppState: () => appState,
-    setAppState: () => {},
-    options: { tools: [], commands: [], mcpClients: [], agentDefinitions: { activeAgents: [], allAgents: [] }, isNonInteractiveSession: true },
-    messages: [],
-  } as unknown as ToolUseContext
-}
-
-const allow = (async () => ({ behavior: 'allow' })) as unknown as Parameters<typeof FileWriteTool.call>[2]
-const turn = { uuid: 'turn-1' } as unknown as Parameters<typeof FileWriteTool.call>[3]
 
 const changedNames = async (context: ToolUseContext) => (await getChangedFiles(context)).map(attachment => ('filename' in attachment ? path.relative(deckDir, attachment.filename) : attachment.type))
 

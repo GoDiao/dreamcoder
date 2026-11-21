@@ -12,6 +12,7 @@ export type FileState = {
   // Edit/Write must require an explicit Read first. `content` here holds the
   // RAW disk bytes (for getChangedFiles diffing), not what the model saw.
   isPartialView?: boolean
+  truncated?: { lastLine: number; totalLines: number }
 }
 
 // Default max entries for read file state caches

@@ -251,6 +251,7 @@ export type ToolUseContext = {
   fileReadingLimits?: {
     maxTokens?: number
     maxSizeBytes?: number
+    failWhenOverLimit?: boolean
   }
   globLimits?: {
     maxResults?: number
@@ -479,6 +480,8 @@ export type Tool<
    * hook/permission returns a fresh updatedInput — those own their shape.
    */
   backfillObservableInput?(input: Record<string, unknown>): void
+
+  resolveApprovalInput?(input: Record<string, unknown>): void
 
   /**
    * Determines if this tool is allowed to run with this input in the current context.

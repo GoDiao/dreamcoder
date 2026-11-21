@@ -71,7 +71,10 @@ import {
 } from '../../utils/permissions/filesystem.js'
 import type { PermissionDecision } from '../../utils/permissions/PermissionResult.js'
 import { matchWildcardPattern } from '../../utils/permissions/shellRuleMatching.js'
-import { readFileInRange } from '../../utils/readFileInRange.js'
+import {
+  FileTooLargeError,
+  readFileInRange,
+} from '../../utils/readFileInRange.js'
 import { semanticNumber } from '../../utils/semanticNumber.js'
 import { semanticOptionalString } from '../../utils/semanticOptionalString.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
@@ -84,6 +87,7 @@ import {
   LINE_FORMAT_INSTRUCTION,
   OFFSET_INSTRUCTION_DEFAULT,
   OFFSET_INSTRUCTION_TARGETED,
+  readTruncatedNote,
   renderPromptTemplate,
 } from './prompt.js'
 import {
@@ -264,6 +268,12 @@ const outputSchema = lazySchema(() => {
           .describe('Number of lines in the returned content'),
         startLine: z.number().describe('The starting line number'),
         totalLines: z.number().describe('Total number of lines in the file'),
+        truncated: z
+          .boolean()
+          .optional()
+          .describe(
+            'True when the read stopped early at a line boundary to fit the size limit',
+          ),
       }),
     }),
     z.object({
@@ -346,7 +356,7 @@ export const FileReadTool = buildTool({
   async prompt() {
     const limits = getDefaultFileReadingLimits()
     const maxSizeInstruction = limits.includeMaxSizeInPrompt
-      ? `. Files larger than ${formatFileSize(limits.maxSizeBytes)} will return an error; use offset and limit for larger files`
+      ? `. A read larger than ${formatFileSize(limits.maxSizeBytes)} returns the lines that fit; use offset and limit to read the rest`
       : ''
     const offsetInstruction = limits.targetedRangeNudge
       ? OFFSET_INSTRUCTION_TARGETED
@@ -695,6 +705,13 @@ export const FileReadTool = buildTool({
           content =
             memoryFileFreshnessPrefix(data) +
             formatFileLines(data.file) +
+            (data.file.truncated
+              ? readTruncatedNote(
+                  data.file.startLine,
+                  data.file.startLine + data.file.numLines - 1,
+                  data.file.totalLines,
+                )
+              : '') +
             (shouldIncludeFileReadMitigation()
               ? CYBER_RISK_MITIGATION_REMINDER
               : '')
@@ -751,23 +768,43 @@ function memoryFileFreshnessPrefix(data: object): string {
   return memoryFreshnessNote(mtimeMs)
 }
 
+async function countContentTokens(
+  content: string,
+  ext: string,
+  maxTokens: number,
+): Promise<number> {
+  const tokenEstimate = roughTokenCountEstimationForFileType(content, ext)
+  if (!tokenEstimate || tokenEstimate <= maxTokens / 4) return tokenEstimate
+
+  return (await countTokensWithAPI(content)) ?? tokenEstimate
+}
+
 async function validateContentTokens(
   content: string,
   ext: string,
-  maxTokens?: number,
+  maxTokens: number,
 ): Promise<void> {
-  const effectiveMaxTokens =
-    maxTokens ?? getDefaultFileReadingLimits().maxTokens
-
-  const tokenEstimate = roughTokenCountEstimationForFileType(content, ext)
-  if (!tokenEstimate || tokenEstimate <= effectiveMaxTokens / 4) return
-
-  const tokenCount = await countTokensWithAPI(content)
-  const effectiveCount = tokenCount ?? tokenEstimate
-
-  if (effectiveCount > effectiveMaxTokens) {
-    throw new MaxFileReadTokenExceededError(effectiveCount, effectiveMaxTokens)
+  const tokenCount = await countContentTokens(content, ext, maxTokens)
+  if (tokenCount > maxTokens) {
+    throw new MaxFileReadTokenExceededError(tokenCount, maxTokens)
   }
+}
+
+function linesWithinTokenLimit(
+  content: string,
+  tokenCount: number,
+  maxTokens: number,
+): string[] {
+  const maxChars = (content.length * maxTokens) / tokenCount
+  const lines = content.split('\n')
+  let chars = -1
+  let kept = 0
+  for (const line of lines) {
+    chars += line.length + 1
+    if (chars > maxChars) break
+    kept++
+  }
+  return lines.slice(0, kept)
 }
 
 type ImageResult = {
@@ -1023,22 +1060,43 @@ async function callInner(
 
   // --- Text file (single async read via readFileInRange) ---
   const lineOffset = offset === 0 ? 0 : offset - 1
-  const { content, lineCount, totalLines, totalBytes, readBytes, mtimeMs } =
-    await readFileInRange(
-      resolvedFilePath,
-      lineOffset,
-      limit,
-      limit === undefined ? maxSizeBytes : undefined,
-      context.abortController.signal,
-    )
+  const truncateToFit = !context.fileReadingLimits?.failWhenOverLimit
+  const read = await readFileInRange(
+    resolvedFilePath,
+    lineOffset,
+    limit,
+    limit === undefined ? maxSizeBytes : undefined,
+    context.abortController.signal,
+    { truncateOnByteLimit: truncateToFit },
+  )
+  const { totalLines, totalBytes, mtimeMs } = read
+  if (read.truncatedByBytes && read.lineCount === 0) {
+    throw new FileTooLargeError(totalBytes, maxSizeBytes)
+  }
 
-  await validateContentTokens(content, ext, maxTokens)
+  let { content, lineCount } = read
+  const tokenCount = await countContentTokens(content, ext, maxTokens)
+  if (tokenCount > maxTokens) {
+    const lines = truncateToFit
+      ? linesWithinTokenLimit(content, tokenCount, maxTokens)
+      : []
+    if (lines.length === 0) {
+      throw new MaxFileReadTokenExceededError(tokenCount, maxTokens)
+    }
+    content = lines.join('\n')
+    lineCount = lines.length
+  }
+  const truncated = read.truncatedByBytes || lineCount < read.lineCount
+  const readBytes = Buffer.byteLength(content, 'utf8')
 
   readFileState.set(fullFilePath, {
     content,
     timestamp: Math.floor(mtimeMs),
     offset,
     limit,
+    ...(truncated && {
+      truncated: { lastLine: lineOffset + lineCount, totalLines },
+    }),
   })
   context.nestedMemoryAttachmentTriggers?.add(fullFilePath)
 
@@ -1056,6 +1114,7 @@ async function callInner(
       numLines: lineCount,
       startLine: offset,
       totalLines,
+      ...(truncated && { truncated }),
     },
   }
   if (isAutoMemFile(fullFilePath)) {

@@ -1449,6 +1449,7 @@ export async function createPostCompactFileAttachments(
           ...toolUseContext,
           fileReadingLimits: {
             maxTokens: POST_COMPACT_MAX_TOKENS_PER_FILE,
+            failWhenOverLimit: true,
           },
         },
         'tengu_post_compact_file_restore_success',

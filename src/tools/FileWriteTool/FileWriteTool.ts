@@ -40,7 +40,11 @@ import {
 } from '../../utils/permissions/filesystem.js'
 import type { PermissionDecision } from '../../utils/permissions/PermissionResult.js'
 import { matchWildcardPattern } from '../../utils/permissions/shellRuleMatching.js'
-import { FILE_UNEXPECTEDLY_MODIFIED_ERROR } from '../FileEditTool/constants.js'
+import {
+  FILE_EDIT_TOOL_NAME,
+  FILE_UNEXPECTEDLY_MODIFIED_ERROR,
+  NO_READ_BACK_NOTE,
+} from '../FileEditTool/constants.js'
 import { gitDiffSchema, hunkSchema } from '../FileEditTool/types.js'
 import { FILE_WRITE_TOOL_NAME, getWriteToolDescription } from './prompt.js'
 import {
@@ -203,6 +207,14 @@ export const FileWriteTool = buildTool({
         message:
           'File has not been read yet. Read it first before writing to it.',
         errorCode: 2,
+      }
+    }
+    if (readTimestamp.truncated) {
+      const { lastLine, totalLines } = readTimestamp.truncated
+      return {
+        result: false,
+        message: `The last read of this file stopped at line ${lastLine} of ${totalLines}, so writing it would discard lines that were never read. Read the rest with offset and limit first, or use ${FILE_EDIT_TOOL_NAME} to change part of the file.`,
+        errorCode: 4,
       }
     }
 
@@ -423,13 +435,13 @@ export const FileWriteTool = buildTool({
         return {
           tool_use_id: toolUseID,
           type: 'tool_result',
-          content: `File created successfully at: ${filePath}`,
+          content: `File created successfully at: ${filePath}. ${NO_READ_BACK_NOTE}`,
         }
       case 'update':
         return {
           tool_use_id: toolUseID,
           type: 'tool_result',
-          content: `The file ${filePath} has been updated successfully.`,
+          content: `The file ${filePath} has been updated successfully. ${NO_READ_BACK_NOTE}`,
         }
     }
   },

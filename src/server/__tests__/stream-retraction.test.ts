@@ -18,8 +18,6 @@ describe('a stream the CLI retries', () => {
     expect(retracted.messages).toEqual([{ type: 'reply_retracted' }])
     expect(retracted.events).toEqual([{ type: 'turn_activity_reported', activity: 'thinking' }])
     expect(stream.activeBlockTypes.size).toBe(0)
-    expect(stream.activeToolBlocks.size).toBe(0)
-    expect(stream.streamedToolUseIds.size).toBe(0)
     expect(stream.hasReceivedStreamEvents).toBe(false)
   })
 

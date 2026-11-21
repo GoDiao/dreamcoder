@@ -9,3 +9,6 @@ export const CLAUDE_FOLDER_PERMISSION_PATTERN = '/.claude/**'
 
 export const FILE_UNEXPECTEDLY_MODIFIED_ERROR =
   'File has been unexpectedly modified. Read it again before attempting to write it.'
+
+export const NO_READ_BACK_NOTE =
+  'The result is already in your context, so there is no need to read the file back.'

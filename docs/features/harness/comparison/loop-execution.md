@@ -17,6 +17,7 @@
 5. **只有 ZCode 有重复调用防护**：同名同参连续 3 次插入提醒（只提醒不拦截，每回合最多 3 次）。DreamCoder 与 Codex 未找到任何重复调用检测。ZCode 还有「静默 5 次响应提醒向用户汇报」。
 6. **工具并行：Codex 和 ZCode 在流式过程中就开始执行，DreamCoder 在本场景下要等整个响应结束。** DreamCoder 的流式工具执行受 GrowthBook 门控，GrowthBook 关闭时为 false。Codex 对可并行工具不设数量上限；ZCode 与 DreamCoder 上限 10。
 7. **读取上限：DreamCoder 与 ZCode 常量相同（256KB、25,000 token、描述写 2000 行但代码不按行截断），但超 token 时行为不同**：ZCode 首次整文件读取返回部分视图，DreamCoder 直接报错，模型要再发一次带 offset/limit 的请求。DreamCoder 每次 Read 结果末尾还附约 330 字符的恶意软件提醒，另两家没有。
+   状态：本次修复：超限时按行返回前一部分（代码现在按行截断），@ 附件不再按 2,000 行截断；Edit 匹配加了行号前缀、行尾空白、缩进、转义四种回退；成功文案告诉模型不必读回。见 [README](../README.md) 执行层。
 8. **Shell 超时语义：Codex 不杀进程，10 秒后交回 session ID 由模型轮询；ZCode 与 DreamCoder 默认 120 秒，到时自动转后台并承诺完成后通知。** 输出上限：Codex 约 10,000 token/字节，ZCode 30KB 尾部预览，DreamCoder 30,000 字符。
 9. **规划工具：Codex 不注册 `update_plan` 但 prompt 仍描述它；ZCode 的 TodoWrite 描述只有 3 行、不鼓励主动使用；DreamCoder 在应用里启用 4 个 Task 工具（约 8K 字符描述），描述要求「3 步以上主动使用」、开始前标 in_progress、完成后立即标 completed。** 这是 DreamCoder 在普通小任务上额外工具调用和往返的主要来源（推断）。
 10. **子 agent：Codex 明文禁止未经要求就委派；ZCode 鼓励「需要跨多个文件阅读」时委派；DreamCoder 鼓励「超过 3 次查询」时用 Explore（模型为 provider 的 fastModel）。** DreamCoder 与 Codex 子 agent 都不能再嵌套（深度 1）。
@@ -66,7 +67,7 @@
 | 描述长度 | prompt 一行 | Edit 约 380 字符 | Edit 约 1.2K 字符 |
 | read-before-edit | 无 | 有 | 有 |
 | 过期检查 | 无 | mtime 前进或大小变化 | mtime 前进且内容不同 |
-| 匹配遍数 | 4 遍逐行 + 末尾空行回退 | 精确 + 7 回退 | 精确 + 弯引号；接收时反净化 |
+| 匹配遍数 | 4 遍逐行 + 末尾空行回退 | 精确 + 7 回退 | 精确 + 弯引号；接收时反净化（本次：精确之后依次尝试反净化、弯引号、行号前缀、行尾空白、缩进、转义，都在执行时进行） |
 | 歧义处理 | 不拒绝，取游标后第一个 | 拒绝 | 拒绝 |
 | 失败提示是否带文件实际内容 | 否 | 否 | 否 |
 | 成功返回 | 文件列表 A/M/D，约 100–200 字符 | 一句话 + 「不要读回」 | 一句话，约 60–100 字符 |
@@ -92,10 +93,10 @@
 - 成功：`The file X has been updated successfully. (file state is current in your context — no need to Read it back)`（`edit.ts:53-77`）；结果给模型的上限 100KB（`edit.ts:281-289`）。保留编码与行尾（`edit.ts:509-515`）。Write 描述约 230 字符，同样的未读/过期检查，保留原行尾（`handlers/write.ts:37-64, 109, 131`）。
 
 **DreamCoder**（`src/tools/FileEditTool/`）
-- 接收时（解析模型输出阶段，`src/utils/messages.ts:2798` → `src/utils/api.ts:622-645` → `utils.ts:581-662`）：new_string 每行去尾部空白（.md/.mdx 除外）；old_string 精确找不到时套用 18 项反净化表（`<fnr>`、`<n>`、`\n\nH:` 等，`utils.ts:531-550`），同样替换应用到 new_string。
-- validateInput 顺序（`FileEditTool.ts:138-345`）：old==new → deny 规则 → >1GiB（`:85`）→ 读入并 CRLF→LF → 文件不存在（附 Did you mean）/ old_string 空但文件非空 → .ipynb → 未读过或部分视图（code 6）→ 过期（code 7，文案同 ZCode）→ 精确匹配，失败再弯引号归一（`utils.ts:73-96`）→ 找不到（code 8：`String to replace not found in file.\nString: <old_string>`）→ 多处匹配（code 9）。
+- 接收时（解析模型输出阶段，`src/utils/messages.ts:2798` → `src/utils/api.ts:622-645` → `utils.ts:581-662`）：new_string 每行去尾部空白（.md/.mdx 除外）；old_string 精确找不到时套用 18 项反净化表（`<fnr>`、`<n>`、`\n\nH:` 等，`utils.ts:531-550`），同样替换应用到 new_string。（本次：接收时不再读文件，只去 new_string 行尾空白；反净化改为 `matchEdit` 的一种匹配方式，在 validateInput、确认和 call 时都生效，见 `src/tools/FileEditTool/matchEdit.ts`）
+- validateInput 顺序（`FileEditTool.ts:138-345`）：old==new → deny 规则 → >1GiB（`:85`）→ 读入并 CRLF→LF → 文件不存在（附 Did you mean）/ old_string 空但文件非空 → .ipynb → 未读过或部分视图（code 6）→ 过期（code 7，文案同 ZCode）→ 精确匹配，失败再弯引号归一（`utils.ts:73-96`；本次：改为 `matchEdit` 的各种匹配方式）→ 找不到（code 8：`String to replace not found in file.\nString: <old_string>`）→ 多处匹配（code 9）。
 - call 阶段再查一次过期，失败抛 `File has been unexpectedly modified. Read it again before attempting to write it.`（`FileEditTool.ts:445-470`；`constants.ts:10-11`）。new_string 为空且后接换行时连换行一起删（`utils.ts:218-229`）。保留编码（utf8/utf16le）与行尾（`src/utils/fileRead.ts:87-96`；`src/utils/file.ts:84-98`）。
-- 成功：`The file <path> has been updated successfully.`（`FileEditTool.ts:555-575`）。没有「不要读回」提示。
+- 成功：`The file <path> has been updated successfully.`（`FileEditTool.ts:555-575`）。没有「不要读回」提示（本次：加了一句不需要读回，写入文本和 new_string 不同或用户改过时不加）。
 - Write：已存在文件要求读过且未改（`src/tools/FileWriteTool/FileWriteTool.ts:199-219`）；content 每行去尾空白（非 md，`src/utils/api.ts:646-660`）；固定写 LF（`FileWriteTool.ts:307`）；返回 `File created successfully at: <path>` 或 `The file <path> has been updated successfully.`（`:426, 432`）。
 - 读过的文件被外部修改后，下一次请求附 `edited_text_file` 附件（`src/utils/attachments.ts:862, 2047-2102`）。
 
@@ -124,7 +125,7 @@
 
 - Codex：读取靠 `cat`/`sed -n`/`rg`；exec 输出预算默认 10,000 token（`codex:core/src/unified_exec/mod.rs:74`），回退模型截断策略 10,000 字节（`codex:models-manager/src/model_info.rs:126`），截断时加 `Warning: truncated output (original token count: N)`（`codex:core/src/tools/context.rs:519-521`）。
 - ZCode：常量 256KB / 25,000 / 2,000（`zcode:contracts/src/tools/read.ts:15-17`）；2,000 只用于描述和附件（`zcode:core/src/runtime/helpers/attachments.ts:307`；`zcode:core/src/tool/handlers/read.ts:72`）。超 token 的首次整读返回前若干行，提示放在批次后附件中（`zcode:core/src/tool/handlers/read-text.ts:150-200`）；带 offset/limit 超限才报错。超 256KB 报错，文案与 DreamCoder 相同（`zcode:adapters/src/fs/text-range-reader.ts:41-43`）。去重文案（`read-text.ts:17-18`；`read.ts:207-210`）。描述写明「Do NOT re-read a file you just edited to verify」（`read.ts:78`）。Glob 100 条/100KB（`zcode:core/src/tool/handlers/glob.ts:20-21`）；Grep 默认 files_with_matches（`grep.ts:29, 203`）。
-- DreamCoder：确认上限为 256KB（`src/utils/file.ts:48`；`src/utils/readFileInRange.ts:63, 96-101`，仅在未给 limit 时检查，`src/tools/FileReadTool/FileReadTool.ts:1017-1025`）与 25,000 token（`src/tools/FileReadTool/limits.ts` `DEFAULT_MAX_OUTPUT_TOKENS`；`FileReadTool.ts:176-183, 753-770`）。报错文案都要求「Use offset and limit parameters to read specific portions of the file, or search for specific content」，模型下一步是带 offset/limit 重读或改用 Grep，+1 往返。描述默认不提 256KB（`includeMaxSizeInPrompt` 来自 GrowthBook，`FileReadTool.ts:347-349`）。估算超过 6,250 token 时调用 count_tokens API；代理只接 `/proxy/v1/messages`（`src/server/proxy/handler.ts:11-17`），调用失败返回 null 后用估算值（`src/services/tokenEstimation.ts:192-198`）（推断：每次大文件读取多一次失败的本地 HTTP 请求）。2,000 行只用于描述和附件（`src/tools/FileReadTool/prompt.ts:37`；`src/utils/attachments.ts:3137`）。去重仅对同 offset/limit、mtime 未变的 Read 生效（`FileReadTool.ts:530-570`），Edit 后的状态不参与去重。恶意软件提醒对 `claude-opus-4-7` 以外的所有模型都附（`FileReadTool.ts:697-698, 727-736`）。Grep head_limit 250、2 万字符（`src/tools/GrepTool/GrepTool.ts:108, 164`）；Glob 100 个（`src/tools/GlobTool/GlobTool.ts:157`）。
+- DreamCoder：确认上限为 256KB（`src/utils/file.ts:48`；`src/utils/readFileInRange.ts:63, 96-101`，仅在未给 limit 时检查，`src/tools/FileReadTool/FileReadTool.ts:1017-1025`）与 25,000 token（`src/tools/FileReadTool/limits.ts` `DEFAULT_MAX_OUTPUT_TOKENS`；`FileReadTool.ts:176-183, 753-770`）。报错文案都要求「Use offset and limit parameters to read specific portions of the file, or search for specific content」，模型下一步是带 offset/limit 重读或改用 Grep，+1 往返。描述默认不提 256KB（`includeMaxSizeInPrompt` 来自 GrowthBook，`FileReadTool.ts:347-349`）。估算超过 6,250 token 时调用 count_tokens API；代理只接 `/proxy/v1/messages`（`src/server/proxy/handler.ts:11-17`），调用失败返回 null 后用估算值（`src/services/tokenEstimation.ts:192-198`）（推断：每次大文件读取多一次失败的本地 HTTP 请求）。2,000 行只用于描述和附件（`src/tools/FileReadTool/prompt.ts:37`；`src/utils/attachments.ts:3137`）（本次：附件不再按 2,000 行截断，2,000 只剩描述里那句）。去重仅对同 offset/limit、mtime 未变的 Read 生效（`FileReadTool.ts:530-570`），Edit 后的状态不参与去重。恶意软件提醒对 `claude-opus-4-7` 以外的所有模型都附（`FileReadTool.ts:697-698, 727-736`）。Grep head_limit 250、2 万字符（`src/tools/GrepTool/GrepTool.ts:108, 164`）；Glob 100 个（`src/tools/GlobTool/GlobTool.ts:157`）。
 
 ### 2.5 Shell
 
@@ -212,17 +213,17 @@ TodoWrite 描述不要求主动使用，通常不调用。若 old_string 带行�
 |---|---|---|
 | 每次 Read 附恶意软件提醒 | 约 330 字符，除 `claude-opus-4-7` 外都附（`src/tools/FileReadTool/FileReadTool.ts:697-736`） | 每次读取多约 80–100 token，并累积进历史；对非 Claude 模型没有对应训练，可能使其对正常代码修改更犹豫 |
 | 应用内启用 4 个 Task 工具且描述要求主动、逐项更新 | `src/server/services/conversationService.ts:1052`；`src/constants/prompts.ts:270-282` | 小任务也可能多 1~2 次往返和多次工具调用；4 份描述每次请求都发送 |
-| Read 超 25,000 token 直接报错 | `FileReadTool.ts:176-183, 753-770` | 大文件首读必定 +1 往返；ZCode 同常量但返回部分视图 |
+| Read 超 25,000 token 直接报错 | `FileReadTool.ts:176-183, 753-770` | 大文件首读必定 +1 往返；ZCode 同常量但返回部分视图（本次修复） |
 | 大文件读取触发 count_tokens 请求 | 代理不接该路径（`src/server/proxy/handler.ts:11-17`） | 一次失败的本地 HTTP 请求，增加延迟，不增加 token |
-| 接收时的反净化替换表 | `src/tools/FileEditTool/utils.ts:531-550` | 针对 Claude 输出特性的修正，对第三方模型基本无作用 |
+| 接收时的反净化替换表 | `src/tools/FileEditTool/utils.ts:531-550` | 针对 Claude 输出特性的修正，对第三方模型基本无作用（本次：移入 `matchEdit`，执行时生效） |
 
 ### 另两家都有而 DreamCoder 没有
 
 | 差异 | 事实 | 后果（推断） |
 |---|---|---|
 | 流式过程中开始执行工具 | Codex 全部、ZCode 只读类（`codex:core/src/stream_events_utils.rs:~345-372`；`zcode:core/src/runtime/methods/streaming-tool-coordinator.ts:383-406`）；DreamCoder 被 GrowthBook 门关闭（`src/query/config.ts:33`） | 不影响 token 和轮数，只影响墙钟时间；与 benchmark 中 Claude Code「运行时间最长」方向一致，但贡献大小未测 |
-| 编辑匹配对空白/缩进的容忍 | Codex trim_end/trim/Unicode 归一；ZCode 7 种回退；DreamCoder 只有弯引号 | 第三方模型常见的缩进、行尾空白、带行号前缀、转义错误在 DreamCoder 上都变成失败，每次 +1~2 往返，且需重发整段 old_string |
-| 编辑成功后明确告诉模型「不要读回」 | ZCode 成功文案（`zcode:core/src/tool/handlers/edit.ts:59`）、Read 描述（`read.ts:78`）；Codex prompt（`codex:models-manager/prompt.md:143`）；DreamCoder 两处都没有 | 模型可能在编辑后再 Read 验证，+1 往返和一份全文输出 |
+| 编辑匹配对空白/缩进的容忍 | Codex trim_end/trim/Unicode 归一；ZCode 7 种回退；DreamCoder 只有弯引号 | 第三方模型常见的缩进、行尾空白、带行号前缀、转义错误在 DreamCoder 上都变成失败，每次 +1~2 往返，且需重发整段 old_string（本次修复） |
+| 编辑成功后明确告诉模型「不要读回」 | ZCode 成功文案（`zcode:core/src/tool/handlers/edit.ts:59`）、Read 描述（`read.ts:78`）；Codex prompt（`codex:models-manager/prompt.md:143`）；DreamCoder 两处都没有 | 模型可能在编辑后再 Read 验证，+1 往返和一份全文输出（本次修复） |
 | 循环异常保护（在两家中至少一家有） | ZCode 有重复调用提醒、可疑空响应重试、静默提醒；Codex 没有。严格说这不是「两家都有」，单列在此 | DreamCoder 遇到第三方模型重复同一调用时没有任何干预；空响应直接结束回合，headless 运行会以空结果收尾 |
 
 ### 三家共同点（不构成差异，但影响判断）

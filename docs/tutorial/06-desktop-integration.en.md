@@ -155,7 +155,7 @@ CLI output returns to the Sidecar over `/sdk/:sessionId`. [`handleSdkPayload()`]
 | CLI message | UI event |
 | --- | --- |
 | Text deltas in `stream_event` | `content_delta` |
-| A complete `tool_use` content block (from the `content_block_stop` streaming event, or from an `assistant` message) | `tool_use_complete`, with the tool name, `toolUseId` and arguments |
+| A complete `tool_use` content block in an `assistant` message | `tool_use_complete`, with the tool name, `toolUseId` and arguments |
 | A `user` message carrying `tool_result` | `tool_result`, with `toolUseId`, content and `isError`; the UI uses these to match it to the call shown earlier. [source](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/ws/handler.ts#L1075) |
 | `control_request` (`can_use_tool`) | `permission_request`; see [Part 3](./03-permissions.en.md) |
 | `result` | `message_complete`; when execution fails, an `error` may come before it. [source](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/ws/handler.ts#L1229) |

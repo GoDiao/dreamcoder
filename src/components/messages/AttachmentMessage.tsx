@@ -143,7 +143,7 @@ export function AttachmentMessage({
       }
       return <Line>
           Read <Text bold>{attachment.displayPath}</Text> (
-          {attachment.content.type === 'text' ? `${attachment.content.file.numLines}${attachment.truncated ? '+' : ''} lines` : formatFileSize(attachment.content.file.originalSize)}
+          {attachment.content.type === 'text' ? `${attachment.content.file.numLines}${attachment.content.file.truncated ? '+' : ''} lines` : formatFileSize(attachment.content.file.originalSize)}
           )
         </Line>;
     case 'compact_file_reference':

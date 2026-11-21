@@ -75,7 +75,7 @@ async function runTool(use, tools, context) {
 }
 ```
 
-`Edit` 写入文件后返回 `The file /example/src/app.ts has been updated successfully.`，文件内容变为 `export const value = 2`。两次调用分属两次模型响应：模型先看到 `Read` 的结果，才能写出与文件一致的 `old_string`。
+`Edit` 写入文件后返回 `The file /example/src/app.ts has been updated successfully. The result is already in your context, so there is no need to read the file back.`，文件内容变为 `export const value = 2`。两次调用分属两次模型响应：模型先看到 `Read` 的结果，才能写出与文件一致的 `old_string`。
 
 ## 对应到 DreamCoder 源码
 
@@ -128,7 +128,7 @@ if (isValidCall?.result === false) {
 }
 ```
 
-`old_string` 带上了行号前缀（例如 `1\texport const value = 1`）时，文件中找不到这段文本，也会在这一步返回错误。
+`old_string` 带上了行号前缀（例如 `1\texport const value = 1`）时，精确匹配找不到这段文本；如果每一行都带前缀，Edit 会去掉前缀再找，只找到一处就照常修改，否则在这一步返回错误。
 
 ### 第 4 步：权限决定
 
