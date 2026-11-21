@@ -6,7 +6,7 @@ export type ReasoningFields = {
   thinking?: { type: 'enabled' | 'disabled' | 'adaptive' }
   reasoning_effort?: ReasoningEffort
   enable_thinking?: boolean
-  reasoning?: { effort: ReasoningEffort } | { enabled: true }
+  reasoning?: { effort: ReasoningEffort; summary?: 'auto' } | { enabled: true }
 }
 
 export type OpenAIChatMessage = {

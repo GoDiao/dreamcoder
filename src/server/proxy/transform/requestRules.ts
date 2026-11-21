@@ -35,7 +35,7 @@ function dialectFields(dialect: ReasoningDialect, plan: ThinkingPlan, level: Eff
       return level ? { reasoning_effort: level } : {}
     case 'responses_reasoning':
       if (off) return { reasoning: { effort: 'none' } }
-      return level ? { reasoning: { effort: level } } : {}
+      return level ? { reasoning: { effort: level, summary: 'auto' } } : {}
     case 'thinking_type':
       if (off) return { thinking: { type: 'disabled' } }
       return { thinking: { type: 'enabled' }, ...(level && { reasoning_effort: level }) }
