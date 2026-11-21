@@ -12,6 +12,7 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Changed
 
+- **Thinking text from Responses-format providers.** When thinking is on, requests to providers in the OpenAI Responses format ask for reasoning summaries, so the model's thinking text shows in the conversation instead of only a signature (#295).
 - **New app icon.** The app, Dock, taskbar and tray icons and the logo inside the app are redrawn: a warm-white crescent prompt and an amber star on an ink-blue tile. On macOS the menu bar icon is now a template image, so it follows the light or dark menu bar. The interface colors are unchanged. (#292)
 - Thinking text in a streaming reply is batched like the reply text, so a long thinking block updates the conversation once per 50 ms instead of on every chunk (#258). Thanks @iruzen-dono.
 - **Providers in OpenAI format reuse their prompt cache.** Later turns of a session now hit the cache for about 99% of the input (measured on OpenRouter with GPT-4.1 mini and GLM-4.6), and cache hits that DeepSeek and Moonshot report are counted as cache reads (#262).
