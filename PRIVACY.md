@@ -1,6 +1,6 @@
 # 隐私政策 / Privacy Policy
 
-最后更新 / Last Updated: 2026-09-27
+最后更新 / Last Updated: 2026-11-20
 
 ---
 
@@ -21,6 +21,8 @@ DreamCoder 的桌面应用和会话服务在本机运行，项目不提供托管
 ### 第三方服务
 
 DreamCoder 支持连接用户自行选择的 AI 服务提供商，包括预设和自定义端点。发送给服务商的数据受其隐私政策约束，请在配置前阅读相应条款。
+
+DreamCoder 在启动时（本地目录已超过一小时时）和之后每小时从 [models.dev](https://models.dev) 获取公开的模型能力目录（`https://models.dev/api.json`），用来确定模型的上下文窗口、输出上限、思考方式等。请求不包含提示词、代码、API 密钥或其他用户数据；如果在网络设置中配置了手动代理，请求经由该代理发出。获取的目录缓存在配置目录下的 `dreamcoder/cache/models-dev.json`。
 
 Computer Use 使用第三方开源组件 [cua-driver](https://github.com/trycua/cua)（MIT）。开启时，DreamCoder 从 GitHub 下载固定版本的 cua 官方安装器并校验哈希。cua-driver 默认会发送不含内容的产品遥测；DreamCoder 自己安装时会持久关闭它，每次启动也会带上关闭遥测和更新检查的环境变量。如果你本机已有 cua-driver 并开启了遥测，设置页会提示并提供关闭按钮，但不会替你修改；在 macOS 上，环境变量传不到共用的后台进程，只有持久化设置才对它生效。截图和窗口内容会作为工具结果发送给你选择的 AI 服务商。
 
@@ -54,6 +56,8 @@ DreamCoder runs its desktop app and session service locally; the project does no
 ### Third-Party Services
 
 DreamCoder can connect to providers you choose through presets or custom endpoints. Data sent to a provider is governed by that provider's privacy policy; review it before configuring the service.
+
+DreamCoder fetches the public model catalog from [models.dev](https://models.dev) (`https://models.dev/api.json`) at startup (when the local copy is more than an hour old) and hourly after that, to determine model context windows, output limits, thinking modes and similar capabilities. The request carries no prompts, code, API keys or other user data; if a manual proxy is set in the network settings, the request goes through it. The fetched catalog is cached at `dreamcoder/cache/models-dev.json` under the config directory.
 
 Computer Use uses the third-party open-source component [cua-driver](https://github.com/trycua/cua) (MIT). When you turn it on, DreamCoder downloads cua's official installer for a pinned version from GitHub and checks its hash. cua-driver sends content-free product telemetry by default; when DreamCoder installs it, DreamCoder turns that off persistently, and every session passes variables that turn telemetry and the update check off. If you already have cua-driver installed with telemetry on, the settings page tells you and offers to turn it off, but does not change it for you; on macOS the variables do not reach the shared background process, so only the persisted setting applies to it. Screenshots and window contents are sent as tool results to the AI provider you chose.
 

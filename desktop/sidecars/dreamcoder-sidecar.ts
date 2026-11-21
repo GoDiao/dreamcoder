@@ -33,6 +33,8 @@ if (mode === 'server') {
   Object.assign(process.env, await desktopSidecarEnvironment(process.env, LAUNCHER_ENV_KEYS))
   const { startServer } = await import('../../src/server/index.ts')
   startServer()
+  const { startModelsDevRefresh } = await import('../../src/server/services/modelsDev/modelsDevRefresh.ts')
+  void startModelsDevRefresh()
 } else {
   await import('../../src/entrypoints/cli.tsx')
 }

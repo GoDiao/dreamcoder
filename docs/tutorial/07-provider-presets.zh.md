@@ -30,7 +30,7 @@
 
 ## 添加预设
 
-编辑前，请从服务商官方文档确认基础 URL、API 格式、认证要求和模型 ID。只添加有可靠来源且稳定的默认值，不要根据产品宣传名称猜测模型 ID。上下文窗口、输出上限、思考档位这类模型事实不写在预设里，写在按模型的规则表 `src/server/config/modelRules.json`（见 [model-rules.md](../features/harness/model-rules.md)），每条注明来源。
+编辑前，请从服务商官方文档确认基础 URL、API 格式、认证要求和模型 ID。只添加有可靠来源且稳定的默认值，不要根据产品宣传名称猜测模型 ID。上下文窗口、输出上限、思考档位这类模型事实不写在预设里，来自 [models.dev](https://models.dev)：随包快照在 `src/server/config/modelsDev.json`，应用每小时刷新一次。按模型的规则表 `src/server/config/modelRules.json` 只放 models.dev 没有的内容，以及有厂商文档证明的修正，每条注明来源（见 [model-rules.md](../features/harness/model-rules.md)）。
 
 将条目加入 `providerPresets.json`。以下缩略结构只展示必填字段；请用经过核实的服务商信息替换示例值：
 

@@ -47,20 +47,6 @@
         "note": "Numbers from the list-models example response; the pricing page shows the same limits as 1M and 384K."
       },
       "rules": {
-        "contextWindow": 1048576,
-        "maxOutputTokens": 393216,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "high",
-            "max"
-          ]
-        },
-        "input": {
-          "image": false,
-          "pdf": false
-        },
         "structuredOutput": false
       }
     },
@@ -75,20 +61,6 @@
         "note": "Numbers from the list-models example response; the pricing page shows the same limits as 1M and 384K."
       },
       "rules": {
-        "contextWindow": 1048576,
-        "maxOutputTokens": 393216,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "high",
-            "max"
-          ]
-        },
-        "input": {
-          "image": true,
-          "pdf": false
-        },
         "structuredOutput": false
       }
     },
@@ -103,20 +75,6 @@
         "note": "deepseek-v4-flash is temporarily routed to V4.1 Flash (deepseek-flash)."
       },
       "rules": {
-        "contextWindow": 1048576,
-        "maxOutputTokens": 393216,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "high",
-            "max"
-          ]
-        },
-        "input": {
-          "image": true,
-          "pdf": false
-        },
         "structuredOutput": false
       }
     },
@@ -131,14 +89,6 @@
         "note": "Thinking is on by default (deep-thinking guide). PDF input is not mentioned."
       },
       "rules": {
-        "contextWindow": 1000000,
-        "maxOutputTokens": 65536,
-        "reasoning": {
-          "control": "toggle"
-        },
-        "input": {
-          "image": true
-        },
         "structuredOutput": true
       }
     },
@@ -153,14 +103,6 @@
         "note": "Thinking is on by default (deep-thinking guide). PDF input is not mentioned."
       },
       "rules": {
-        "contextWindow": 1000000,
-        "maxOutputTokens": 65536,
-        "reasoning": {
-          "control": "toggle"
-        },
-        "input": {
-          "image": true
-        },
         "structuredOutput": true
       }
     },
@@ -175,15 +117,6 @@
         "note": "Thinking is off by default (deep-thinking guide)."
       },
       "rules": {
-        "contextWindow": 1000000,
-        "maxOutputTokens": 32768,
-        "reasoning": {
-          "control": "toggle"
-        },
-        "input": {
-          "image": false,
-          "pdf": false
-        },
         "structuredOutput": true
       }
     },
@@ -198,34 +131,7 @@
         "note": "Model page gives a 32,768 context window; the overview page says 128K. The smaller value is used."
       },
       "rules": {
-        "contextWindow": 32768,
-        "maxOutputTokens": 8192,
-        "reasoning": {
-          "control": "none"
-        },
-        "input": {
-          "image": false,
-          "pdf": false
-        },
         "structuredOutput": true
-      }
-    },
-    {
-      "match": {
-        "modelPrefix": "qwen3-max"
-      },
-      "source": {
-        "url": "https://www.alibabacloud.com/help/en/model-studio/qwen3-max",
-        "checkedAt": "2026-11-19",
-        "status": "unverified",
-        "note": "Official page returns 404; values are from search summaries."
-      },
-      "rules": {
-        "contextWindow": 262144,
-        "maxOutputTokens": 32768,
-        "reasoning": {
-          "control": "toggle"
-        }
       }
     },
     {
@@ -265,15 +171,6 @@
         "note": "The page gives a 10,000,000 window, but HTTP requests carry at most 1M tokens. Structured output is JSON Object mode only."
       },
       "rules": {
-        "contextWindow": 1000000,
-        "maxOutputTokens": 8192,
-        "reasoning": {
-          "control": "none"
-        },
-        "input": {
-          "image": false,
-          "pdf": false
-        },
         "structuredOutput": false
       }
     },
@@ -288,10 +185,6 @@
         "note": "thinking.type only accepts enabled; disabled returns an error. No reasoning_effort. 256K window like the rest of the K2 series. Deprecated, expected to go offline in late December 2026."
       },
       "rules": {
-        "contextWindow": 262144,
-        "reasoning": {
-          "control": "always"
-        },
         "structuredOutput": true
       }
     },
@@ -306,10 +199,6 @@
         "note": "256K window. Output limit is not published. kimi-k2.6 can turn thinking off; kimi-k2.7-code has its own entry. The K2 series is deprecated, expected to go offline in late December 2026."
       },
       "rules": {
-        "contextWindow": 262144,
-        "reasoning": {
-          "control": "toggle"
-        },
         "structuredOutput": true
       }
     },
@@ -324,19 +213,6 @@
         "note": "1M window per the models overview; max_completion_tokens defaults to 131,072 (up to 1,048,576). reasoning_effort accepts low, high and max; thinking cannot be turned off."
       },
       "rules": {
-        "contextWindow": 1048576,
-        "maxOutputTokens": 131072,
-        "reasoning": {
-          "control": "always",
-          "levels": [
-            "low",
-            "high",
-            "max"
-          ]
-        },
-        "input": {
-          "image": true
-        },
         "structuredOutput": true
       }
     },
@@ -351,21 +227,6 @@
         "note": "Model page gives 200K context and 128K output; exact token counts not published (OpenRouter reports 204,800)."
       },
       "rules": {
-        "contextWindow": 200000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "input": {
-          "image": false,
-          "pdf": false
-        },
         "structuredOutput": false
       }
     },
@@ -380,21 +241,6 @@
         "note": "Model page gives 200K context and 128K output; exact token counts not published (OpenRouter reports 204,800)."
       },
       "rules": {
-        "contextWindow": 200000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "input": {
-          "image": false,
-          "pdf": false
-        },
         "structuredOutput": false
       }
     },
@@ -409,21 +255,6 @@
         "note": "GLM-5-Turbo has no guide page; limits follow the GLM-5 series (chat API: 128K maximum output)."
       },
       "rules": {
-        "contextWindow": 200000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "input": {
-          "image": false,
-          "pdf": false
-        },
         "structuredOutput": false
       }
     },
@@ -438,21 +269,6 @@
         "note": "Model page gives 200K context and 128K output; exact token counts not published (OpenRouter reports 204,800)."
       },
       "rules": {
-        "contextWindow": 200000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "input": {
-          "image": false,
-          "pdf": false
-        },
         "structuredOutput": false
       }
     },
@@ -467,21 +283,6 @@
         "note": "Model page gives 200K context and 128K output; exact token counts not published (OpenRouter reports 204,800)."
       },
       "rules": {
-        "contextWindow": 200000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "input": {
-          "image": false,
-          "pdf": false
-        },
         "structuredOutput": false
       }
     },
@@ -496,15 +297,6 @@
         "note": "Model page gives 128K context and 96K output. Covers glm-4.5-air."
       },
       "rules": {
-        "contextWindow": 128000,
-        "maxOutputTokens": 96000,
-        "reasoning": {
-          "control": "toggle"
-        },
-        "input": {
-          "image": false,
-          "pdf": false
-        },
         "structuredOutput": false
       }
     },
@@ -519,20 +311,6 @@
         "note": "Text-only input; reasoning cannot be disabled; reasoning_effort accepts low, high and max. The chat API offers json_object only."
       },
       "rules": {
-        "contextWindow": 1000000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "always",
-          "levels": [
-            "low",
-            "high",
-            "max"
-          ]
-        },
-        "input": {
-          "image": false,
-          "pdf": false
-        },
         "structuredOutput": false
       }
     },
@@ -547,68 +325,7 @@
         "note": "1M window, 128K output. thinking.type enabled/disabled. reasoning_effort: low and medium map to high, xhigh to max (https://docs.z.ai/api-reference/llm/chat-completion). Text input only; response_format documents json_object only."
       },
       "rules": {
-        "contextWindow": 1000000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "high",
-            "max"
-          ]
-        },
-        "input": {
-          "image": false,
-          "pdf": false
-        },
         "structuredOutput": false
-      }
-    },
-    {
-      "match": {
-        "modelPrefix": "minimax-m3.1-flash"
-      },
-      "source": {
-        "url": "https://platform.minimax.io/docs/api-reference/text-chat-openai.md",
-        "checkedAt": "2026-11-19",
-        "status": "verified",
-        "note": "Always thinks; reasoning_effort accepts low, medium, high, xhigh and max. PDF and structured output are not mentioned."
-      },
-      "rules": {
-        "contextWindow": 1000000,
-        "maxOutputTokens": 524288,
-        "reasoning": {
-          "control": "always",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "input": {
-          "image": true
-        }
-      }
-    },
-    {
-      "match": {
-        "modelPrefix": "minimax-m3"
-      },
-      "source": {
-        "url": "https://platform.minimax.io/docs/api-reference/text-chat-openai.md",
-        "checkedAt": "2026-11-19",
-        "status": "verified",
-        "note": "thinking.type accepts adaptive or disabled. The page states no context window for M3; 1M follows the M3 series announcement."
-      },
-      "rules": {
-        "contextWindow": 1000000,
-        "maxOutputTokens": 524288,
-        "reasoning": {
-          "control": "toggle"
-        },
-        "input": {
-          "image": true
-        }
       }
     },
     {
@@ -622,20 +339,6 @@
         "note": "Reasoning effort supports minimal, low, medium and high; it cannot be turned off."
       },
       "rules": {
-        "contextWindow": 400000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "effort",
-          "levels": [
-            "low",
-            "medium",
-            "high"
-          ]
-        },
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true
       }
     },
@@ -649,20 +352,6 @@
         "status": "verified"
       },
       "rules": {
-        "contextWindow": 400000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "medium",
-            "high"
-          ]
-        },
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true
       }
     },
@@ -676,20 +365,6 @@
         "status": "verified"
       },
       "rules": {
-        "contextWindow": 400000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "medium",
-            "high"
-          ]
-        },
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true
       }
     },
@@ -703,20 +378,6 @@
         "status": "verified"
       },
       "rules": {
-        "contextWindow": 1050000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "medium",
-            "high"
-          ]
-        },
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true
       }
     },
@@ -730,20 +391,6 @@
         "status": "verified"
       },
       "rules": {
-        "contextWindow": 1050000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "medium",
-            "high"
-          ]
-        },
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true
       }
     },
@@ -758,21 +405,6 @@
         "note": "reasoning.effort accepts none through max; xhigh is not a CLI effort level. Chat Completions takes function calls only with reasoning effort none; use the Responses format for tools with reasoning."
       },
       "rules": {
-        "contextWindow": 1050000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true
       }
     },
@@ -787,21 +419,6 @@
         "note": "reasoning.effort accepts none through max; xhigh is not a CLI effort level. Tool calling needs the Responses API."
       },
       "rules": {
-        "contextWindow": 1050000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true
       }
     },
@@ -816,21 +433,6 @@
         "note": "The API rejects reasoning effort none, so thinking stays on; xhigh is not a CLI effort level. Tool calling needs the Responses API."
       },
       "rules": {
-        "contextWindow": 1050000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "effort",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true
       }
     },
@@ -845,21 +447,6 @@
         "note": "The API rejects reasoning effort none, so thinking stays on; xhigh is not a CLI effort level."
       },
       "rules": {
-        "contextWindow": 1050000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "effort",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true
       }
     },
@@ -874,21 +461,6 @@
         "note": "The API rejects reasoning effort none, so thinking stays on; xhigh is not a CLI effort level."
       },
       "rules": {
-        "contextWindow": 1050000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "effort",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true
       }
     },
@@ -902,15 +474,6 @@
         "status": "verified"
       },
       "rules": {
-        "contextWindow": 1047576,
-        "maxOutputTokens": 32768,
-        "reasoning": {
-          "control": "none"
-        },
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true
       }
     },
@@ -925,20 +488,6 @@
         "note": "Reasoning cannot be turned off (OpenAI compatibility guide)."
       },
       "rules": {
-        "contextWindow": 1048576,
-        "maxOutputTokens": 65536,
-        "reasoning": {
-          "control": "always",
-          "levels": [
-            "low",
-            "medium",
-            "high"
-          ]
-        },
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true
       }
     },
@@ -953,19 +502,6 @@
         "note": "reasoning_effort none disables thinking (OpenAI compatibility guide). PDF input is not mentioned."
       },
       "rules": {
-        "contextWindow": 1048576,
-        "maxOutputTokens": 65536,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "medium",
-            "high"
-          ]
-        },
-        "input": {
-          "image": true
-        },
         "structuredOutput": true
       }
     },
@@ -980,20 +516,6 @@
         "note": "Thinking levels per the thinking guide (gemini-3.1-pro-preview, gemini-3.8-flash); reasoning cannot be turned off. The guide does not repeat the window and output limits."
       },
       "rules": {
-        "contextWindow": 1048576,
-        "maxOutputTokens": 65536,
-        "reasoning": {
-          "control": "always",
-          "levels": [
-            "low",
-            "medium",
-            "high"
-          ]
-        },
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true
       }
     },
@@ -1008,23 +530,8 @@
         "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
       },
       "rules": {
-        "contextWindow": 1000000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "effort",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "reasoningDialect": "anthropic_adaptive",
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true,
+        "reasoningDialect": "anthropic_adaptive",
         "nativeWebSearch": true
       }
     },
@@ -1070,23 +577,8 @@
         "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
       },
       "rules": {
-        "contextWindow": 1000000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "effort",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "reasoningDialect": "anthropic_adaptive",
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true,
+        "reasoningDialect": "anthropic_adaptive",
         "nativeWebSearch": true
       }
     },
@@ -1101,23 +593,8 @@
         "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
       },
       "rules": {
-        "contextWindow": 1000000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "reasoningDialect": "anthropic_adaptive",
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true,
+        "reasoningDialect": "anthropic_adaptive",
         "nativeWebSearch": true
       }
     },
@@ -1132,23 +609,8 @@
         "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
       },
       "rules": {
-        "contextWindow": 1000000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "effort",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "reasoningDialect": "anthropic_adaptive",
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true,
+        "reasoningDialect": "anthropic_adaptive",
         "nativeWebSearch": true
       }
     },
@@ -1163,23 +625,8 @@
         "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
       },
       "rules": {
-        "contextWindow": 1000000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "reasoningDialect": "anthropic_adaptive",
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true,
+        "reasoningDialect": "anthropic_adaptive",
         "nativeWebSearch": true
       }
     },
@@ -1194,23 +641,8 @@
         "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
       },
       "rules": {
-        "contextWindow": 1000000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "reasoningDialect": "anthropic_adaptive",
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true,
+        "reasoningDialect": "anthropic_adaptive",
         "nativeWebSearch": true
       }
     },
@@ -1225,23 +657,8 @@
         "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
       },
       "rules": {
-        "contextWindow": 1000000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "reasoningDialect": "anthropic_adaptive",
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true,
+        "reasoningDialect": "anthropic_adaptive",
         "nativeWebSearch": true
       }
     },
@@ -1256,23 +673,8 @@
         "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
       },
       "rules": {
-        "contextWindow": 1000000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "reasoningDialect": "anthropic_adaptive",
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true,
+        "reasoningDialect": "anthropic_adaptive",
         "nativeWebSearch": true
       }
     },
@@ -1287,23 +689,8 @@
         "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
       },
       "rules": {
-        "contextWindow": 1000000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "reasoningDialect": "anthropic_adaptive",
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true,
+        "reasoningDialect": "anthropic_adaptive",
         "nativeWebSearch": true
       }
     },
@@ -1318,23 +705,8 @@
         "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
       },
       "rules": {
-        "contextWindow": 1000000,
-        "maxOutputTokens": 128000,
-        "reasoning": {
-          "control": "toggle_effort",
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ]
-        },
-        "reasoningDialect": "anthropic_adaptive",
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true,
+        "reasoningDialect": "anthropic_adaptive",
         "nativeWebSearch": true
       }
     },
@@ -1349,15 +721,6 @@
         "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
       },
       "rules": {
-        "contextWindow": 200000,
-        "maxOutputTokens": 64000,
-        "reasoning": {
-          "control": "toggle"
-        },
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true,
         "nativeWebSearch": true
       }
@@ -1373,15 +736,6 @@
         "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
       },
       "rules": {
-        "contextWindow": 200000,
-        "maxOutputTokens": 64000,
-        "reasoning": {
-          "control": "toggle"
-        },
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true,
         "nativeWebSearch": true
       }
@@ -1397,15 +751,6 @@
         "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
       },
       "rules": {
-        "contextWindow": 200000,
-        "maxOutputTokens": 64000,
-        "reasoning": {
-          "control": "toggle"
-        },
-        "input": {
-          "image": true,
-          "pdf": true
-        },
         "structuredOutput": true,
         "nativeWebSearch": true
       }
@@ -1477,6 +822,173 @@
           "pdf": true
         },
         "structuredOutput": false
+      }
+    }
+  ],
+  "corrections": [
+    {
+      "match": {
+        "modelId": "claude-haiku-4-5"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting",
+        "modelsDevPr": "https://github.com/anomalyco/models.dev/pull/14144",
+        "checkedAt": "2026-11-20",
+        "note": "Extended thinking only, off by default; models.dev lists only budget_tokens without toggle."
+      },
+      "rules": {
+        "reasoning": {
+          "control": "toggle",
+          "levels": []
+        }
+      }
+    },
+    {
+      "match": {
+        "modelId": "claude-sonnet-4-5"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting",
+        "modelsDevPr": "https://github.com/anomalyco/models.dev/pull/14144",
+        "checkedAt": "2026-11-20",
+        "note": "Extended thinking only, off by default; models.dev lists only budget_tokens without toggle."
+      },
+      "rules": {
+        "reasoning": {
+          "control": "toggle",
+          "levels": []
+        }
+      }
+    },
+    {
+      "match": {
+        "modelId": "claude-opus-4-5"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting",
+        "modelsDevPr": "https://github.com/anomalyco/models.dev/pull/14144",
+        "checkedAt": "2026-11-20",
+        "note": "Extended thinking only, off by default; models.dev lists effort and budget_tokens without toggle."
+      },
+      "rules": {
+        "reasoning": {
+          "control": "toggle_effort",
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ]
+        }
+      }
+    },
+    {
+      "match": {
+        "modelId": "claude-opus-4-6"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting",
+        "modelsDevPr": "https://github.com/anomalyco/models.dev/pull/14144",
+        "checkedAt": "2026-11-20",
+        "note": "Adaptive and extended thinking, off by default; models.dev lists effort and budget_tokens without toggle."
+      },
+      "rules": {
+        "reasoning": {
+          "control": "toggle_effort",
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "match": {
+        "modelId": "claude-sonnet-4-6"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting",
+        "modelsDevPr": "https://github.com/anomalyco/models.dev/pull/14144",
+        "checkedAt": "2026-11-20",
+        "note": "Adaptive and extended thinking, off by default; models.dev lists effort and budget_tokens without toggle."
+      },
+      "rules": {
+        "reasoning": {
+          "control": "toggle_effort",
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "match": {
+        "modelId": "claude-opus-4-7"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting",
+        "modelsDevPr": "https://github.com/anomalyco/models.dev/pull/14144",
+        "checkedAt": "2026-11-20",
+        "note": "Adaptive thinking only, off by default, and disabled is accepted; models.dev lists effort without toggle."
+      },
+      "rules": {
+        "reasoning": {
+          "control": "toggle_effort",
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "match": {
+        "modelId": "claude-opus-4-8"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting",
+        "modelsDevPr": "https://github.com/anomalyco/models.dev/pull/14144",
+        "checkedAt": "2026-11-20",
+        "note": "Adaptive thinking only, off by default, and disabled is accepted; models.dev lists effort without toggle."
+      },
+      "rules": {
+        "reasoning": {
+          "control": "toggle_effort",
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "match": {
+        "modelId": "claude-opus-5"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting",
+        "modelsDevPr": "https://github.com/anomalyco/models.dev/pull/14144",
+        "checkedAt": "2026-11-20",
+        "note": "On by default; disabled is accepted at effort high and below. models.dev lists effort without toggle."
+      },
+      "rules": {
+        "reasoning": {
+          "control": "toggle_effort",
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "max"
+          ]
+        }
       }
     }
   ],
@@ -1731,6 +1243,21 @@
       "rules": {
         "reasoningDialect": "openrouter",
         "maxTokensField": "max_tokens"
+      }
+    },
+    {
+      "match": {
+        "host": "openrouter.ai",
+        "apiFormat": "anthropic"
+      },
+      "source": {
+        "url": "https://openrouter.ai/docs/use-cases/reasoning-tokens",
+        "checkedAt": "2026-11-20",
+        "status": "verified",
+        "note": "Anthropic Messages requests: thinking.type adaptive and output_config.effort are normalized to the unified reasoning parameter for every reasoning model."
+      },
+      "rules": {
+        "reasoningDialect": "anthropic_adaptive"
       }
     },
     {

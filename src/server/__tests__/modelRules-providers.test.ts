@@ -7,6 +7,9 @@ import { handleProvidersApi } from '../api/providers.js'
 import { ProviderService } from '../services/providerService.js'
 import type { CreateProviderInput, SavedProvider } from '../types/provider.js'
 import { MODEL_RULES_ENV_KEY, type CliModelRulesEnv } from '../../utils/model/modelRules.js'
+import { useTestModelsDevCatalog } from './fixtures/modelsDevCatalog.js'
+
+useTestModelsDevCatalog()
 
 let tmpDir: string
 let originalConfigDir: string | undefined

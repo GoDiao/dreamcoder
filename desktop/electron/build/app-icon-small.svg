@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#434c65"/>
+      <stop offset="1" stop-color="#13192b"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.32"/>
+      <stop offset="0.3" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0.08"/>
+    </linearGradient>
+    <radialGradient id="glow" gradientUnits="userSpaceOnUse" cx="45.5" cy="24" r="34">
+      <stop offset="0" stop-color="#ffe6b8" stop-opacity="0.15"/>
+      <stop offset="0.45" stop-color="#ffe6b8" stop-opacity="0.052"/>
+      <stop offset="1" stop-color="#ffe6b8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bloom" gradientUnits="userSpaceOnUse" cx="45.5" cy="24" r="10">
+      <stop offset="0" stop-color="#ffe6b8" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#ffe6b8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="prompt" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#fff8ea"/>
+      <stop offset="1" stop-color="#eed6a4"/>
+    </linearGradient>
+    <linearGradient id="star" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd27a"/>
+      <stop offset="1" stop-color="#eea445"/>
+    </linearGradient>
+    <clipPath id="tile-clip">
+      <rect width="64" height="64" rx="14.4"/>
+    </clipPath>
+  </defs>
+  <rect width="64" height="64" rx="14.4" fill="url(#tile)"/>
+  <g clip-path="url(#tile-clip)">
+    <rect width="64" height="64" fill="url(#glow)"/>
+    <rect width="64" height="64" fill="url(#bloom)"/>
+  </g>
+  <rect x="0.5" y="0.5" width="63" height="63" rx="13.9" fill="none" stroke="url(#rim)" stroke-width="1"/>
+  <g transform="translate(-1 2)">
+    <path d="M15 17 L32 33 L15 49 A34 34 0 0 0 15 17 Z" fill="url(#prompt)" stroke="url(#prompt)" stroke-width="4.5" stroke-linejoin="round"/>
+    <path d="M46.5 11.65 Q48.12 20.38 56.85 22 Q48.12 23.62 46.5 32.35 Q44.88 23.62 36.15 22 Q44.88 20.38 46.5 11.65 Z" fill="url(#star)" stroke="url(#star)" stroke-width="0.6" stroke-linejoin="round"/>
+  </g>
+</svg>

@@ -21,6 +21,9 @@ import { SettingsService } from '../services/settingsService.js'
 import type { ResolvedModelRules } from '../types/modelRules.js'
 import type { ApiFormat } from '../types/provider.js'
 import { sendToUpstream } from '../upstream/client.js'
+import { useTestModelsDevCatalog } from './fixtures/modelsDevCatalog.js'
+
+useTestModelsDevCatalog()
 
 const THINKING_KEYS = ['thinking', 'reasoning', 'reasoning_effort', 'enable_thinking'] as const
 const MAX_TOKEN_KEYS = ['max_tokens', 'max_completion_tokens', 'max_output_tokens'] as const
@@ -339,8 +342,8 @@ describe('images and PDF', () => {
   })
 
   test('chat carries images and PDFs when the model accepts them, with tool result images in the next user message', () => {
-    const rules = rulesFor('https://api.openai.com/v1', 'openai_chat', 'gpt-5.1')
-    const body = chat(rules, 'gpt-5.1', withMedia([toolResult, { type: 'text', text: 'read this' }, pdf, image]))
+    const rules = rulesFor('https://api.openai.com/v1', 'openai_chat', 'gpt-4.1')
+    const body = chat(rules, 'gpt-4.1', withMedia([toolResult, { type: 'text', text: 'read this' }, pdf, image]))
     const messages = body.messages as Body[]
     const tool = messages.find(message => message.role === 'tool')!
     expect(tool.content).toContain('screenshot taken')
@@ -371,8 +374,8 @@ describe('images and PDF', () => {
   })
 
   test('Responses carries images and PDFs as input parts, also inside tool output', () => {
-    const rules = rulesFor('https://api.openai.com/v1', 'openai_responses', 'gpt-5.1')
-    const body = responses(rules, 'gpt-5.1', withMedia([toolResult, pdf]))
+    const rules = rulesFor('https://api.openai.com/v1', 'openai_responses', 'gpt-4.1')
+    const body = responses(rules, 'gpt-4.1', withMedia([toolResult, pdf]))
     const input = body.input as Body[]
     const output = input.find(item => item.type === 'function_call_output')!
     expect(output.output).toEqual([

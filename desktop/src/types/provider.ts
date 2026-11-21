@@ -29,7 +29,7 @@ export type ReasoningDialect =
 
 export type ReasoningControl = 'none' | 'toggle' | 'effort' | 'toggle_effort' | 'always'
 
-export type FieldSource = 'fallback' | 'format' | 'model' | 'site' | 'discovered' | 'user'
+export type FieldSource = 'fallback' | 'format' | 'model' | 'modelsDev' | 'site' | 'discovered' | 'user'
 
 export type InheritedSource = Exclude<FieldSource, 'format' | 'user'>
 

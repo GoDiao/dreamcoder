@@ -3,21 +3,15 @@ import { getManualNetworkProxyUrl, type NetworkSettings } from '../../services/n
 import { validFields } from '../../services/modelRules/validFields.js'
 import { DiscoveredModelSchema } from '../../types/modelRules.js'
 import type { DiscoveredProviderModel } from '../../types/provider.js'
-import { deepseekSource } from './deepseek.js'
 import { listedSource } from './listed.js'
 import { lmstudioSource } from './lmstudio.js'
-import { openrouterSource } from './openrouter.js'
 import { ollamaSource } from './ollama.js'
-import { qwenSource } from './qwen.js'
 import { warnLookupFailure, type ModelMetadataRequest, type ModelMetadataSource, type RawModelMetadata } from './source.js'
 
 const MODEL_METADATA_SOURCES: ModelMetadataSource[] = [
   listedSource,
-  openrouterSource,
   ollamaSource,
   lmstudioSource,
-  deepseekSource,
-  qwenSource,
 ]
 
 const LOOKUP_TIMEOUT_MS = 10_000

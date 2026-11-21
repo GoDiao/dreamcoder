@@ -12,6 +12,9 @@ import type { ReasoningControl, ReasoningDialect, ResolvedModelRules } from '../
 import type { ApiFormat } from '../types/provider.js'
 import { CliModelRulesSchema, type CliModelRules } from '../../utils/model/modelRules.js'
 import type { EffortLevel } from '../../utils/effort.js'
+import { useTestModelsDevCatalog } from './fixtures/modelsDevCatalog.js'
+
+useTestModelsDevCatalog()
 
 function resolved(
   control: ReasoningControl,
@@ -243,19 +246,15 @@ describe('GPT-6 models the official model pages list', () => {
   })
 })
 
-describe('reasoning that OpenRouter declares', () => {
-  const openrouter = {
-    baseUrl: 'https://openrouter.ai/api',
-    apiFormat: 'anthropic',
-    discoveredModels: { 'vendor/model': { reasoning: { control: 'toggle_effort', levels: ['medium', 'high'] }, reasoningDialect: 'anthropic_adaptive' } },
-  } as const
+describe('reasoning that models.dev lists for OpenRouter', () => {
+  const openrouter = { baseUrl: 'https://openrouter.ai/api', apiFormat: 'anthropic' } as const
 
-  test('gives a model without a table entry an effort menu labelled as discovered', () => {
+  test('gives a model without a table entry adaptive thinking with an effort menu on the Messages endpoint', () => {
     const env = buildCliModelRulesEnv(openrouter, ['vendor/model'], undefined)
     expect(env.models['vendor/model']).toMatchObject({ thinkingWhenOn: 'adaptive', thinkingWhenOff: 'disabled', effortLevels: ['medium', 'high'] })
     const view = buildResolvedModelsView(openrouter, ['vendor/model'])?.['vendor/model']
     expect(view).toMatchObject({ effortLevels: ['medium', 'high'], usedFallback: false })
-    expect(view?.sources.reasoning).toBe('discovered')
+    expect(view?.sources.reasoning).toBe('modelsDev')
   })
 })
 
@@ -293,11 +292,11 @@ describe('buildResolvedModelsView', () => {
       pdf: false,
       usedFallback: false,
       sources: {
-        contextWindow: 'model',
-        maxOutputTokens: 'model',
-        reasoning: 'model',
-        image: 'model',
-        pdf: 'model',
+        contextWindow: 'modelsDev',
+        maxOutputTokens: 'modelsDev',
+        reasoning: 'modelsDev',
+        image: 'modelsDev',
+        pdf: 'modelsDev',
         structuredOutput: 'model',
       },
     })
@@ -307,7 +306,7 @@ describe('buildResolvedModelsView', () => {
 
   test('shows no levels where the CLI sends no effort', () => {
     const view = buildResolvedModelsView({ baseUrl: 'https://api.kimi.com/coding', apiFormat: 'anthropic' }, ['kimi-k3'])
-    expect(view?.['kimi-k3']?.reasoning.control).toBe('always')
+    expect(view?.['kimi-k3']?.reasoning.control).toBe('effort')
     expect(view?.['kimi-k3']?.effortLevels).toEqual([])
     expect(view?.['kimi-k3'] && 'appliedEffort' in view['kimi-k3']).toBe(false)
   })
@@ -329,7 +328,7 @@ describe('buildResolvedModelsView', () => {
         contextWindow: 400_000,
         reasoning: { control: 'effort' },
         effortLevels: ['low', 'medium', 'high'],
-        sources: { reasoning: 'model', contextWindow: 'model' },
+        sources: { reasoning: 'modelsDev', contextWindow: 'modelsDev' },
       },
     })
   })

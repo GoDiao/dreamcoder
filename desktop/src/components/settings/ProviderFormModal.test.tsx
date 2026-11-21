@@ -417,6 +417,21 @@ describe('ProviderFormModal edit mode', () => {
     expect(screen.getByRole('toolbar', { name: 'Thinking for model-1' })).toBeInTheDocument()
   })
 
+  it('labels values that come from models.dev', () => {
+    const fromModelsDev: SavedProvider = {
+      ...resolvedProvider,
+      resolvedModels: {
+        'model-1': resolvedView({
+          sources: { contextWindow: 'modelsDev', maxOutputTokens: 'modelsDev', reasoning: 'modelsDev', image: 'fallback', pdf: 'modelsDev', structuredOutput: 'modelsDev' },
+        }),
+      },
+    }
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={fromModelsDev} presets={[deepseekPreset]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Model settings for model-1' }))
+    expect(screen.getByLabelText('Context window for model-1')).toHaveAttribute('placeholder', '1,048,576 · models.dev')
+    expect(screen.getByTestId('model-rules-editor-model-1')).toHaveTextContent('Default: Low, High, Max (models.dev)')
+  })
+
   it('saves edited overrides and keeps the fields the form does not edit', async () => {
     const withHandWritten: SavedProvider = {
       ...resolvedProvider,

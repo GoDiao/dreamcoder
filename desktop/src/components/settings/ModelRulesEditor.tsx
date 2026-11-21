@@ -35,6 +35,7 @@ const EMPTY_DRAFT: ModelOverrideDraft = { contextWindow: '', maxOutputTokens: ''
 const SOURCE_LABEL_KEYS: Record<InheritedSource, TranslationKey> = {
   fallback: 'settings.providers.sourceFallback',
   model: 'settings.providers.sourceBuiltIn',
+  modelsDev: 'settings.providers.sourceModelsDev',
   site: 'settings.providers.sourceBuiltIn',
   discovered: 'settings.providers.sourceDiscovered',
 }

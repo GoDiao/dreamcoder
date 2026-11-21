@@ -24,6 +24,7 @@ import { handleWebCloneRoute } from './browserHost/webClone.js'
 import { WEB_CLONE_BROWSER_PATH } from './browserHost/names.js'
 import { startBrowserHostTokenReader } from './browserHost/stdinToken.js'
 import { H5AccessService } from './services/h5AccessService.js'
+import { startModelsDevRefresh } from './services/modelsDev/modelsDevRefresh.js'
 import { setServerEndpoint } from './ws/sessionRuntime.js'
 
 function readArgValue(flag: string): string | undefined {
@@ -459,4 +460,5 @@ process.on('exit', () => {
 
 if (import.meta.main) {
   startServer()
+  void startModelsDevRefresh()
 }
