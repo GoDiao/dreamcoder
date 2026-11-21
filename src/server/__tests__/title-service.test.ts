@@ -345,7 +345,8 @@ describe('titleService', () => {
       expect(typeof system).toBe('string')
       expect(system).toContain('title-generation task, not a conversation')
       expect(system).toContain('Never answer the user\'s question')
-      expect(system).toContain('user\'s primary language')
+      expect(system).toContain('language the user writes in')
+      expect(system).toContain('排查 CI 上的测试失败')
     } finally {
       server.stop(true)
     }
