@@ -86,6 +86,7 @@ const CONTENT_SECURITY_POLICY = [
 const WINDOW_STATE_SAVE_DELAY_MS = 300
 const IS_MAC = process.platform === 'darwin'
 const IS_WINDOWS = process.platform === 'win32'
+const TRAY_ICON = IS_MAC ? 'trayTemplate.png' : 'tray.png'
 
 protocol.registerSchemesAsPrivileged([
   { scheme: APP_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
@@ -136,7 +137,7 @@ function resolvePaths(): AppPaths {
       h5DistDir: dist,
       webDist: dist,
       artifactShellDir: path.join(dist, ARTIFACT_SHELL_DIRNAME),
-      trayIcon: path.join(process.resourcesPath, 'icons', 'tray.png'),
+      trayIcon: path.join(process.resourcesPath, 'icons', TRAY_ICON),
     }
   }
   const desktopRoot = path.resolve(app.getAppPath(), '..')
@@ -146,7 +147,7 @@ function resolvePaths(): AppPaths {
     h5DistDir: dist,
     webDist: dist,
     artifactShellDir: path.join(desktopRoot, 'public', ARTIFACT_SHELL_DIRNAME),
-    trayIcon: path.join(desktopRoot, 'electron', 'build', 'icons', 'tray.png'),
+    trayIcon: path.join(desktopRoot, 'electron', 'build', 'icons', TRAY_ICON),
   }
 }
 
@@ -574,7 +575,7 @@ function installTray(iconPath: string) {
     console.error(`[electron] tray icon not found at ${iconPath}`)
     return
   }
-  tray = new Tray(image.resize({ width: IS_MAC ? 18 : 16, height: IS_MAC ? 18 : 16 }))
+  tray = new Tray(image)
   tray.setToolTip('DreamCoder')
   const menu = Menu.buildFromTemplate([
     { label: 'Show DreamCoder', click: showMainWindow },

@@ -4,6 +4,10 @@ import { anthropicToOpenaiResponses } from '../proxy/transform/anthropicToOpenai
 import { openaiChatToAnthropic } from '../proxy/transform/openaiChatToAnthropic.js'
 import { openaiResponsesToAnthropic } from '../proxy/transform/openaiResponsesToAnthropic.js'
 import type { AnthropicRequest, OpenAIChatResponse, OpenAIResponsesResponse } from '../proxy/transform/types.js'
+import { resolveFallbackModelRules } from '../services/modelRules/resolveModelRules.js'
+
+const CHAT_RULES = resolveFallbackModelRules({ baseUrl: 'https://llm.example.com/v1', apiFormat: 'openai_chat' })
+const RESPONSES_RULES = resolveFallbackModelRules({ baseUrl: 'https://llm.example.com/v1', apiFormat: 'openai_responses' })
 
 describe('anthropicToOpenaiChat', () => {
   test('basic text message', () => {
@@ -12,7 +16,7 @@ describe('anthropicToOpenaiChat', () => {
       max_tokens: 1024,
       messages: [{ role: 'user', content: 'Hello' }],
     }
-    const result = anthropicToOpenaiChat(req)
+    const result = anthropicToOpenaiChat(req, CHAT_RULES)
     expect(result.model).toBe('gpt-4')
     expect(result.max_tokens).toBeUndefined()
     expect(result.messages).toEqual([{ role: 'user', content: 'Hello' }])
@@ -20,9 +24,9 @@ describe('anthropicToOpenaiChat', () => {
 
   test('streaming requests ask for token usage', () => {
     const base: AnthropicRequest = { model: 'gpt-4', max_tokens: 100, messages: [{ role: 'user', content: 'Hi' }] }
-    expect(anthropicToOpenaiChat({ ...base, stream: true }).stream_options).toEqual({ include_usage: true })
-    expect(anthropicToOpenaiChat(base).stream_options).toBeUndefined()
-    expect(anthropicToOpenaiChat({ ...base, stream: false }).stream_options).toBeUndefined()
+    expect(anthropicToOpenaiChat({ ...base, stream: true }, CHAT_RULES).stream_options).toEqual({ include_usage: true })
+    expect(anthropicToOpenaiChat(base, CHAT_RULES).stream_options).toBeUndefined()
+    expect(anthropicToOpenaiChat({ ...base, stream: false }, CHAT_RULES).stream_options).toBeUndefined()
   })
 
   test('system prompt string', () => {
@@ -32,7 +36,7 @@ describe('anthropicToOpenaiChat', () => {
       system: 'You are helpful',
       messages: [{ role: 'user', content: 'Hi' }],
     }
-    const result = anthropicToOpenaiChat(req)
+    const result = anthropicToOpenaiChat(req, CHAT_RULES)
     expect(result.messages[0]).toEqual({ role: 'system', content: 'You are helpful' })
     expect(result.messages[1]).toEqual({ role: 'user', content: 'Hi' })
   })
@@ -44,7 +48,7 @@ describe('anthropicToOpenaiChat', () => {
       system: [{ type: 'text', text: 'Part 1' }, { type: 'text', text: 'Part 2' }],
       messages: [{ role: 'user', content: 'Hi' }],
     }
-    const result = anthropicToOpenaiChat(req)
+    const result = anthropicToOpenaiChat(req, CHAT_RULES)
     expect(result.messages[0]).toEqual({ role: 'system', content: 'Part 1\nPart 2' })
   })
 
@@ -55,7 +59,7 @@ describe('anthropicToOpenaiChat', () => {
       stop_sequences: ['END', 'STOP'],
       messages: [{ role: 'user', content: 'Hi' }],
     }
-    const result = anthropicToOpenaiChat(req)
+    const result = anthropicToOpenaiChat(req, CHAT_RULES)
     expect(result.stop).toEqual(['END', 'STOP'])
   })
 
@@ -70,7 +74,7 @@ describe('anthropicToOpenaiChat', () => {
         input_schema: { type: 'object', properties: { city: { type: 'string' } } },
       }],
     }
-    const result = anthropicToOpenaiChat(req)
+    const result = anthropicToOpenaiChat(req, CHAT_RULES)
     expect(result.tools).toHaveLength(1)
     expect(result.tools![0].type).toBe('function')
     expect(result.tools![0].function.name).toBe('get_weather')
@@ -87,7 +91,7 @@ describe('anthropicToOpenaiChat', () => {
         { name: 'real_tool', input_schema: {} },
       ],
     }
-    const result = anthropicToOpenaiChat(req)
+    const result = anthropicToOpenaiChat(req, CHAT_RULES)
     expect(result.tools).toHaveLength(1)
     expect(result.tools![0].function.name).toBe('real_tool')
   })
@@ -99,7 +103,7 @@ describe('anthropicToOpenaiChat', () => {
       messages: [{ role: 'user', content: 'Hi' }],
       tool_choice: { type: 'any' },
     }
-    const result = anthropicToOpenaiChat(req)
+    const result = anthropicToOpenaiChat(req, CHAT_RULES)
     expect(result.tool_choice).toBe('required')
   })
 
@@ -110,46 +114,8 @@ describe('anthropicToOpenaiChat', () => {
       messages: [{ role: 'user', content: 'Hi' }],
       tool_choice: { type: 'tool', name: 'get_weather' },
     }
-    const result = anthropicToOpenaiChat(req)
+    const result = anthropicToOpenaiChat(req, CHAT_RULES)
     expect(result.tool_choice).toEqual({ type: 'function', function: { name: 'get_weather' } })
-  })
-
-  test('thinking budget → reasoning_effort', () => {
-    const lowReq: AnthropicRequest = {
-      model: 'gpt-4',
-      max_tokens: 100,
-      messages: [{ role: 'user', content: 'Hi' }],
-      thinking: { type: 'enabled', budget_tokens: 512 },
-    }
-    expect(anthropicToOpenaiChat(lowReq).reasoning_effort).toBe('low')
-
-    const medReq: AnthropicRequest = {
-      model: 'gpt-4',
-      max_tokens: 100,
-      messages: [{ role: 'user', content: 'Hi' }],
-      thinking: { type: 'enabled', budget_tokens: 4096 },
-    }
-    expect(anthropicToOpenaiChat(medReq).reasoning_effort).toBe('medium')
-
-    const highReq: AnthropicRequest = {
-      model: 'gpt-4',
-      max_tokens: 100,
-      messages: [{ role: 'user', content: 'Hi' }],
-      thinking: { type: 'enabled', budget_tokens: 16000 },
-    }
-    expect(anthropicToOpenaiChat(highReq).reasoning_effort).toBe('high')
-  })
-
-  test('passes explicit thinking toggle for DeepSeek-compatible chat proxies', () => {
-    const req: AnthropicRequest = {
-      model: 'deepseek-v4-flash',
-      max_tokens: 100,
-      messages: [{ role: 'user', content: 'Hi' }],
-      thinking: { type: 'disabled' },
-    }
-
-    expect(anthropicToOpenaiChat(req).thinking).toBeUndefined()
-    expect(anthropicToOpenaiChat(req, { passThinkingToggle: true }).thinking).toEqual({ type: 'disabled' })
   })
 
   test('assistant message with tool_use', () => {
@@ -164,7 +130,7 @@ describe('anthropicToOpenaiChat', () => {
         ],
       }],
     }
-    const result = anthropicToOpenaiChat(req)
+    const result = anthropicToOpenaiChat(req, CHAT_RULES)
     const msg = result.messages[0]
     expect(msg.role).toBe('assistant')
     expect(msg.content).toBe('Let me check')
@@ -172,32 +138,6 @@ describe('anthropicToOpenaiChat', () => {
     expect(msg.tool_calls![0].id).toBe('tc_1')
     expect(msg.tool_calls![0].function.name).toBe('get_weather')
     expect(msg.tool_calls![0].function.arguments).toBe('{"city":"NYC"}')
-  })
-
-  test('round-trips assistant thinking as reasoning_content for DeepSeek tool-call history', () => {
-    const req: AnthropicRequest = {
-      model: 'deepseek-v4-pro',
-      max_tokens: 100,
-      messages: [{
-        role: 'assistant',
-        content: [
-          { type: 'thinking', thinking: 'Need the date first. ' },
-          { type: 'thinking', thinking: 'Then call weather.' },
-          { type: 'text', text: 'Let me check that.' },
-          { type: 'tool_use', id: 'call_1', name: 'get_weather', input: { location: 'Hangzhou' } },
-        ],
-      }],
-    }
-
-    const defaultResult = anthropicToOpenaiChat(req)
-    expect(defaultResult.messages[0].reasoning_content).toBeUndefined()
-
-    const result = anthropicToOpenaiChat(req, { roundTripReasoningContent: true })
-    const msg = result.messages[0]
-    expect(msg.role).toBe('assistant')
-    expect(msg.content).toBe('Let me check that.')
-    expect(msg.reasoning_content).toBe('Need the date first. Then call weather.')
-    expect(msg.tool_calls?.[0].id).toBe('call_1')
   })
 
   test('user message with tool_result', () => {
@@ -211,7 +151,7 @@ describe('anthropicToOpenaiChat', () => {
         ],
       }],
     }
-    const result = anthropicToOpenaiChat(req)
+    const result = anthropicToOpenaiChat(req, CHAT_RULES)
     expect(result.messages[0].role).toBe('tool')
     expect(result.messages[0].tool_call_id).toBe('tc_1')
     expect(result.messages[0].content).toBe('Sunny, 72°F')
@@ -228,13 +168,13 @@ describe('anthropicToOpenaiChat', () => {
         ],
       }],
     }
-    const result = anthropicToOpenaiChat(req)
+    const result = anthropicToOpenaiChat(req, CHAT_RULES)
     const content = result.messages[0].content as Array<{ type: string; image_url?: { url: string } }>
     expect(content[0].type).toBe('image_url')
     expect(content[0].image_url!.url).toBe('data:image/png;base64,abc123')
   })
 
-  test('tool_result with image content becomes placeholder, not dropped', () => {
+  test('tool_result images move to the next user message', () => {
     const req: AnthropicRequest = {
       model: 'gpt-4',
       max_tokens: 100,
@@ -252,10 +192,17 @@ describe('anthropicToOpenaiChat', () => {
         ],
       }],
     }
-    const result = anthropicToOpenaiChat(req)
+    const result = anthropicToOpenaiChat(req, CHAT_RULES)
     expect(result.messages[0].role).toBe('tool')
     expect(result.messages[0].tool_call_id).toBe('tc_img')
-    expect(result.messages[0].content).toBe('Screenshot below:\n[image omitted: image/png]')
+    expect(result.messages[0].content).toBe('Screenshot below:\n[Attachments from this result are in the next user message.]')
+    expect(result.messages[1]).toEqual({
+      role: 'user',
+      content: [
+        { type: 'text', text: '[Attachments from tool result tc_img]' },
+        { type: 'image_url', image_url: { url: 'data:image/png;base64,deadbeef' } },
+      ],
+    })
   })
 
 })
@@ -275,7 +222,7 @@ describe('openaiChatToAnthropic', () => {
       }],
     } as unknown as OpenAIChatResponse
 
-    expect(openaiChatToAnthropic(res, 'kimi-k2.6').usage).toEqual({ input_tokens: 1000, output_tokens: 20, cache_read_input_tokens: 0 })
+    expect(openaiChatToAnthropic(res, 'kimi-k2.6', CHAT_RULES).usage).toEqual({ input_tokens: 1000, output_tokens: 20, cache_read_input_tokens: 0 })
   })
 
   test('basic text response', () => {
@@ -291,7 +238,7 @@ describe('openaiChatToAnthropic', () => {
       }],
       usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
     }
-    const result = openaiChatToAnthropic(res, 'gpt-4')
+    const result = openaiChatToAnthropic(res, 'gpt-4', CHAT_RULES)
     expect(result.type).toBe('message')
     expect(result.role).toBe('assistant')
     expect(result.content).toEqual([{ type: 'text', text: 'Hello!' }])
@@ -320,7 +267,7 @@ describe('openaiChatToAnthropic', () => {
         finish_reason: 'tool_calls',
       }],
     }
-    const result = openaiChatToAnthropic(res, 'gpt-4')
+    const result = openaiChatToAnthropic(res, 'gpt-4', CHAT_RULES)
     expect(result.stop_reason).toBe('tool_use')
     expect(result.content).toHaveLength(1)
     expect(result.content[0].type).toBe('tool_use')
@@ -355,7 +302,7 @@ describe('openaiChatToAnthropic', () => {
       }],
     }
 
-    const result = openaiChatToAnthropic(res, 'gpt-4')
+    const result = openaiChatToAnthropic(res, 'gpt-4', CHAT_RULES)
     expect(result.content[0].type).toBe('tool_use')
     if (result.content[0].type === 'tool_use') {
       expect(result.content[0].name).toBe('Write')
@@ -380,7 +327,7 @@ describe('openaiChatToAnthropic', () => {
       }],
     } as OpenAIChatResponse
 
-    expect(openaiChatToAnthropic(res, 'gemini').stop_reason).toBe('tool_use')
+    expect(openaiChatToAnthropic(res, 'gemini', CHAT_RULES).stop_reason).toBe('tool_use')
   })
 
   test('finish_reason mapping', () => {
@@ -389,11 +336,11 @@ describe('openaiChatToAnthropic', () => {
       choices: [{ index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: reason }],
     } as OpenAIChatResponse)
 
-    expect(openaiChatToAnthropic(make('stop'), 'gpt-4').stop_reason).toBe('end_turn')
-    expect(openaiChatToAnthropic(make('length'), 'gpt-4').stop_reason).toBe('max_tokens')
-    expect(openaiChatToAnthropic(make('tool_calls'), 'gpt-4').stop_reason).toBe('tool_use')
-    expect(openaiChatToAnthropic(make('model_context_window_exceeded'), 'gpt-4').stop_reason).toBe('model_context_window_exceeded')
-    expect(() => openaiChatToAnthropic(make('content_filter'), 'gpt-4'))
+    expect(openaiChatToAnthropic(make('stop'), 'gpt-4', CHAT_RULES).stop_reason).toBe('end_turn')
+    expect(openaiChatToAnthropic(make('length'), 'gpt-4', CHAT_RULES).stop_reason).toBe('max_tokens')
+    expect(openaiChatToAnthropic(make('tool_calls'), 'gpt-4', CHAT_RULES).stop_reason).toBe('tool_use')
+    expect(openaiChatToAnthropic(make('model_context_window_exceeded'), 'gpt-4', CHAT_RULES).stop_reason).toBe('model_context_window_exceeded')
+    expect(() => openaiChatToAnthropic(make('content_filter'), 'gpt-4', CHAT_RULES))
       .toThrow("The provider's content filter stopped the reply (finish_reason: content_filter).")
   })
 
@@ -402,7 +349,7 @@ describe('openaiChatToAnthropic', () => {
       id: 'x', object: 'chat.completion', created: 0, model: 'gpt-4',
       choices: [],
     }
-    const result = openaiChatToAnthropic(res, 'gpt-4')
+    const result = openaiChatToAnthropic(res, 'gpt-4', CHAT_RULES)
     expect(result.content).toEqual([{ type: 'text', text: '' }])
     expect(result.stop_reason).toBe('end_turn')
   })
@@ -418,7 +365,7 @@ describe('openaiChatToAnthropic', () => {
         prompt_tokens_details: { cached_tokens: 80 },
       },
     }
-    const result = openaiChatToAnthropic(res, 'gpt-4')
+    const result = openaiChatToAnthropic(res, 'gpt-4', CHAT_RULES)
     expect(result.usage).toEqual({ input_tokens: 20, output_tokens: 50, cache_read_input_tokens: 80 })
   })
 
@@ -431,7 +378,7 @@ describe('openaiChatToAnthropic', () => {
       choices: [{ index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' }],
       usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150, ...cacheFields },
     }
-    const result = openaiChatToAnthropic(res, 'gpt-4')
+    const result = openaiChatToAnthropic(res, 'gpt-4', CHAT_RULES)
     expect(result.usage).toEqual({ input_tokens: 20, output_tokens: 50, cache_read_input_tokens: 80 })
   })
 })
@@ -444,7 +391,7 @@ describe('anthropicToOpenaiResponses', () => {
       system: 'Be helpful',
       messages: [{ role: 'user', content: 'Hello' }],
     }
-    const result = anthropicToOpenaiResponses(req)
+    const result = anthropicToOpenaiResponses(req, RESPONSES_RULES)
     expect(result.model).toBe('gpt-4o')
     expect(result.instructions).toBe('Be helpful')
     expect(result.store).toBe(false)
@@ -464,7 +411,7 @@ describe('anthropicToOpenaiResponses', () => {
         input_schema: { type: 'object', properties: { city: { type: 'string' } } },
       }],
     }
-    const result = anthropicToOpenaiResponses(req)
+    const result = anthropicToOpenaiResponses(req, RESPONSES_RULES)
     expect(result.tools).toHaveLength(1)
     expect(result.tools![0]).toEqual({
       type: 'function',
@@ -486,7 +433,7 @@ describe('anthropicToOpenaiResponses', () => {
         ],
       }],
     }
-    const result = anthropicToOpenaiResponses(req)
+    const result = anthropicToOpenaiResponses(req, RESPONSES_RULES)
     const fc = result.input.find((i) => i.type === 'function_call')
     expect(fc).toBeDefined()
     if (fc && fc.type === 'function_call') {
@@ -510,7 +457,7 @@ describe('anthropicToOpenaiResponses', () => {
         ],
       }],
     }
-    const result = anthropicToOpenaiResponses(req)
+    const result = anthropicToOpenaiResponses(req, RESPONSES_RULES)
     expect(result.input.map((i) => i.type)).toEqual(['message', 'function_call', 'message'])
     expect((result.input[0] as { content: unknown }).content).toEqual([
       { type: 'output_text', text: 'Let me check.' },
@@ -530,24 +477,13 @@ describe('anthropicToOpenaiResponses', () => {
         ],
       }],
     }
-    const result = anthropicToOpenaiResponses(req)
+    const result = anthropicToOpenaiResponses(req, RESPONSES_RULES)
     const fco = result.input.find((i) => i.type === 'function_call_output')
     expect(fco).toBeDefined()
     if (fco && fco.type === 'function_call_output') {
       expect(fco.call_id).toBe('tc_1')
       expect(fco.output).toBe('found it')
     }
-  })
-
-  test('thinking → reasoning', () => {
-    const req: AnthropicRequest = {
-      model: 'gpt-4o',
-      max_tokens: 100,
-      messages: [{ role: 'user', content: 'Hi' }],
-      thinking: { type: 'enabled', budget_tokens: 10000 },
-    }
-    const result = anthropicToOpenaiResponses(req)
-    expect(result.reasoning).toEqual({ effort: 'high' })
   })
 
   test('stop_sequences dropped', () => {
@@ -557,7 +493,7 @@ describe('anthropicToOpenaiResponses', () => {
       messages: [{ role: 'user', content: 'Hi' }],
       stop_sequences: ['END'],
     }
-    const result = anthropicToOpenaiResponses(req)
+    const result = anthropicToOpenaiResponses(req, RESPONSES_RULES)
     expect((result as Record<string, unknown>).stop).toBeUndefined()
     expect((result as Record<string, unknown>).stop_sequences).toBeUndefined()
   })
@@ -573,7 +509,7 @@ describe('anthropicToOpenaiResponses', () => {
         ],
       }],
     }
-    const result = anthropicToOpenaiResponses(req)
+    const result = anthropicToOpenaiResponses(req, RESPONSES_RULES)
     const msg = result.input.find((i) => i.type === 'message')!
     expect(msg).toBeDefined()
     const content = msg.content as Array<{ type: string; image_url?: string }>
@@ -593,7 +529,7 @@ describe('anthropicToOpenaiResponses', () => {
         ],
       }],
     }
-    const result = anthropicToOpenaiResponses(req)
+    const result = anthropicToOpenaiResponses(req, RESPONSES_RULES)
     const msg = result.input.find((i) => i.type === 'message')!
     const content = msg.content as Array<{ type: string }>
     expect(content[0].type).toBe('input_text')
@@ -615,7 +551,7 @@ describe('anthropicToOpenaiResponses', () => {
         },
       ],
     }
-    const result = anthropicToOpenaiResponses(req)
+    const result = anthropicToOpenaiResponses(req, RESPONSES_RULES)
     const msg = result.input.find((i) => i.type === 'message' && i.role === 'assistant')!
     const content = msg.content as Array<{ type: string; text: string }>
     expect(content).toEqual([
@@ -631,7 +567,7 @@ describe('anthropicToOpenaiResponses', () => {
       messages: [{ role: 'user', content: 'Hi' }],
       tool_choice: { type: 'tool', name: 'get_weather' },
     }
-    const result = anthropicToOpenaiResponses(req)
+    const result = anthropicToOpenaiResponses(req, RESPONSES_RULES)
     expect(result.tool_choice).toEqual({ type: 'function', name: 'get_weather' })
   })
 
@@ -642,7 +578,7 @@ describe('anthropicToOpenaiResponses', () => {
         max_tokens: 100,
         messages: [{ role: 'user', content: 'Hi' }],
         tool_choice,
-      }).tool_choice
+      }, RESPONSES_RULES).tool_choice
     expect(choose({ type: 'any' })).toBe('required')
     expect(choose({ type: 'auto' })).toBe('auto')
     expect(choose({ type: 'none' })).toBe('none')
@@ -654,12 +590,12 @@ describe('anthropicToOpenaiResponses', () => {
       max_tokens: 100,
       messages: [{ role: 'assistant', content: [{ type: 'text', text: 'Done.' }] }],
     }
-    const result = anthropicToOpenaiResponses(req)
+    const result = anthropicToOpenaiResponses(req, RESPONSES_RULES)
     const msg = result.input.find((i) => i.type === 'message')!
     expect(msg.content).toBe('Done.')
   })
 
-  test('tool_result with image content becomes placeholder, not dropped', () => {
+  test('tool_result images stay in the function call output', () => {
     const req: AnthropicRequest = {
       model: 'gpt-4o',
       max_tokens: 100,
@@ -677,10 +613,13 @@ describe('anthropicToOpenaiResponses', () => {
         ],
       }],
     }
-    const result = anthropicToOpenaiResponses(req)
+    const result = anthropicToOpenaiResponses(req, RESPONSES_RULES)
     const fco = result.input.find((i) => i.type === 'function_call_output')!
     expect(fco).toBeDefined()
-    expect(fco.output).toBe('Screenshot:\n[image omitted: image/jpeg]')
+    expect(fco.output).toEqual([
+      { type: 'input_text', text: 'Screenshot:' },
+      { type: 'input_image', image_url: 'data:image/jpeg;base64,ff' },
+    ])
   })
 
 })
@@ -692,13 +631,13 @@ describe('openaiResponsesToAnthropic', () => {
   ])('maps an incomplete reply with %o to %s', (details, stopReason) => {
     const res = { id: 'r1', object: 'response', created_at: 0, model: 'gpt-4.1', status: 'incomplete', incomplete_details: details, output: [] } as OpenAIResponsesResponse
 
-    expect(openaiResponsesToAnthropic(res, 'gpt-4.1').stop_reason).toBe(stopReason)
+    expect(openaiResponsesToAnthropic(res, 'gpt-4.1', RESPONSES_RULES).stop_reason).toBe(stopReason)
   })
 
   test('reports an incomplete reply stopped by the content filter as an error', () => {
     const res = { id: 'r1', object: 'response', created_at: 0, model: 'gpt-4.1', status: 'incomplete', incomplete_details: { reason: 'content_filter' }, output: [] } as OpenAIResponsesResponse
 
-    expect(() => openaiResponsesToAnthropic(res, 'gpt-4.1'))
+    expect(() => openaiResponsesToAnthropic(res, 'gpt-4.1', RESPONSES_RULES))
       .toThrow("The provider's content filter stopped the reply (incomplete: content_filter).")
   })
 
@@ -716,7 +655,7 @@ describe('openaiResponsesToAnthropic', () => {
       }],
       usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
     }
-    const result = openaiResponsesToAnthropic(res, 'gpt-4o')
+    const result = openaiResponsesToAnthropic(res, 'gpt-4o', RESPONSES_RULES)
     expect(result.content).toEqual([{ type: 'text', text: 'Hello!' }])
     expect(result.stop_reason).toBe('end_turn')
     expect(result.usage).toEqual({ input_tokens: 10, output_tokens: 5 })
@@ -732,7 +671,7 @@ describe('openaiResponsesToAnthropic', () => {
       output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'ok' }] }],
       usage: { input_tokens: 100, output_tokens: 5, total_tokens: 105, input_tokens_details: { cached_tokens: 80 } },
     }
-    const result = openaiResponsesToAnthropic(res, 'gpt-4o')
+    const result = openaiResponsesToAnthropic(res, 'gpt-4o', RESPONSES_RULES)
     expect(result.usage).toEqual({ input_tokens: 20, output_tokens: 5, cache_read_input_tokens: 80 })
   })
 
@@ -751,7 +690,7 @@ describe('openaiResponsesToAnthropic', () => {
         arguments: '{"q":"test"}',
       }],
     }
-    const result = openaiResponsesToAnthropic(res, 'gpt-4o')
+    const result = openaiResponsesToAnthropic(res, 'gpt-4o', RESPONSES_RULES)
     expect(result.stop_reason).toBe('tool_use')
     expect(result.content[0].type).toBe('tool_use')
     if (result.content[0].type === 'tool_use') {
@@ -776,7 +715,7 @@ describe('openaiResponsesToAnthropic', () => {
       }],
     }
 
-    const result = openaiResponsesToAnthropic(res, 'gpt-4o')
+    const result = openaiResponsesToAnthropic(res, 'gpt-4o', RESPONSES_RULES)
     expect(result.content[0].type).toBe('tool_use')
     if (result.content[0].type === 'tool_use') {
       expect(result.content[0].input).toEqual({
@@ -798,7 +737,7 @@ describe('openaiResponsesToAnthropic', () => {
         { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'Result' }] },
       ],
     }
-    const result = openaiResponsesToAnthropic(res, 'gpt-4o')
+    const result = openaiResponsesToAnthropic(res, 'gpt-4o', RESPONSES_RULES)
     expect(result.content).toHaveLength(2)
     expect(result.content[0].type).toBe('thinking')
     if (result.content[0].type === 'thinking') {
@@ -816,7 +755,7 @@ describe('openaiResponsesToAnthropic', () => {
       status: 'incomplete',
       output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'partial' }] }],
     }
-    const result = openaiResponsesToAnthropic(res, 'gpt-4o')
+    const result = openaiResponsesToAnthropic(res, 'gpt-4o', RESPONSES_RULES)
     expect(result.stop_reason).toBe('max_tokens')
   })
 
@@ -829,7 +768,7 @@ describe('openaiResponsesToAnthropic', () => {
       status: 'completed',
       output: [],
     }
-    const result = openaiResponsesToAnthropic(res, 'gpt-4o')
+    const result = openaiResponsesToAnthropic(res, 'gpt-4o', RESPONSES_RULES)
     expect(result.content).toEqual([{ type: 'text', text: '' }])
   })
 })
@@ -840,15 +779,15 @@ describe('response model name', () => {
       id: 'x', object: 'chat.completion', created: 0, model: 'gpt-4.1-2025-04-14',
       choices: [{ index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' }],
     }
-    expect(openaiChatToAnthropic(res, 'gpt-4.1').model).toBe('gpt-4.1')
-    expect(openaiChatToAnthropic({ ...res, choices: [] }, 'gpt-4.1').model).toBe('gpt-4.1')
+    expect(openaiChatToAnthropic(res, 'gpt-4.1', CHAT_RULES).model).toBe('gpt-4.1')
+    expect(openaiChatToAnthropic({ ...res, choices: [] }, 'gpt-4.1', CHAT_RULES).model).toBe('gpt-4.1')
   })
 
   test('Responses API results report the requested model, not the snapshot the upstream returns', () => {
     const res: OpenAIResponsesResponse = {
       id: 'r', object: 'response', created_at: 0, model: 'gpt-4.1-2025-04-14', status: 'completed', output: [],
     }
-    expect(openaiResponsesToAnthropic(res, 'gpt-4.1').model).toBe('gpt-4.1')
+    expect(openaiResponsesToAnthropic(res, 'gpt-4.1', RESPONSES_RULES).model).toBe('gpt-4.1')
   })
 })
 
@@ -857,15 +796,15 @@ describe('tool request options', () => {
   const base: AnthropicRequest = { model: 'gpt-4', max_tokens: 100, messages: [{ role: 'user', content: 'Hi' }] }
 
   test.each([
-    ['anthropicToOpenaiChat', (req: AnthropicRequest) => anthropicToOpenaiChat(req) as { parallel_tool_calls?: boolean }],
-    ['anthropicToOpenaiResponses', (req: AnthropicRequest) => anthropicToOpenaiResponses(req) as { parallel_tool_calls?: boolean }],
+    ['anthropicToOpenaiChat', (req: AnthropicRequest) => anthropicToOpenaiChat(req, CHAT_RULES) as { parallel_tool_calls?: boolean }],
+    ['anthropicToOpenaiResponses', (req: AnthropicRequest) => anthropicToOpenaiResponses(req, RESPONSES_RULES) as { parallel_tool_calls?: boolean }],
   ] as const)('%s allows parallel tool calls only when tools are sent', (_name, convert) => {
     expect(convert({ ...base, tools: [tool] }).parallel_tool_calls).toBe(true)
     expect(convert(base).parallel_tool_calls).toBeUndefined()
   })
   test.each([
-    ['anthropicToOpenaiChat', (req: AnthropicRequest) => anthropicToOpenaiChat(req).tools![0]!.function.parameters],
-    ['anthropicToOpenaiResponses', (req: AnthropicRequest) => anthropicToOpenaiResponses(req).tools![0]!.parameters],
+    ['anthropicToOpenaiChat', (req: AnthropicRequest) => anthropicToOpenaiChat(req, CHAT_RULES).tools![0]!.function.parameters],
+    ['anthropicToOpenaiResponses', (req: AnthropicRequest) => anthropicToOpenaiResponses(req, RESPONSES_RULES).tools![0]!.parameters],
   ] as const)('%s drops the schema URL and the safe-integer bounds zod adds', (_name, parametersOf) => {
     const inputSchema = {
       $schema: 'https://json-schema.org/draft/2020-12/schema',

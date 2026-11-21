@@ -589,9 +589,10 @@ export class CronScheduler {
       }
     }
 
+    const providerId = task.providerId ?? (await this.providerService.listProviders()).activeId
     const explicitProviderEnv =
-      typeof task.providerId === 'string'
-        ? await this.providerService.getProviderRuntimeEnv(task.providerId, task.model)
+      typeof providerId === 'string'
+        ? await this.providerService.getProviderRuntimeEnv(providerId, task.model)
         : null
     const attributionHeaderEnv = attributionHeaderEnvForModel(
       task.model?.trim() ||

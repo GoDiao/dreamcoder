@@ -1,5 +1,12 @@
 import { z } from 'zod'
 
+import {
+  DiscoveredModelSchema,
+  ModelOverrideSchema,
+  type DiscoveredModel,
+  type ResolvedModelRulesView,
+} from './modelRules.js'
+
 export const ApiFormatSchema = z.enum([
   'anthropic',
   'openai_chat',
@@ -38,11 +45,8 @@ export const ProviderModelsSchema = z.array(ProviderModelSchema).superRefine((mo
   })
 })
 
-export const ModelContextWindowSchema = z.number().int().min(16000).max(10000000)
-export const ModelContextWindowsSchema = z.record(
-  z.string().min(1),
-  ModelContextWindowSchema,
-)
+const ModelOverridesSchema = z.record(z.string().min(1), ModelOverrideSchema)
+const DiscoveredModelsSchema = z.record(z.string().min(1), DiscoveredModelSchema)
 
 export const ProviderStringMapSchema = z.record(z.string(), z.string())
 
@@ -57,7 +61,9 @@ export const SavedProviderSchema = z.object({
   runtimeKind: ProviderRuntimeKindSchema.default('anthropic_compatible'),
   models: ProviderModelsSchema.min(1),
   fastModel: z.string().trim().min(1).optional(),
-  modelContextWindows: ModelContextWindowsSchema.optional(),
+  modelOverrides: ModelOverridesSchema.optional(),
+  discoveredModels: DiscoveredModelsSchema.optional(),
+  discoveredAt: z.string().optional(),
   extraHeaders: ProviderStringMapSchema.optional(),
   queryParams: ProviderStringMapSchema.optional(),
   notes: z.string().optional(),
@@ -79,7 +85,7 @@ export const CreateProviderSchema = z.object({
   runtimeKind: ProviderRuntimeKindSchema.default('anthropic_compatible'),
   models: ProviderModelsSchema.min(1),
   fastModel: z.string().trim().min(1).optional(),
-  modelContextWindows: ModelContextWindowsSchema.optional(),
+  modelOverrides: ModelOverridesSchema.optional(),
   extraHeaders: ProviderStringMapSchema.optional(),
   queryParams: ProviderStringMapSchema.optional(),
   notes: z.string().optional(),
@@ -94,7 +100,7 @@ export const UpdateProviderSchema = z.object({
   runtimeKind: ProviderRuntimeKindSchema.optional(),
   models: ProviderModelsSchema.min(1).optional(),
   fastModel: z.string().trim().min(1).nullable().optional(),
-  modelContextWindows: ModelContextWindowsSchema.nullable().optional(),
+  modelOverrides: ModelOverridesSchema.optional(),
   extraHeaders: ProviderStringMapSchema.nullable().optional(),
   queryParams: ProviderStringMapSchema.nullable().optional(),
   notes: z.string().optional(),
@@ -114,16 +120,23 @@ export const DiscoverProviderModelsSchema = z.object({
   apiKey: z.string(),
   authStrategy: ProviderAuthStrategySchema.optional(),
   apiFormat: ApiFormatSchema.default('anthropic'),
+  extraHeaders: ProviderStringMapSchema.optional(),
+  queryParams: ProviderStringMapSchema.optional(),
 })
 
 export type ProviderModel = z.infer<typeof ProviderModelSchema>
-export type DiscoveredProviderModel = ProviderModel & { contextWindow?: number }
+export type DiscoveredProviderModel = ProviderModel & DiscoveredModel
 export type SavedProvider = z.infer<typeof SavedProviderSchema>
+export type ProviderListItem = SavedProvider & {
+  resolvedModels?: Record<string, ResolvedModelRulesView>
+}
 export type ProvidersIndex = z.infer<typeof ProvidersIndexSchema>
 export type CreateProviderInput = z.infer<typeof CreateProviderSchema>
 export type UpdateProviderInput = z.infer<typeof UpdateProviderSchema>
 export type TestProviderInput = z.infer<typeof TestProviderSchema>
 export type DiscoverProviderModelsInput = z.infer<typeof DiscoverProviderModelsSchema>
+type ModelDiscoveryWarning = { ok: false; error: string }
+export type ProviderSaveResult = { provider: SavedProvider; modelDiscovery?: ModelDiscoveryWarning }
 
 export interface ProviderTestStepResult {
   success: boolean

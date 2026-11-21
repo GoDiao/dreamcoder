@@ -1,3 +1,4 @@
+import type { ResolvedModelRules } from '../../types/modelRules.js'
 import type {
   AnthropicRequest,
   AnthropicMessage,
@@ -5,17 +6,20 @@ import type {
   OpenAIResponsesInputItem,
   OpenAIResponsesContentPart,
 } from './types.js'
-import { extractToolResultContent } from './toolArguments.js'
+import { joinText, mediaPart, toolResultParts, type MediaPart } from './media.js'
+import { responsesReasoningItem } from './reasoningReplay.js'
+import { applyRequestRules, outputFormatFor, type RequestRulesOptions } from './requestRules.js'
 import { cleanToolSchema } from './toolSchema.js'
 
 export function anthropicToOpenaiResponses(
   body: AnthropicRequest,
-  options: { promptCacheKey?: string } = {},
+  rules: ResolvedModelRules,
+  options: RequestRulesOptions & { promptCacheKey?: string } = {},
 ): OpenAIResponsesRequest {
   const input: OpenAIResponsesInputItem[] = []
 
   for (const msg of body.messages) {
-    convertMessageToInputItems(msg, input)
+    convertMessageToInputItems(msg, input, rules)
   }
 
   const result: OpenAIResponsesRequest = {
@@ -55,21 +59,35 @@ export function anthropicToOpenaiResponses(
     result.tool_choice = convertToolChoice(body.tool_choice)
   }
 
-  if (body.thinking) {
-    const budget = body.thinking.budget_tokens
-    if (budget !== undefined) {
-      if (budget <= 1024) result.reasoning = { effort: 'low' }
-      else if (budget <= 8192) result.reasoning = { effort: 'medium' }
-      else result.reasoning = { effort: 'high' }
-    } else if (body.thinking.type === 'enabled') {
-      result.reasoning = { effort: 'high' }
-    }
+  if (rules.reasoningReplay === 'same_as_received' && rules.reasoning.control !== 'none') {
+    result.include = ['reasoning.encrypted_content']
   }
 
+  const format = outputFormatFor(body, rules)
+  if (format) result.text = { format: { type: 'json_schema', name: 'output', schema: format.schema } }
+
+  applyRequestRules(result, body, rules, options)
   return result
 }
 
-function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIResponsesInputItem[]): void {
+function responsesPart(part: MediaPart, textType: 'input_text' | 'output_text'): OpenAIResponsesContentPart {
+  switch (part.kind) {
+    case 'text':
+      return { type: textType, text: part.text }
+    case 'image':
+      return { type: 'input_image', image_url: part.url }
+    case 'file':
+      return { type: 'input_file', filename: part.filename, file_data: part.fileData }
+  }
+}
+
+function toolOutput(content: Parameters<typeof toolResultParts>[0], rules: ResolvedModelRules): string | OpenAIResponsesContentPart[] {
+  const parts = toolResultParts(content, rules)
+  if (parts.every(part => part.kind === 'text')) return joinText(parts)
+  return parts.map(part => responsesPart(part, 'input_text'))
+}
+
+function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIResponsesInputItem[], rules: ResolvedModelRules): void {
   const content = msg.content
 
   if (typeof content === 'string') {
@@ -89,11 +107,14 @@ function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIRespons
   for (const block of content) {
     if (block.type === 'text') {
       contentParts.push({ type: textType, text: block.text })
-    } else if (block.type === 'image') {
-      contentParts.push({
-        type: 'input_image',
-        image_url: `data:${block.source.media_type};base64,${block.source.data}`,
-      })
+    } else if (block.type === 'image' || block.type === 'document') {
+      contentParts.push(responsesPart(mediaPart(block, rules), textType))
+    } else if (block.type === 'thinking') {
+      const item = responsesReasoningItem(block, rules)
+      if (item) {
+        flushContentParts(contentParts, msg.role, textType, output)
+        output.push(item)
+      }
     } else if (block.type === 'tool_use') {
       flushContentParts(contentParts, msg.role, textType, output)
       output.push({
@@ -103,11 +124,10 @@ function convertMessageToInputItems(msg: AnthropicMessage, output: OpenAIRespons
         arguments: typeof block.input === 'string' ? block.input : JSON.stringify(block.input),
       })
     } else if (block.type === 'tool_result') {
-      const resultContent = extractToolResultContent(block.content)
       output.push({
         type: 'function_call_output',
         call_id: block.tool_use_id,
-        output: resultContent,
+        output: toolOutput(block.content, rules),
       })
     }
   }

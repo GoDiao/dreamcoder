@@ -1,4 +1,4 @@
-import { EFFORT_LEVELS } from '../api/models.js'
+import { isEffortLevel } from '../../utils/effort.js'
 import type { RuntimeSelection } from '../session/state/types.js'
 
 export function normalizeRuntimeSelection(value: unknown): RuntimeSelection | null {
@@ -6,7 +6,7 @@ export function normalizeRuntimeSelection(value: unknown): RuntimeSelection | nu
   const candidate = value as Record<string, unknown>
   const modelId = typeof candidate.modelId === 'string' ? candidate.modelId.trim() : ''
   const effort =
-    typeof candidate.effort === 'string' && (EFFORT_LEVELS as readonly string[]).includes(candidate.effort)
+    typeof candidate.effort === 'string' && isEffortLevel(candidate.effort)
       ? candidate.effort
       : undefined
   if (!modelId && !effort) return null

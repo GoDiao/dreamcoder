@@ -68,6 +68,11 @@ import {
   getSonnet1mExpTreatmentEnabled,
 } from "../../utils/context.js";
 import { resolveAppliedEffort } from "../../utils/effort.js";
+import {
+  auxiliaryThinking,
+  getCliModelRules,
+  modelSupportsStructuredOutput,
+} from "../../utils/model/modelRules.js";
 import { isEnvTruthy } from "../../utils/envUtils.js";
 import { errorMessage } from "../../utils/errors.js";
 import { computeFingerprintFromMessages } from "../../utils/fingerprint.js";
@@ -200,6 +205,7 @@ import { count } from "../../utils/array.js";
 import { insertBlockAfterToolResults } from "../../utils/contentArray.js";
 import { validateBoundedIntEnvVar } from "../../utils/envValidation.js";
 import { safeParseJSON } from "../../utils/json.js";
+import { isClaudeModelName } from "../../utils/model/claudeModelName.js";
 import { getInferenceProfileBackingModel } from "../../utils/model/bedrock.js";
 import {
   normalizeModelStringForAPI,
@@ -697,6 +703,7 @@ export type Options = {
   skipCacheWrite?: boolean;
   temperatureOverride?: number;
   effortValue?: EffortValue;
+  auxiliary?: boolean;
   mcpTools: Tools;
   hasPendingMcpServers?: boolean;
   queryTracking?: QueryChainTracking;
@@ -1316,7 +1323,9 @@ async function* queryModel(
   });
 
   queryCheckpoint("query_message_normalization_start");
-  let messagesForAPI = normalizeMessagesForAPI(messages, filteredTools);
+  let messagesForAPI = normalizeMessagesForAPI(messages, filteredTools, {
+    foldIntoToolResults: isClaudeModelName(options.model),
+  });
   queryCheckpoint("query_message_normalization_end");
 
   // Model-specific post-processing: strip tool-search-specific fields if the
@@ -1497,7 +1506,11 @@ async function* queryModel(
     }
   }
 
-  const effort = resolveAppliedEffort(options.model, options.effortValue);
+  const modelRules = getCliModelRules(options.model);
+  const effort =
+    options.auxiliary && modelRules
+      ? auxiliaryThinking(modelRules, false).effort
+      : resolveAppliedEffort(options.model, options.effortValue);
 
   if (feature("PROMPT_CACHE_BREAK_DETECTION")) {
     // Exclude defer_loading tools from the hash -- the API strips them from the
@@ -1605,7 +1618,7 @@ async function* queryModel(
       !isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_THINKING)
     const modelCanThink = modelSupportsThinking(options.model)
     const sendsExplicitDisabledThinking =
-      !hasThinking && (modelCanThink || shouldSendExplicitDisabledThinking())
+      !hasThinking && shouldSendExplicitDisabledThinking(options.model)
 
     const outputConfig: BetaOutputConfig = {
       ...((extraBodyParams.output_config as BetaOutputConfig) ?? {}),
@@ -1631,7 +1644,11 @@ async function* queryModel(
 
     // Merge outputFormat into extraBodyParams.output_config alongside effort
     // Requires structured-outputs beta header per SDK (see parse() in messages.mjs)
-    if (options.outputFormat && !("format" in outputConfig)) {
+    if (
+      options.outputFormat &&
+      !("format" in outputConfig) &&
+      modelSupportsStructuredOutput(options.model)
+    ) {
       outputConfig.format = options.outputFormat as BetaJSONOutputFormat;
       // Add beta header if not already present and provider supports it
       if (
@@ -3377,6 +3394,7 @@ export async function queryHaiku({
         options: {
           ...options,
           model: getSmallFastModel(),
+          auxiliary: true,
           enablePromptCaching: options.enablePromptCaching ?? false,
           outputFormat,
           async getToolPermissionContext() {

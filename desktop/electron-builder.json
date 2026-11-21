@@ -30,8 +30,11 @@
       "to": "web-clone"
     },
     {
-      "from": "electron/build/icons/tray.png",
-      "to": "icons/tray.png"
+      "from": "electron/build/icons",
+      "to": "icons",
+      "filter": [
+        "tray*.png"
+      ]
     },
     {
       "from": "../THIRD_PARTY_NOTICES.md",

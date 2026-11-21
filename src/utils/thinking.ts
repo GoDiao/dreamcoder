@@ -3,10 +3,9 @@ import type { Theme } from './theme.js'
 import { feature } from 'bun:bundle'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growthbook.js'
 import { getCanonicalName } from './model/model.js'
-import { get3PModelCapabilityOverride } from './model/modelSupportOverrides.js'
+import { getCliModelRules } from './model/modelRules.js'
 import { getAPIProvider, isFirstPartyAnthropicBaseUrl } from './model/providers.js'
 import { getSettingsWithErrors } from './settings/settings.js'
-import { isEnvTruthy } from './envUtils.js'
 
 export type ThinkingConfig =
   | { type: 'adaptive' }
@@ -89,9 +88,9 @@ export function getRainbowColor(
 // TODO(inigo): add support for probing unknown models via API error detection
 // Provider-aware thinking support detection (aligns with modelSupportsISP in betas.ts)
 export function modelSupportsThinking(model: string): boolean {
-  const supported3P = get3PModelCapabilityOverride(model, 'thinking')
-  if (supported3P !== undefined) {
-    return supported3P
+  const rules = getCliModelRules(model)
+  if (rules) {
+    return rules.thinkingWhenOn !== 'omit'
   }
   if (process.env.USER_TYPE === 'ant') {
     if (resolveAntModel(model.toLowerCase())) {
@@ -109,23 +108,15 @@ export function modelSupportsThinking(model: string): boolean {
   ) {
     return !canonical.includes('claude-3-')
   }
-  if (isMiniMaxAnthropicEndpoint() && canonical.includes('minimax')) {
-    return true
-  }
   // 3P (Bedrock/Vertex): only Opus 4+ and Sonnet 4+
   return canonical.includes('sonnet-4') || canonical.includes('opus-4')
 }
 
-function isMiniMaxAnthropicEndpoint(): boolean {
-  const baseUrl = process.env.ANTHROPIC_BASE_URL?.toLowerCase() ?? ''
-  return baseUrl.includes('minimax') || baseUrl.includes('minimaxi')
-}
-
 // @[MODEL LAUNCH]: Add the new model to the allowlist if it supports adaptive thinking.
 export function modelSupportsAdaptiveThinking(model: string): boolean {
-  const supported3P = get3PModelCapabilityOverride(model, 'adaptive_thinking')
-  if (supported3P !== undefined) {
-    return supported3P
+  const rules = getCliModelRules(model)
+  if (rules) {
+    return rules.thinkingWhenOn === 'adaptive'
   }
   const canonical = getCanonicalName(model)
   const provider = getAPIProvider()
@@ -180,6 +171,7 @@ export function shouldEnableThinkingByDefault(): boolean {
   return true
 }
 
-export function shouldSendExplicitDisabledThinking(): boolean {
-  return isEnvTruthy(process.env.DREAMCODER_SEND_DISABLED_THINKING)
+export function shouldSendExplicitDisabledThinking(model: string): boolean {
+  const rules = getCliModelRules(model)
+  return rules ? rules.thinkingWhenOff === 'disabled' : modelSupportsThinking(model)
 }

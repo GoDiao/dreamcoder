@@ -7,10 +7,10 @@ import {
   goalObjectiveFromHookCommand,
   isGoalLocalCommandOutputContent,
   getThreadGoal,
-  isGoalPromptHookCommand,
   parseGoalCommand,
   setThreadGoalHook,
 } from './goalState.js'
+import { isGoalPromptHookCommand } from './goalHookMarker.js'
 
 function hookContext() {
   const appState = {

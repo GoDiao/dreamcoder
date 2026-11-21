@@ -1,8 +1,6 @@
-export const ATTRIBUTION_HEADER_ENV_KEY = 'CLAUDE_CODE_ATTRIBUTION_HEADER'
+import { isClaudeModelName } from '../../utils/model/claudeModelName.js'
 
-export function isClaudeModelName(modelName?: string | null): boolean {
-  return typeof modelName === 'string' && modelName.trim().toLowerCase().startsWith('claude')
-}
+export const ATTRIBUTION_HEADER_ENV_KEY = 'CLAUDE_CODE_ATTRIBUTION_HEADER'
 
 export function attributionHeaderEnvForModel(
   modelName?: string | null,

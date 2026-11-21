@@ -1,4 +1,5 @@
 import { signClaudeCodeCCHInTransformedString } from '../../utils/claudeCodeCch.js'
+import { normalizeEffortLevel, type EffortLevel } from '../../utils/effort.js'
 import { getProxyFetchOptions } from '../../utils/proxy.js'
 import { anthropicToOpenaiChat } from '../proxy/transform/anthropicToOpenaiChat.js'
 import { anthropicToOpenaiResponses } from '../proxy/transform/anthropicToOpenaiResponses.js'
@@ -12,7 +13,10 @@ import type {
   OpenAIChatResponse,
   OpenAIResponsesResponse,
 } from '../proxy/transform/types.js'
-import { getManualNetworkProxyUrl, loadNetworkSettings, type NetworkSettings } from '../services/networkSettings.js'
+import { resolveModelRules, type ModelRulesProvider } from '../services/modelRules/resolveModelRules.js'
+import { getManualNetworkProxyUrl, loadNetworkSettings, normalizeNetworkSettings, type NetworkSettings } from '../services/networkSettings.js'
+import { SettingsService } from '../services/settingsService.js'
+import type { ResolvedModelRules } from '../types/modelRules.js'
 import {
   getPresetAuthStrategy,
   getPresetDefaultEnv,
@@ -28,7 +32,7 @@ import {
   UpstreamReplyError,
   type UpstreamFailure,
 } from './upstreamError.js'
-import { fillContextWindows } from './contextWindows/index.js'
+import { fillModelMetadata } from './contextWindows/index.js'
 import { superviseAnthropicStream } from './anthropicStream.js'
 import {
   recordUpstreamRequest,
@@ -46,6 +50,8 @@ export type UpstreamTarget = {
   extraHeaders?: Record<string, string>
   queryParams?: Record<string, string>
 }
+
+export type ProxyUpstream = { target: UpstreamTarget; provider: ModelRulesProvider }
 
 export type UpstreamResult =
   | { ok: true; httpStatus: number; message: AnthropicResponse }
@@ -76,6 +82,8 @@ export function resolveUpstreamTarget(provider: SavedProvider): UpstreamTarget {
 
 type SendOptions = { timeoutMs?: number; signal?: AbortSignal; sessionId?: string }
 type RequestContext = {
+  rules: ResolvedModelRules
+  defaultEffort: EffortLevel
   networkSettings: NetworkSettings
   timeoutMs: number
   startedAt: number
@@ -84,11 +92,12 @@ type RequestContext = {
 }
 
 export async function sendToUpstream(
-  target: UpstreamTarget,
+  { target, provider }: ProxyUpstream,
   request: AnthropicRequest,
   options?: SendOptions,
 ): Promise<UpstreamResult> {
   const anthropicRequest = { ...request, model: stripContextSuffix(request.model) }
+  const rules = resolveModelRules(provider, anthropicRequest.model)
   const info: UpstreamRequestInfo = {
     providerId: target.providerId,
     model: anthropicRequest.model,
@@ -97,10 +106,13 @@ export async function sendToUpstream(
     stream: request.stream === true,
     startedAt: Date.now(),
   }
-  const networkSettings = await loadNetworkSettings()
+  const userSettings = await new SettingsService().getUserSettings()
+  const networkSettings = normalizeNetworkSettings(userSettings)
   const timeoutMs = options?.timeoutMs ?? networkSettings.aiRequestTimeoutMs
   const response: UpstreamResponseInfo = {}
   const result = await requestUpstream(target, anthropicRequest, response, {
+    rules,
+    defaultEffort: normalizeEffortLevel(userSettings.effort),
     networkSettings,
     timeoutMs,
     startedAt: info.startedAt,
@@ -128,13 +140,13 @@ async function requestUpstream(
   target: UpstreamTarget,
   anthropicRequest: AnthropicRequest,
   responseInfo: UpstreamResponseInfo,
-  { networkSettings, timeoutMs, startedAt, signal, sessionId }: RequestContext,
+  { rules, defaultEffort, networkSettings, timeoutMs, startedAt, signal, sessionId }: RequestContext,
 ): Promise<UpstreamResult> {
   const isStream = anthropicRequest.stream === true
 
   let response: Response
   try {
-    const upstreamRequest = buildUpstreamRequest(target, anthropicRequest, sessionId)
+    const upstreamRequest = buildUpstreamRequest(target, anthropicRequest, rules, { defaultEffort, promptCacheKey: sessionId })
     response = await fetchWithTimeout(upstreamRequest.url, {
       method: 'POST',
       headers: upstreamRequest.headers,
@@ -163,7 +175,7 @@ async function requestUpstream(
     return {
       ok: true,
       httpStatus: response.status,
-      stream: toAnthropicStream(target.apiFormat, response.body, anthropicRequest.model),
+      stream: toAnthropicStream(target.apiFormat, response.body, anthropicRequest.model, rules),
     }
   }
 
@@ -177,7 +189,7 @@ async function requestUpstream(
     return {
       ok: true,
       httpStatus: response.status,
-      message: toAnthropicMessage(target.apiFormat, body!, anthropicRequest.model),
+      message: toAnthropicMessage(target.apiFormat, body!, anthropicRequest.model, rules),
     }
   } catch (err) {
     if (err instanceof UpstreamReplyError) return toFailure(err.error, {})
@@ -185,8 +197,14 @@ async function requestUpstream(
   }
 }
 
-export async function fetchUpstreamModels(target: UpstreamTarget, presetId?: string): Promise<UpstreamModelsResult> {
+export async function fetchUpstreamModels(
+  target: UpstreamTarget,
+  presetId?: string,
+  totalTimeoutMs?: number,
+): Promise<UpstreamModelsResult> {
   const networkSettings = await loadNetworkSettings()
+  const timeoutMs = totalTimeoutMs ?? networkSettings.aiRequestTimeoutMs
+  const totalSignal = totalTimeoutMs === undefined ? undefined : AbortSignal.timeout(totalTimeoutMs)
   const modelsUrl = target.apiFormat === 'anthropic'
     ? `${normalizeUpstreamBaseUrl(target.baseUrl)}/v1/models`
     : withQueryParams(`${openaiUpstreamBaseUrl(target.baseUrl)}/models`, target.queryParams)
@@ -216,10 +234,10 @@ export async function fetchUpstreamModels(target: UpstreamTarget, presetId?: str
         method: 'GET',
         headers,
         ...getProxyFetchOptions({ proxyUrl: getManualNetworkProxyUrl(networkSettings) }),
-      }, networkSettings.aiRequestTimeoutMs, false)
+      }, timeoutMs, false, totalSignal)
     } catch (err) {
       if (err instanceof DOMException && err.name === 'TimeoutError') {
-        return { ok: false, error: `Request timed out (${Math.round(networkSettings.aiRequestTimeoutMs / 1000)}s)` }
+        return { ok: false, error: `Request timed out (${Math.round(timeoutMs / 1000)}s)` }
       }
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
@@ -251,7 +269,7 @@ export async function fetchUpstreamModels(target: UpstreamTarget, presetId?: str
     }
 
     if (target.apiFormat !== 'anthropic' || body?.has_more !== true) {
-      await fillContextWindows(models, { baseUrl: target.baseUrl, apiKey: target.apiKey, presetId, listed, networkSettings })
+      await fillModelMetadata(models, { baseUrl: target.baseUrl, apiKey: target.apiKey, presetId, listed, networkSettings })
       return { ok: true, httpStatus: response.status, models }
     }
 
@@ -265,18 +283,17 @@ export async function fetchUpstreamModels(target: UpstreamTarget, presetId?: str
   return { ok: false, httpStatus: 502, error: `Upstream model pagination exceeded ${maxPages} pages` }
 }
 
-function buildUpstreamRequest(target: UpstreamTarget, request: AnthropicRequest, sessionId?: string): UpstreamRequest {
+function buildUpstreamRequest(
+  target: UpstreamTarget,
+  request: AnthropicRequest,
+  rules: ResolvedModelRules,
+  options: { defaultEffort: EffortLevel; promptCacheKey?: string },
+): UpstreamRequest {
   if (target.apiFormat === 'openai_chat') {
-    const base = openaiUpstreamBaseUrl(target.baseUrl)
-    const compat = shouldUseDeepSeekReasoningCompat(base)
-    const transformed = anthropicToOpenaiChat(request, {
-      roundTripReasoningContent: compat,
-      passThinkingToggle: compat,
-    })
     return {
-      url: withQueryParams(`${base}/chat/completions`, target.queryParams),
+      url: withQueryParams(`${openaiUpstreamBaseUrl(target.baseUrl)}/chat/completions`, target.queryParams),
       headers: openaiHeaders(target),
-      body: signClaudeCodeCCHInTransformedString(JSON.stringify(transformed)),
+      body: signClaudeCodeCCHInTransformedString(JSON.stringify(anthropicToOpenaiChat(request, rules, options))),
     }
   }
 
@@ -284,7 +301,7 @@ function buildUpstreamRequest(target: UpstreamTarget, request: AnthropicRequest,
     return {
       url: withQueryParams(`${openaiUpstreamBaseUrl(target.baseUrl)}/responses`, target.queryParams),
       headers: openaiHeaders(target),
-      body: signClaudeCodeCCHInTransformedString(JSON.stringify(anthropicToOpenaiResponses(request, { promptCacheKey: sessionId }))),
+      body: signClaudeCodeCCHInTransformedString(JSON.stringify(anthropicToOpenaiResponses(request, rules, options))),
     }
   }
 
@@ -336,13 +353,6 @@ function buildAnthropicAuthHeaders(apiKey: string, authStrategy: ProviderAuthStr
   }
 }
 
-function shouldUseDeepSeekReasoningCompat(baseUrl: string): boolean {
-  return (
-    /(^|[./-])deepseek([./-]|$)/i.test(baseUrl) ||
-    /(^|[./-])opencode\.ai([:/]|$)/i.test(baseUrl)
-  )
-}
-
 async function fetchWithTimeout(
   url: string,
   init: RequestInit,
@@ -371,9 +381,10 @@ function toAnthropicStream(
   format: ApiFormat,
   body: ReadableStream<Uint8Array>,
   model: string,
+  rules: ResolvedModelRules,
 ): ReadableStream<Uint8Array> {
-  if (format === 'openai_chat') return openaiChatStreamToAnthropic(body, model)
-  if (format === 'openai_responses') return openaiResponsesStreamToAnthropic(body, model)
+  if (format === 'openai_chat') return openaiChatStreamToAnthropic(body, model, rules)
+  if (format === 'openai_responses') return openaiResponsesStreamToAnthropic(body, model, rules)
   return body
 }
 
@@ -381,9 +392,10 @@ function toAnthropicMessage(
   format: ApiFormat,
   body: Record<string, unknown>,
   model: string,
+  rules: ResolvedModelRules,
 ): AnthropicResponse {
-  if (format === 'openai_chat') return openaiChatToAnthropic(body as OpenAIChatResponse, model)
-  if (format === 'openai_responses') return openaiResponsesToAnthropic(body as OpenAIResponsesResponse, model)
+  if (format === 'openai_chat') return openaiChatToAnthropic(body as OpenAIChatResponse, model, rules)
+  if (format === 'openai_responses') return openaiResponsesToAnthropic(body as OpenAIResponsesResponse, model, rules)
   return body as AnthropicResponse
 }
 

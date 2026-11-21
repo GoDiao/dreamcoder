@@ -8,6 +8,7 @@ import { getLocalISODate } from './constants/common.js'
 import {
   filterInjectedMemoryFiles,
   getClaudeMds,
+  getClaudeMdsForSubagent,
   getMemoryFiles,
 } from './utils/claudemd.js'
 import { logForDiagnosticsNoPII } from './utils/diagLogs.js'
@@ -149,6 +150,23 @@ export const getSystemContext = memoize(
   },
 )
 
+function isClaudeMdDisabled(): boolean {
+  return (
+    isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_CLAUDE_MDS) ||
+    (isBareMode() && getAdditionalDirectoriesForClaudeMd().length === 0)
+  )
+}
+
+export async function getSubagentUserContext(): Promise<{
+  [k: string]: string
+}> {
+  const { claudeMd: _mainClaudeMd, ...rest } = await getUserContext()
+  const claudeMd = isClaudeMdDisabled()
+    ? ''
+    : getClaudeMdsForSubagent(filterInjectedMemoryFiles(await getMemoryFiles()))
+  return { ...(claudeMd && { claudeMd }), ...rest }
+}
+
 /**
  * This context is prepended to each conversation, and cached for the duration of the conversation.
  */
@@ -159,12 +177,7 @@ export const getUserContext = memoize(
     const startTime = Date.now()
     logForDiagnosticsNoPII('info', 'user_context_started')
 
-    // CLAUDE_CODE_DISABLE_CLAUDE_MDS: hard off, always.
-    // --bare: skip auto-discovery (cwd walk), BUT honor explicit --add-dir.
-    // --bare means "skip what I didn't ask for", not "ignore what I asked for".
-    const shouldDisableClaudeMd =
-      isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_CLAUDE_MDS) ||
-      (isBareMode() && getAdditionalDirectoriesForClaudeMd().length === 0)
+    const shouldDisableClaudeMd = isClaudeMdDisabled()
     // Await the async I/O (readFile/readdir directory walk) so the event
     // loop yields naturally at the first fs.readFile.
     const claudeMd = shouldDisableClaudeMd

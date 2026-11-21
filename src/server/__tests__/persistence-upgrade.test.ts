@@ -286,19 +286,20 @@ describe('persistent storage upgrade migrations', () => {
     expect(quarantined.length).toBe(1)
   })
 
-  test('upgrades existing DeepSeek managed env to follow global thinking settings', async () => {
+  test('removes retired capability, window and thinking keys from managed settings', async () => {
     const dreamcoderDir = path.join(tempDir, 'dreamcoder')
     await fs.mkdir(dreamcoderDir, { recursive: true })
     await fs.writeFile(
       path.join(dreamcoderDir, 'settings.json'),
       JSON.stringify({
+        theme: 'dark',
         env: {
-          ANTHROPIC_BASE_URL: 'https://api.deepseek.com/anthropic',
-          ANTHROPIC_AUTH_TOKEN: 'test-token',
-          ANTHROPIC_MODEL: 'deepseek-v4-pro',
-          ANTHROPIC_DEFAULT_HAIKU_MODEL: 'deepseek-v4-flash',
-          ANTHROPIC_DEFAULT_SONNET_MODEL: 'deepseek-v4-pro',
-          ANTHROPIC_DEFAULT_OPUS_MODEL: 'deepseek-v4-pro',
+          ANTHROPIC_BASE_URL: 'https://api.kimi.com/coding',
+          ANTHROPIC_MODEL: 'kimi-k2.6',
+          ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES: 'thinking',
+          ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES: 'thinking',
+          ANTHROPIC_DEFAULT_OPUS_MODEL_SUPPORTED_CAPABILITIES: 'thinking',
+          CLAUDE_CODE_MODEL_CONTEXT_WINDOWS: '{"kimi-k2.6":262144}',
           DREAMCODER_SEND_DISABLED_THINKING: '1',
           USER_CUSTOM_ENV: 'keep-me',
         },
@@ -310,23 +311,174 @@ describe('persistent storage upgrade migrations', () => {
 
     expect(report.failures).toEqual([])
     expect(report.migratedEntries).toContain('dreamcoder/settings.json')
+    const migrated = JSON.parse(await fs.readFile(path.join(dreamcoderDir, 'settings.json'), 'utf-8'))
+    expect(migrated).toEqual({
+      theme: 'dark',
+      env: {
+        ANTHROPIC_BASE_URL: 'https://api.kimi.com/coding',
+        ANTHROPIC_MODEL: 'kimi-k2.6',
+        USER_CUSTOM_ENV: 'keep-me',
+      },
+    })
+  })
 
-    const migrated = JSON.parse(await fs.readFile(path.join(dreamcoderDir, 'settings.json'), 'utf-8')) as {
-      env?: Record<string, string>
+  test('loads an old DeepSeek compatibility config and serves it with rules instead of capability variables', async () => {
+    const dreamcoderDir = path.join(tempDir, 'dreamcoder')
+    await fs.mkdir(dreamcoderDir, { recursive: true })
+    await fs.writeFile(
+      path.join(dreamcoderDir, 'settings.json'),
+      JSON.stringify({
+        env: {
+          ANTHROPIC_BASE_URL: 'https://api.deepseek.com/anthropic',
+          ANTHROPIC_MODEL: 'deepseek-v4-pro',
+          ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES: 'thinking,effort,adaptive_thinking,max_effort',
+          DREAMCODER_SEND_DISABLED_THINKING: '1',
+        },
+      }, null, 2),
+      'utf-8',
+    )
+    await fs.writeFile(
+      path.join(dreamcoderDir, 'providers.json'),
+      JSON.stringify({
+        schemaVersion: 2,
+        activeId: 'deepseek',
+        providers: [{
+          id: 'deepseek',
+          presetId: 'deepseek',
+          name: 'DeepSeek',
+          apiKey: 'token',
+          baseUrl: 'https://api.deepseek.com/anthropic',
+          apiFormat: 'anthropic',
+          models: [{ id: 'deepseek-v4-pro' }, { id: 'deepseek-v4-flash' }],
+          fastModel: 'deepseek-v4-flash',
+          modelContextWindows: { 'deepseek-v4-pro': 1000000, 'deepseek-v4-flash': 1000000 },
+        }],
+      }, null, 2),
+      'utf-8',
+    )
+
+    const env = await new ProviderService().getProviderRuntimeEnv('deepseek')
+    const rules = JSON.parse(env.DREAMCODER_MODEL_RULES!) as { models: Record<string, { contextWindow: number }> }
+    const settings = JSON.parse(await fs.readFile(path.join(dreamcoderDir, 'settings.json'), 'utf-8')) as {
+      env: Record<string, string>
     }
-    expect(migrated.env?.DREAMCODER_SEND_DISABLED_THINKING).toBeUndefined()
-    expect(migrated.env?.ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES).toBe(
-      'thinking,effort,adaptive_thinking,max_effort',
-    )
-    expect(migrated.env?.ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES).toBe(
-      'thinking,effort,adaptive_thinking,max_effort',
-    )
-    expect(migrated.env?.ANTHROPIC_DEFAULT_OPUS_MODEL_SUPPORTED_CAPABILITIES).toBe(
-      'thinking,effort,adaptive_thinking,max_effort',
-    )
-    expect(migrated.env?.USER_CUSTOM_ENV).toBe('keep-me')
 
-    const backups = (await listFiles(dreamcoderDir)).filter((file) => file.startsWith('settings.json.bak-before-migration-'))
-    expect(backups.length).toBe(1)
+    expect(rules.models['deepseek-v4-pro']?.contextWindow).toBe(1048576)
+    expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES).toBeUndefined()
+    expect(settings.env).toEqual({
+      ANTHROPIC_BASE_URL: 'https://api.deepseek.com/anthropic',
+      ANTHROPIC_MODEL: 'deepseek-v4-pro',
+    })
+  })
+
+  test('moves user context windows into modelOverrides and drops values equal to the old defaults', async () => {
+    const dreamcoderDir = path.join(tempDir, 'dreamcoder')
+    await fs.mkdir(dreamcoderDir, { recursive: true })
+    await fs.writeFile(
+      path.join(dreamcoderDir, 'providers.json'),
+      JSON.stringify({
+        schemaVersion: 2,
+        activeId: 'kimi',
+        providers: [
+          {
+            id: 'kimi',
+            presetId: 'kimi',
+            name: 'Kimi',
+            apiKey: 'token',
+            baseUrl: 'https://api.kimi.com/coding',
+            apiFormat: 'anthropic',
+            models: [{ id: 'kimi-k2.6' }, { id: 'kimi-k2.5' }, { id: 'my-model' }],
+            modelContextWindows: { 'kimi-k2.6': 262144, 'kimi-k2.5': 300000, 'my-model': 64000 },
+            modelOverrides: { 'my-model': { image: false } },
+          },
+          {
+            id: 'router',
+            presetId: 'custom',
+            name: 'Router',
+            apiKey: 'token',
+            baseUrl: 'https://openrouter.ai/api/v1',
+            apiFormat: 'openai_chat',
+            models: [
+              { id: 'openai/gpt-5.4' },
+              { id: 'qwen-long-latest' },
+              { id: 'glm-4.5-air' },
+              { id: 'minimax-m2.7' },
+              { id: 'google/gemini-3-pro' },
+            ],
+            modelContextWindows: {
+              'openai/gpt-5.4': 400000,
+              'qwen-long-latest': 10000000,
+              'glm-4.5-air': 128000,
+              'minimax-m2.7': 204800,
+              'google/gemini-3-pro': 1000000,
+            },
+          },
+          {
+            id: 'plain',
+            presetId: 'custom',
+            name: 'Plain',
+            apiKey: 'token',
+            baseUrl: 'https://api.example.com',
+            apiFormat: 'anthropic',
+            models: [{ id: 'model-a' }],
+          },
+        ],
+      }, null, 2),
+      'utf-8',
+    )
+
+    const report = await ensurePersistentStorageUpgraded()
+    const migrated = JSON.parse(await fs.readFile(path.join(dreamcoderDir, 'providers.json'), 'utf-8')) as {
+      providers: Array<Record<string, unknown>>
+    }
+    const [kimi, router, plain] = migrated.providers
+
+    expect(report.failures).toEqual([])
+    expect(report.migratedEntries).toContain('dreamcoder/providers.json')
+    expect(kimi!.modelContextWindows).toBeUndefined()
+    expect(kimi!.modelOverrides).toEqual({
+      'kimi-k2.5': { contextWindow: 300000 },
+      'my-model': { image: false, contextWindow: 64000 },
+    })
+    expect(router!.modelContextWindows).toBeUndefined()
+    expect(router!.modelOverrides).toEqual({ 'google/gemini-3-pro': { contextWindow: 1000000 } })
+    expect('modelOverrides' in plain!).toBe(false)
+  })
+
+  test('running the migrations again does not rewrite migrated files', async () => {
+    const dreamcoderDir = path.join(tempDir, 'dreamcoder')
+    await fs.mkdir(dreamcoderDir, { recursive: true })
+    await fs.writeFile(
+      path.join(dreamcoderDir, 'providers.json'),
+      JSON.stringify({
+        schemaVersion: 2,
+        activeId: null,
+        providers: [{
+          id: 'custom',
+          presetId: 'custom',
+          name: 'Custom',
+          apiKey: 'token',
+          baseUrl: 'https://api.example.com',
+          apiFormat: 'anthropic',
+          models: [{ id: 'model-a' }],
+          modelContextWindows: { 'model-a': 300000 },
+        }],
+      }, null, 2),
+      'utf-8',
+    )
+    await fs.writeFile(
+      path.join(dreamcoderDir, 'settings.json'),
+      JSON.stringify({ env: { DREAMCODER_SEND_DISABLED_THINKING: '1' } }, null, 2),
+      'utf-8',
+    )
+
+    const first = await ensurePersistentStorageUpgraded()
+    const providersAfterFirst = await fs.readFile(path.join(dreamcoderDir, 'providers.json'), 'utf-8')
+    resetPersistentStorageMigrationsForTests()
+    const second = await ensurePersistentStorageUpgraded()
+
+    expect(first.migratedEntries).toEqual(['dreamcoder/providers.json', 'dreamcoder/settings.json'])
+    expect(second.migratedEntries).toEqual([])
+    expect(await fs.readFile(path.join(dreamcoderDir, 'providers.json'), 'utf-8')).toBe(providersAfterFirst)
   })
 })

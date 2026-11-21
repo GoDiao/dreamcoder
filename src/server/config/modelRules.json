@@ -1,0 +1,1423 @@
+{
+  "fallback": {
+    "rules": {
+      "contextWindow": 131072,
+      "maxOutputTokens": 32000,
+      "reasoning": {
+        "control": "none",
+        "levels": []
+      },
+      "input": {
+        "image": true,
+        "pdf": false
+      },
+      "structuredOutput": false,
+      "thinkTagsInText": false,
+      "reasoningReplay": "same_as_received",
+      "unmarkedReasoningReplay": "none",
+      "reasoningDialect": "reasoning_effort",
+      "maxTokensField": "max_tokens",
+      "nativeWebSearch": false,
+      "extraBody": {}
+    }
+  },
+  "formats": {
+    "anthropic": {
+      "reasoningDialect": "anthropic_budget",
+      "maxTokensField": "max_tokens"
+    },
+    "openai_chat": {
+      "reasoningDialect": "reasoning_effort",
+      "maxTokensField": "max_tokens"
+    },
+    "openai_responses": {
+      "reasoningDialect": "responses_reasoning",
+      "maxTokensField": "max_output_tokens"
+    }
+  },
+  "models": [
+    {
+      "match": {
+        "modelPrefix": "deepseek-v4-pro"
+      },
+      "source": {
+        "url": "https://api-docs.deepseek.com/api/list-models",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Numbers from the list-models example response; the pricing page shows the same limits as 1M and 384K."
+      },
+      "rules": {
+        "structuredOutput": false
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "deepseek-flash"
+      },
+      "source": {
+        "url": "https://api-docs.deepseek.com/api/list-models",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Numbers from the list-models example response; the pricing page shows the same limits as 1M and 384K."
+      },
+      "rules": {
+        "structuredOutput": false
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "deepseek-v4-flash"
+      },
+      "source": {
+        "url": "https://api-docs.deepseek.com/updates",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "deepseek-v4-flash is temporarily routed to V4.1 Flash (deepseek-flash)."
+      },
+      "rules": {
+        "structuredOutput": false
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "qwen3.5-plus"
+      },
+      "source": {
+        "url": "https://www.alibabacloud.com/help/en/model-studio/qwen3-5-plus",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking is on by default (deep-thinking guide). PDF input is not mentioned."
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "qwen3.5-flash"
+      },
+      "source": {
+        "url": "https://www.alibabacloud.com/help/en/model-studio/qwen3-5-flash",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking is on by default (deep-thinking guide). PDF input is not mentioned."
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "qwen-plus"
+      },
+      "source": {
+        "url": "https://www.alibabacloud.com/help/en/model-studio/qwen-plus",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking is off by default (deep-thinking guide)."
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "qwen-max"
+      },
+      "source": {
+        "url": "https://www.alibabacloud.com/help/en/model-studio/qwen-max",
+        "checkedAt": "2026-11-19",
+        "status": "conflict",
+        "note": "Model page gives a 32,768 context window; the overview page says 128K. The smaller value is used."
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "qwen4-max"
+      },
+      "source": {
+        "url": "https://www.alibabacloud.com/help/en/model-studio/qwen4-max",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "reasoning_effort accepts low, high and xhigh (default high); xhigh has no CLI level. JSON Schema output is supported. PDF input is not mentioned."
+      },
+      "rules": {
+        "contextWindow": 1000000,
+        "maxOutputTokens": 131072,
+        "reasoning": {
+          "control": "toggle_effort",
+          "levels": [
+            "low",
+            "high"
+          ]
+        },
+        "input": {
+          "image": true
+        },
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "qwen-long"
+      },
+      "source": {
+        "url": "https://www.alibabacloud.com/help/en/model-studio/qwen-long",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "The page gives a 10,000,000 window, but HTTP requests carry at most 1M tokens. Structured output is JSON Object mode only."
+      },
+      "rules": {
+        "structuredOutput": false
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "kimi-k2.7-code"
+      },
+      "source": {
+        "url": "https://platform.kimi.ai/docs/api/chat.md",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "thinking.type only accepts enabled; disabled returns an error. No reasoning_effort. 256K window like the rest of the K2 series. Deprecated, expected to go offline in late December 2026."
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "kimi-k2"
+      },
+      "source": {
+        "url": "https://platform.kimi.ai/docs/api/models-overview.md",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "256K window. Output limit is not published. kimi-k2.6 can turn thinking off; kimi-k2.7-code has its own entry. The K2 series is deprecated, expected to go offline in late December 2026."
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "kimi-k3"
+      },
+      "source": {
+        "url": "https://platform.kimi.ai/docs/api/chat.md",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "1M window per the models overview; max_completion_tokens defaults to 131,072 (up to 1,048,576). reasoning_effort accepts low, high and max; thinking cannot be turned off."
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "glm-5.1"
+      },
+      "source": {
+        "url": "https://docs.z.ai/guides/llm/glm-5.1",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Model page gives 200K context and 128K output; exact token counts not published (OpenRouter reports 204,800)."
+      },
+      "rules": {
+        "structuredOutput": false
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "glm-5"
+      },
+      "source": {
+        "url": "https://docs.z.ai/guides/llm/glm-5",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Model page gives 200K context and 128K output; exact token counts not published (OpenRouter reports 204,800)."
+      },
+      "rules": {
+        "structuredOutput": false
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "glm-5-turbo"
+      },
+      "source": {
+        "url": "https://docs.z.ai/api-reference/llm/chat-completion",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "GLM-5-Turbo has no guide page; limits follow the GLM-5 series (chat API: 128K maximum output)."
+      },
+      "rules": {
+        "structuredOutput": false
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "glm-4.7"
+      },
+      "source": {
+        "url": "https://docs.z.ai/guides/llm/glm-4.7",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Model page gives 200K context and 128K output; exact token counts not published (OpenRouter reports 204,800)."
+      },
+      "rules": {
+        "structuredOutput": false
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "glm-4.6"
+      },
+      "source": {
+        "url": "https://docs.z.ai/guides/llm/glm-4.6",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Model page gives 200K context and 128K output; exact token counts not published (OpenRouter reports 204,800)."
+      },
+      "rules": {
+        "structuredOutput": false
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "glm-4.5"
+      },
+      "source": {
+        "url": "https://docs.z.ai/guides/llm/glm-4.5",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Model page gives 128K context and 96K output. Covers glm-4.5-air."
+      },
+      "rules": {
+        "structuredOutput": false
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "glm-5.3"
+      },
+      "source": {
+        "url": "https://docs.z.ai/guides/llm/glm-5.3",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Text-only input; reasoning cannot be disabled; reasoning_effort accepts low, high and max. The chat API offers json_object only."
+      },
+      "rules": {
+        "structuredOutput": false
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "glm-5.2"
+      },
+      "source": {
+        "url": "https://docs.z.ai/guides/llm/glm-5.2",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "1M window, 128K output. thinking.type enabled/disabled. reasoning_effort: low and medium map to high, xhigh to max (https://docs.z.ai/api-reference/llm/chat-completion). Text input only; response_format documents json_object only."
+      },
+      "rules": {
+        "structuredOutput": false
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "gpt-5"
+      },
+      "source": {
+        "url": "https://developers.openai.com/api/docs/models/gpt-5",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Reasoning effort supports minimal, low, medium and high; it cannot be turned off."
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "gpt-5.1"
+      },
+      "source": {
+        "url": "https://developers.openai.com/api/docs/models/gpt-5.1",
+        "checkedAt": "2026-11-19",
+        "status": "verified"
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "gpt-5.2"
+      },
+      "source": {
+        "url": "https://developers.openai.com/api/docs/models/gpt-5.2",
+        "checkedAt": "2026-11-19",
+        "status": "verified"
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "gpt-5.4"
+      },
+      "source": {
+        "url": "https://developers.openai.com/api/docs/models/gpt-5.4",
+        "checkedAt": "2026-11-19",
+        "status": "verified"
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "gpt-5.5"
+      },
+      "source": {
+        "url": "https://developers.openai.com/api/docs/models/gpt-5.5",
+        "checkedAt": "2026-11-19",
+        "status": "verified"
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "gpt-6-luna"
+      },
+      "source": {
+        "url": "https://developers.openai.com/api/docs/models/gpt-6-luna",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "reasoning.effort accepts none through max; xhigh is not a CLI effort level. Chat Completions takes function calls only with reasoning effort none; use the Responses format for tools with reasoning."
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "gpt-6.1-terra"
+      },
+      "source": {
+        "url": "https://developers.openai.com/api/docs/models/gpt-6.1-terra",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "reasoning.effort accepts none through max; xhigh is not a CLI effort level. Tool calling needs the Responses API."
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "gpt-6.1-sol"
+      },
+      "source": {
+        "url": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "The API rejects reasoning effort none, so thinking stays on; xhigh is not a CLI effort level. Tool calling needs the Responses API."
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "gpt-6.2-sol"
+      },
+      "source": {
+        "url": "https://developers.openai.com/api/docs/models/gpt-6.2-sol",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "The API rejects reasoning effort none, so thinking stays on; xhigh is not a CLI effort level."
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "gpt-6.2-astra"
+      },
+      "source": {
+        "url": "https://developers.openai.com/api/docs/models/gpt-6.2-astra",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "The API rejects reasoning effort none, so thinking stays on; xhigh is not a CLI effort level."
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "gpt-4.1"
+      },
+      "source": {
+        "url": "https://developers.openai.com/api/docs/models/gpt-4.1",
+        "checkedAt": "2026-11-19",
+        "status": "verified"
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "gemini-2.5-pro"
+      },
+      "source": {
+        "url": "https://aistudio.google.com/docs/models/gemini-2.5-pro",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Reasoning cannot be turned off (OpenAI compatibility guide)."
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "gemini-2.5-flash"
+      },
+      "source": {
+        "url": "https://aistudio.google.com/docs/models/gemini-2.5-flash",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "reasoning_effort none disables thinking (OpenAI compatibility guide). PDF input is not mentioned."
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "gemini-3"
+      },
+      "source": {
+        "url": "https://aistudio.google.com/docs/thinking",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking levels per the thinking guide (gemini-3.1-pro-preview, gemini-3.8-flash); reasoning cannot be turned off. The guide does not repeat the window and output limits."
+      },
+      "rules": {
+        "structuredOutput": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "claude-fable-5"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
+      },
+      "rules": {
+        "structuredOutput": true,
+        "reasoningDialect": "anthropic_adaptive",
+        "nativeWebSearch": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "claude-mythos-5"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
+      },
+      "rules": {
+        "contextWindow": 1000000,
+        "maxOutputTokens": 128000,
+        "reasoning": {
+          "control": "effort",
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "max"
+          ]
+        },
+        "reasoningDialect": "anthropic_adaptive",
+        "input": {
+          "image": true,
+          "pdf": true
+        },
+        "structuredOutput": true,
+        "nativeWebSearch": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "claude-opus-5-5"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
+      },
+      "rules": {
+        "structuredOutput": true,
+        "reasoningDialect": "anthropic_adaptive",
+        "nativeWebSearch": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "claude-opus-5"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
+      },
+      "rules": {
+        "structuredOutput": true,
+        "reasoningDialect": "anthropic_adaptive",
+        "nativeWebSearch": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "claude-sonnet-5-5"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
+      },
+      "rules": {
+        "structuredOutput": true,
+        "reasoningDialect": "anthropic_adaptive",
+        "nativeWebSearch": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "claude-sonnet-5"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
+      },
+      "rules": {
+        "structuredOutput": true,
+        "reasoningDialect": "anthropic_adaptive",
+        "nativeWebSearch": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "claude-haiku-5-5"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
+      },
+      "rules": {
+        "structuredOutput": true,
+        "reasoningDialect": "anthropic_adaptive",
+        "nativeWebSearch": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "claude-opus-4-8"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
+      },
+      "rules": {
+        "structuredOutput": true,
+        "reasoningDialect": "anthropic_adaptive",
+        "nativeWebSearch": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "claude-opus-4-7"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
+      },
+      "rules": {
+        "structuredOutput": true,
+        "reasoningDialect": "anthropic_adaptive",
+        "nativeWebSearch": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "claude-opus-4-6"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
+      },
+      "rules": {
+        "structuredOutput": true,
+        "reasoningDialect": "anthropic_adaptive",
+        "nativeWebSearch": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "claude-sonnet-4-6"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
+      },
+      "rules": {
+        "structuredOutput": true,
+        "reasoningDialect": "anthropic_adaptive",
+        "nativeWebSearch": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "claude-opus-4-5"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
+      },
+      "rules": {
+        "structuredOutput": true,
+        "nativeWebSearch": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "claude-sonnet-4-5"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
+      },
+      "rules": {
+        "structuredOutput": true,
+        "nativeWebSearch": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "claude-haiku-4-5"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape."
+      },
+      "rules": {
+        "structuredOutput": true,
+        "nativeWebSearch": true
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "claude-opus-4-1"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape. Retired on the Claude API, still served on Bedrock and Google Cloud."
+      },
+      "rules": {
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000,
+        "reasoning": {
+          "control": "toggle"
+        },
+        "input": {
+          "image": true,
+          "pdf": true
+        },
+        "structuredOutput": false
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "claude-opus-4"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape. Retired on the Claude API, still served on Bedrock and Google Cloud."
+      },
+      "rules": {
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000,
+        "reasoning": {
+          "control": "toggle"
+        },
+        "input": {
+          "image": true,
+          "pdf": true
+        },
+        "structuredOutput": false
+      }
+    },
+    {
+      "match": {
+        "modelPrefix": "claude-sonnet-4"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Thinking per https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting, levels per https://platform.claude.com/docs/en/build-with-claude/effort, structured outputs and web search per their tool pages; relays of Claude models use the native request shape. Retired on the Claude API, still served on Bedrock and Google Cloud."
+      },
+      "rules": {
+        "contextWindow": 200000,
+        "maxOutputTokens": 64000,
+        "reasoning": {
+          "control": "toggle"
+        },
+        "input": {
+          "image": true,
+          "pdf": true
+        },
+        "structuredOutput": false
+      }
+    }
+  ],
+  "corrections": [
+    {
+      "match": {
+        "modelId": "claude-haiku-4-5"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting",
+        "modelsDevPr": "https://github.com/anomalyco/models.dev/pull/14144",
+        "checkedAt": "2026-11-20",
+        "note": "Extended thinking only, off by default; models.dev lists only budget_tokens without toggle."
+      },
+      "rules": {
+        "reasoning": {
+          "control": "toggle",
+          "levels": []
+        }
+      }
+    },
+    {
+      "match": {
+        "modelId": "claude-sonnet-4-5"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting",
+        "modelsDevPr": "https://github.com/anomalyco/models.dev/pull/14144",
+        "checkedAt": "2026-11-20",
+        "note": "Extended thinking only, off by default; models.dev lists only budget_tokens without toggle."
+      },
+      "rules": {
+        "reasoning": {
+          "control": "toggle",
+          "levels": []
+        }
+      }
+    },
+    {
+      "match": {
+        "modelId": "claude-opus-4-5"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting",
+        "modelsDevPr": "https://github.com/anomalyco/models.dev/pull/14144",
+        "checkedAt": "2026-11-20",
+        "note": "Extended thinking only, off by default; models.dev lists effort and budget_tokens without toggle."
+      },
+      "rules": {
+        "reasoning": {
+          "control": "toggle_effort",
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ]
+        }
+      }
+    },
+    {
+      "match": {
+        "modelId": "claude-opus-4-6"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting",
+        "modelsDevPr": "https://github.com/anomalyco/models.dev/pull/14144",
+        "checkedAt": "2026-11-20",
+        "note": "Adaptive and extended thinking, off by default; models.dev lists effort and budget_tokens without toggle."
+      },
+      "rules": {
+        "reasoning": {
+          "control": "toggle_effort",
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "match": {
+        "modelId": "claude-sonnet-4-6"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting",
+        "modelsDevPr": "https://github.com/anomalyco/models.dev/pull/14144",
+        "checkedAt": "2026-11-20",
+        "note": "Adaptive and extended thinking, off by default; models.dev lists effort and budget_tokens without toggle."
+      },
+      "rules": {
+        "reasoning": {
+          "control": "toggle_effort",
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "match": {
+        "modelId": "claude-opus-4-7"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting",
+        "modelsDevPr": "https://github.com/anomalyco/models.dev/pull/14144",
+        "checkedAt": "2026-11-20",
+        "note": "Adaptive thinking only, off by default, and disabled is accepted; models.dev lists effort without toggle."
+      },
+      "rules": {
+        "reasoning": {
+          "control": "toggle_effort",
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "match": {
+        "modelId": "claude-opus-4-8"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting",
+        "modelsDevPr": "https://github.com/anomalyco/models.dev/pull/14144",
+        "checkedAt": "2026-11-20",
+        "note": "Adaptive thinking only, off by default, and disabled is accepted; models.dev lists effort without toggle."
+      },
+      "rules": {
+        "reasoning": {
+          "control": "toggle_effort",
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "match": {
+        "modelId": "claude-opus-5"
+      },
+      "source": {
+        "url": "https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting",
+        "modelsDevPr": "https://github.com/anomalyco/models.dev/pull/14144",
+        "checkedAt": "2026-11-20",
+        "note": "On by default; disabled is accepted at effort high and below. models.dev lists effort without toggle."
+      },
+      "rules": {
+        "reasoning": {
+          "control": "toggle_effort",
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "max"
+          ]
+        }
+      }
+    }
+  ],
+  "sites": [
+    {
+      "match": {
+        "host": "api.deepseek.com",
+        "apiFormat": "openai_chat"
+      },
+      "source": {
+        "url": "https://api-docs.deepseek.com/guides/thinking_mode",
+        "checkedAt": "2026-11-19",
+        "status": "verified"
+      },
+      "rules": {
+        "reasoningDialect": "thinking_type",
+        "maxTokensField": "max_tokens",
+        "unmarkedReasoningReplay": "reasoning_content"
+      }
+    },
+    {
+      "match": {
+        "host": "api.deepseek.com",
+        "apiFormat": "anthropic"
+      },
+      "source": {
+        "url": "https://api-docs.deepseek.com/guides/anthropic_api",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "adaptive is treated as enabled; budget_tokens is ignored."
+      },
+      "rules": {
+        "reasoningDialect": "anthropic_adaptive",
+        "nativeWebSearch": false
+      }
+    },
+    {
+      "match": {
+        "host": "dashscope.aliyuncs.com",
+        "apiFormat": "openai_chat"
+      },
+      "source": {
+        "url": "https://www.alibabacloud.com/help/en/model-studio/qwen-api-via-openai-chat-completions",
+        "checkedAt": "2026-11-19",
+        "status": "verified"
+      },
+      "rules": {
+        "reasoningDialect": "enable_thinking",
+        "maxTokensField": "max_completion_tokens"
+      }
+    },
+    {
+      "match": {
+        "host": "dashscope-intl.aliyuncs.com",
+        "apiFormat": "openai_chat"
+      },
+      "source": {
+        "url": "https://www.alibabacloud.com/help/en/model-studio/qwen-api-via-openai-chat-completions",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Singapore endpoint of the same compatible-mode API."
+      },
+      "rules": {
+        "reasoningDialect": "enable_thinking",
+        "maxTokensField": "max_completion_tokens"
+      }
+    },
+    {
+      "match": {
+        "host": "maas.aliyuncs.com",
+        "apiFormat": "openai_chat"
+      },
+      "source": {
+        "url": "https://www.alibabacloud.com/help/en/model-studio/qwen-api-via-openai-chat-completions",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "Workspace hosts such as {WorkspaceId}.cn-beijing.maas.aliyuncs.com match by suffix."
+      },
+      "rules": {
+        "reasoningDialect": "enable_thinking",
+        "maxTokensField": "max_completion_tokens"
+      }
+    },
+    {
+      "match": {
+        "host": "api.moonshot.ai",
+        "apiFormat": "openai_chat"
+      },
+      "source": {
+        "url": "https://platform.kimi.ai/docs/api/chat.md",
+        "checkedAt": "2026-11-19",
+        "status": "verified"
+      },
+      "rules": {
+        "reasoningDialect": "thinking_type",
+        "maxTokensField": "max_completion_tokens"
+      }
+    },
+    {
+      "match": {
+        "host": "api.moonshot.cn",
+        "apiFormat": "openai_chat"
+      },
+      "source": {
+        "url": "https://platform.kimi.ai/docs/api/chat.md",
+        "checkedAt": "2026-11-19",
+        "status": "verified"
+      },
+      "rules": {
+        "reasoningDialect": "thinking_type",
+        "maxTokensField": "max_completion_tokens"
+      }
+    },
+    {
+      "match": {
+        "host": "api.kimi.com",
+        "apiFormat": "anthropic"
+      },
+      "source": {
+        "url": "https://www.kimi.com/code/docs/en/",
+        "checkedAt": "2026-11-19",
+        "status": "unverified",
+        "note": "Kimi Code endpoint used by the Kimi preset; how it treats adaptive, budget and effort is not documented, so the current behavior is kept."
+      },
+      "rules": {
+        "reasoningDialect": "anthropic_disable_only",
+        "nativeWebSearch": false
+      }
+    },
+    {
+      "match": {
+        "host": "api.kimi.ai",
+        "apiFormat": "anthropic"
+      },
+      "source": {
+        "url": "https://www.kimi.com/code/docs/en/",
+        "checkedAt": "2026-11-19",
+        "status": "unverified",
+        "note": "Overseas Kimi Code endpoint (https://api.kimi.ai/coding/); treated like api.kimi.com."
+      },
+      "rules": {
+        "reasoningDialect": "anthropic_disable_only",
+        "nativeWebSearch": false
+      }
+    },
+    {
+      "match": {
+        "host": "open.bigmodel.cn",
+        "apiFormat": "openai_chat"
+      },
+      "source": {
+        "url": "https://docs.z.ai/api-reference/llm/chat-completion",
+        "checkedAt": "2026-11-19",
+        "status": "verified"
+      },
+      "rules": {
+        "reasoningDialect": "thinking_type",
+        "maxTokensField": "max_tokens"
+      }
+    },
+    {
+      "match": {
+        "host": "api.z.ai",
+        "apiFormat": "openai_chat"
+      },
+      "source": {
+        "url": "https://docs.z.ai/api-reference/llm/chat-completion",
+        "checkedAt": "2026-11-19",
+        "status": "verified"
+      },
+      "rules": {
+        "reasoningDialect": "thinking_type",
+        "maxTokensField": "max_tokens"
+      }
+    },
+    {
+      "match": {
+        "host": "open.bigmodel.cn",
+        "apiFormat": "anthropic"
+      },
+      "source": {
+        "url": "https://docs.bigmodel.cn/cn/guide/develop/claude/introduction",
+        "checkedAt": "2026-11-19",
+        "status": "unverified",
+        "note": "Used by the Zhipu preset; the page does not document thinking fields, so the current behavior is kept."
+      },
+      "rules": {
+        "reasoningDialect": "anthropic_disable_only",
+        "nativeWebSearch": false
+      }
+    },
+    {
+      "match": {
+        "host": "api.z.ai",
+        "apiFormat": "anthropic"
+      },
+      "source": {
+        "url": "https://docs.bigmodel.cn/cn/guide/develop/claude/introduction",
+        "checkedAt": "2026-11-19",
+        "status": "unverified",
+        "note": "Used by the Zhipu preset; the page does not document thinking fields, so the current behavior is kept."
+      },
+      "rules": {
+        "reasoningDialect": "anthropic_disable_only",
+        "nativeWebSearch": false
+      }
+    },
+    {
+      "match": {
+        "host": "api.minimax.io",
+        "apiFormat": "openai_chat"
+      },
+      "source": {
+        "url": "https://platform.minimax.io/docs/api-reference/text-chat-openai.md",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "reasoning_split true moves reasoning into reasoning_content."
+      },
+      "rules": {
+        "reasoningDialect": "thinking_adaptive",
+        "maxTokensField": "max_completion_tokens",
+        "extraBody": {
+          "reasoning_split": true
+        }
+      }
+    },
+    {
+      "match": {
+        "host": "api.minimax.io",
+        "apiFormat": "anthropic"
+      },
+      "source": {
+        "url": "https://platform.minimax.io/docs/api-reference/text-chat-anthropic.md",
+        "checkedAt": "2026-11-19",
+        "status": "verified"
+      },
+      "rules": {
+        "reasoningDialect": "anthropic_adaptive",
+        "nativeWebSearch": false
+      }
+    },
+    {
+      "match": {
+        "host": "openrouter.ai",
+        "apiFormat": "openai_chat"
+      },
+      "source": {
+        "url": "https://openrouter.ai/docs/use-cases/reasoning-tokens",
+        "checkedAt": "2026-11-19",
+        "status": "verified"
+      },
+      "rules": {
+        "reasoningDialect": "openrouter",
+        "maxTokensField": "max_tokens"
+      }
+    },
+    {
+      "match": {
+        "host": "openrouter.ai",
+        "apiFormat": "anthropic"
+      },
+      "source": {
+        "url": "https://openrouter.ai/docs/use-cases/reasoning-tokens",
+        "checkedAt": "2026-11-20",
+        "status": "verified",
+        "note": "Anthropic Messages requests: thinking.type adaptive and output_config.effort are normalized to the unified reasoning parameter for every reasoning model."
+      },
+      "rules": {
+        "reasoningDialect": "anthropic_adaptive"
+      }
+    },
+    {
+      "match": {
+        "host": "api.openai.com",
+        "apiFormat": "openai_chat"
+      },
+      "source": {
+        "url": "https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "max_tokens is deprecated and not compatible with reasoning models."
+      },
+      "rules": {
+        "reasoningDialect": "reasoning_effort",
+        "maxTokensField": "max_completion_tokens"
+      }
+    },
+    {
+      "match": {
+        "host": "api.openai.com",
+        "apiFormat": "openai_responses"
+      },
+      "source": {
+        "url": "https://developers.openai.com/api/docs/guides/reasoning",
+        "checkedAt": "2026-11-19",
+        "status": "verified"
+      },
+      "rules": {
+        "reasoningDialect": "responses_reasoning",
+        "maxTokensField": "max_output_tokens"
+      }
+    },
+    {
+      "match": {
+        "host": "generativelanguage.googleapis.com",
+        "apiFormat": "openai_chat"
+      },
+      "source": {
+        "url": "https://aistudio.google.com/docs/openai",
+        "checkedAt": "2026-11-19",
+        "status": "unverified",
+        "note": "The page does not say which output limit field is accepted; max_tokens is assumed."
+      },
+      "rules": {
+        "reasoningDialect": "reasoning_effort",
+        "maxTokensField": "max_tokens"
+      }
+    },
+    {
+      "match": {
+        "host": "api.moonshot.ai",
+        "apiFormat": "openai_chat",
+        "modelPrefix": "kimi-k2"
+      },
+      "source": {
+        "url": "https://platform.kimi.ai/docs/api/chat.md",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "thinking.keep all keeps earlier reasoning_content (Preserved Thinking)."
+      },
+      "rules": {
+        "extraBody": {
+          "thinking": {
+            "keep": "all"
+          }
+        }
+      }
+    },
+    {
+      "match": {
+        "host": "api.moonshot.ai",
+        "apiFormat": "openai_chat",
+        "modelPrefix": "kimi-k3"
+      },
+      "source": {
+        "url": "https://platform.kimi.ai/docs/api/chat.md",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "The K3 series uses reasoning_effort and does not accept thinking."
+      },
+      "rules": {
+        "reasoningDialect": "reasoning_effort"
+      }
+    },
+    {
+      "match": {
+        "host": "api.moonshot.cn",
+        "apiFormat": "openai_chat",
+        "modelPrefix": "kimi-k2"
+      },
+      "source": {
+        "url": "https://platform.kimi.ai/docs/api/chat.md",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "thinking.keep all keeps earlier reasoning_content (Preserved Thinking)."
+      },
+      "rules": {
+        "extraBody": {
+          "thinking": {
+            "keep": "all"
+          }
+        }
+      }
+    },
+    {
+      "match": {
+        "host": "api.moonshot.cn",
+        "apiFormat": "openai_chat",
+        "modelPrefix": "kimi-k3"
+      },
+      "source": {
+        "url": "https://platform.kimi.ai/docs/api/chat.md",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "The K3 series uses reasoning_effort and does not accept thinking."
+      },
+      "rules": {
+        "reasoningDialect": "reasoning_effort"
+      }
+    },
+    {
+      "match": {
+        "host": "open.bigmodel.cn",
+        "apiFormat": "openai_chat",
+        "modelPrefix": "glm-"
+      },
+      "source": {
+        "url": "https://docs.z.ai/guides/capabilities/thinking-mode",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "clear_thinking false keeps reasoning from earlier turns."
+      },
+      "rules": {
+        "extraBody": {
+          "thinking": {
+            "clear_thinking": false
+          }
+        }
+      }
+    },
+    {
+      "match": {
+        "host": "api.z.ai",
+        "apiFormat": "openai_chat",
+        "modelPrefix": "glm-"
+      },
+      "source": {
+        "url": "https://docs.z.ai/guides/capabilities/thinking-mode",
+        "checkedAt": "2026-11-19",
+        "status": "verified",
+        "note": "clear_thinking false keeps reasoning from earlier turns."
+      },
+      "rules": {
+        "extraBody": {
+          "thinking": {
+            "clear_thinking": false
+          }
+        }
+      }
+    }
+  ]
+}

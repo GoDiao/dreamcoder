@@ -7,7 +7,7 @@ import memoize from 'lodash-es/memoize.js'
 import picomatch from 'picomatch'
 import { homedir, tmpdir } from 'os'
 import { join, normalize, posix, sep } from 'path'
-import { hasAutoMemPathOverride, isAutoMemPath } from 'src/memdir/paths.js'
+import { isAutoMemPath } from 'src/memdir/paths.js'
 import { isAgentMemoryPath } from 'src/tools/AgentTool/agentMemory.js'
 import {
   CLAUDE_FOLDER_PERMISSION_PATTERN,
@@ -1729,14 +1729,7 @@ export function checkEditableInternalPath(
     }
   }
 
-  // Memdir directory (persistent memory for cross-session learning)
-  // This pre-safety-check carve-out exists because the default path is under
-  // ~/.claude/, which is in DANGEROUS_DIRECTORIES. The CLAUDE_COWORK_MEMORY_PATH_OVERRIDE
-  // override is an arbitrary caller-designated directory with no such conflict,
-  // so it gets NO special permission treatment here — writes go through normal
-  // permission flow (step 5 → ask). SDK callers who want silent memory should
-  // pass an allow rule for the override path.
-  if (!hasAutoMemPathOverride() && isAutoMemPath(normalizedPath)) {
+  if (isAutoMemPath(normalizedPath)) {
     return {
       behavior: 'allow',
       updatedInput: input,

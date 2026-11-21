@@ -9,7 +9,12 @@ export function isBrowserSearchEngineId(value: unknown): value is BrowserSearchE
   return typeof value === 'string' && (BROWSER_SEARCH_ENGINE_IDS as readonly string[]).includes(value)
 }
 
-export type EffortLevel = 'low' | 'medium' | 'high' | 'max'
+export const EFFORT_LEVELS = ['low', 'medium', 'high', 'max'] as const
+export type EffortLevel = (typeof EFFORT_LEVELS)[number]
+
+export function isEffortLevel(value: unknown): value is EffortLevel {
+  return typeof value === 'string' && (EFFORT_LEVELS as readonly string[]).includes(value)
+}
 export const THEME_MODES = ['white', 'light', 'dark', 'dreamfield', 'amber', 'midnight', 'aurora'] as const
 export type ThemeMode = (typeof THEME_MODES)[number]
 

@@ -12,7 +12,7 @@ import { markPostCompaction } from 'src/bootstrap/state.js'
 import { getInvokedSkillsForAgent } from '../../bootstrap/state.js'
 import type { QuerySource } from '../../constants/querySource.js'
 import type { CanUseToolFn } from '../../hooks/useCanUseTool.js'
-import type { Tool, ToolUseContext } from '../../Tool.js'
+import type { Tool, Tools, ToolUseContext } from '../../Tool.js'
 import type { LocalAgentTaskState } from '../../tasks/LocalAgentTask/LocalAgentTask.js'
 import { FileReadTool } from '../../tools/FileReadTool/FileReadTool.js'
 import {
@@ -35,10 +35,12 @@ import {
   createAttachmentMessage,
   generateFileAttachment,
   getAgentListingDeltaAttachment,
+  getSkillListingAttachments,
   getDeferredToolsDeltaAttachment,
   getMcpInstructionsDeltaAttachment,
 } from '../../utils/attachments.js'
 import { getMemoryPath } from '../../utils/config.js'
+import { isClaudeModelName } from '../../utils/model/claudeModelName.js'
 import { COMPACT_MAX_OUTPUT_TOKENS } from '../../utils/context.js'
 import {
   analyzeContext,
@@ -201,8 +203,8 @@ export function stripImagesFromMessages(messages: Message[]): Message[] {
 
 /**
  * Strip attachment types that are re-injected post-compaction anyway.
- * skill_discovery/skill_listing are re-surfaced by resetSentSkillNames()
- * + the next turn's discovery signal, so feeding them to the summarizer
+ * skill_discovery/skill_listing are re-surfaced after compaction
+ * and by the next turn's discovery signal, so feeding them to the summarizer
  * wastes tokens and pollutes the summary with stale skill suggestions.
  *
  * No-op when EXPERIMENTAL_SKILL_SEARCH is off (the attachment types
@@ -220,6 +222,24 @@ export function stripReinjectedAttachments(messages: Message[]): Message[] {
     )
   }
   return messages
+}
+
+export function compactRequestMessages(
+  messages: Message[],
+  summaryRequest: UserMessage,
+  tools: Tools,
+  model: string,
+): (UserMessage | AssistantMessage)[] {
+  return normalizeMessagesForAPI(
+    stripImagesFromMessages(
+      stripReinjectedAttachments([
+        ...getMessagesAfterCompactBoundary(messages),
+        summaryRequest,
+      ]),
+    ),
+    tools,
+    { foldIntoToolResults: isClaudeModelName(model) },
+  )
 }
 
 export const ERROR_MESSAGE_NOT_ENOUGH_MESSAGES =
@@ -521,13 +541,6 @@ export async function compactConversation(
     context.readFileState.clear()
     context.loadedNestedMemoryPaths?.clear()
 
-    // Intentionally NOT resetting sentSkillNames: re-injecting the full
-    // skill_listing (~4K tokens) post-compact is pure cache_creation with
-    // marginal benefit. The model still has SkillTool in its schema and
-    // invoked_skills attachment (below) preserves used-skill content. Ants
-    // with EXPERIMENTAL_SKILL_SEARCH already skip re-injection via the
-    // early-return in getSkillListingAttachments.
-
     // Run async attachment generation in parallel
     const [fileAttachments, asyncAgentAttachments] = await Promise.all([
       createPostCompactFileAttachments(
@@ -573,6 +586,9 @@ export async function compactConversation(
       postCompactFileAttachments.push(createAttachmentMessage(att))
     }
     for (const att of getAgentListingDeltaAttachment(context, [])) {
+      postCompactFileAttachments.push(createAttachmentMessage(att))
+    }
+    for (const att of await getSkillListingAttachments(context, [])) {
       postCompactFileAttachments.push(createAttachmentMessage(att))
     }
     for (const att of getMcpInstructionsDeltaAttachment(
@@ -917,8 +933,6 @@ export async function partialCompactConversation(
     const preCompactReadFileState = cacheToObject(context.readFileState)
     context.readFileState.clear()
     context.loadedNestedMemoryPaths?.clear()
-    // Intentionally NOT resetting sentSkillNames — see compactConversation()
-    // for rationale (~4K tokens saved per compact event).
 
     const [fileAttachments, asyncAgentAttachments] = await Promise.all([
       createPostCompactFileAttachments(
@@ -961,6 +975,9 @@ export async function partialCompactConversation(
       postCompactFileAttachments.push(createAttachmentMessage(att))
     }
     for (const att of getAgentListingDeltaAttachment(context, messagesToKeep)) {
+      postCompactFileAttachments.push(createAttachmentMessage(att))
+    }
+    for (const att of await getSkillListingAttachments(context, messagesToKeep)) {
       postCompactFileAttachments.push(createAttachmentMessage(att))
     }
     for (const att of getMcpInstructionsDeltaAttachment(
@@ -1286,14 +1303,11 @@ async function streamCompactSummary({
         : [FileReadTool]
 
       const streamingGen = queryModelWithStreaming({
-        messages: normalizeMessagesForAPI(
-          stripImagesFromMessages(
-            stripReinjectedAttachments([
-              ...getMessagesAfterCompactBoundary(messages),
-              summaryRequest,
-            ]),
-          ),
+        messages: compactRequestMessages(
+          messages,
+          summaryRequest,
           context.options.tools,
+          context.options.mainLoopModel,
         ),
         systemPrompt: asSystemPrompt([
           'You are a helpful AI assistant tasked with summarizing conversations.',

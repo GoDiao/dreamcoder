@@ -10,11 +10,25 @@ import {
   UpstreamReplyError,
   type AnthropicError,
 } from '../../upstream/upstreamError.js'
+import type { ResolvedModelRules } from '../../types/modelRules.js'
+import { ChatReasoningBuffer, readChatReasoning } from './reasoningReplay.js'
+import { splitThinkTags } from './thinkTags.js'
 import { parseOpenAIToolArguments } from './toolArguments.js'
 
 export type ChatFinish = { stopReason: string } | { error: AnthropicError }
 
-export function openaiChatToAnthropic(response: OpenAIChatResponse, model: string): AnthropicResponse {
+function thinkingBlock(thinking: string, signature: string | undefined): AnthropicContentBlock {
+  return signature === undefined ? { type: 'thinking', thinking } : { type: 'thinking', thinking, signature }
+}
+
+function textBlocks(text: string, rules: ResolvedModelRules): AnthropicContentBlock[] {
+  if (!rules.thinkTagsInText) return [{ type: 'text', text }]
+  return splitThinkTags(text).map(segment => segment.kind === 'thinking'
+    ? thinkingBlock(segment.text, undefined)
+    : { type: 'text', text: segment.text })
+}
+
+export function openaiChatToAnthropic(response: OpenAIChatResponse, model: string, rules: ResolvedModelRules): AnthropicResponse {
   const choice = response.choices?.[0]
   if (!choice) {
     return createEmptyResponse(response, model)
@@ -22,24 +36,14 @@ export function openaiChatToAnthropic(response: OpenAIChatResponse, model: strin
 
   const content: AnthropicContentBlock[] = []
 
-  const msg = choice.message as Record<string, unknown>
-
-  if (typeof msg.reasoning_content === 'string' && msg.reasoning_content) {
-    content.push({ type: 'thinking', thinking: msg.reasoning_content })
-  }
-  else if (typeof msg.reasoning === 'string' && msg.reasoning) {
-    content.push({ type: 'thinking', thinking: msg.reasoning })
-  }
-  else if (Array.isArray(msg.thinking_blocks)) {
-    for (const tb of msg.thinking_blocks as Array<Record<string, unknown>>) {
-      if (tb.type === 'thinking' && typeof tb.thinking === 'string') {
-        content.push({ type: 'thinking', thinking: tb.thinking, signature: tb.signature as string | undefined })
-      }
-    }
+  for (const piece of readChatReasoning(choice.message)) {
+    const buffer = new ChatReasoningBuffer()
+    buffer.add(piece)
+    content.push(thinkingBlock(piece.thinking, buffer.signatureFor(rules)))
   }
 
   if (choice.message.content) {
-    content.push({ type: 'text', text: choice.message.content })
+    content.push(...textBlocks(choice.message.content, rules))
   }
 
   if (choice.message.tool_calls) {

@@ -1,3 +1,4 @@
+import type { ResolvedModelRules } from '../../types/modelRules.js'
 import type {
   AnthropicRequest,
   AnthropicContentBlock,
@@ -8,12 +9,15 @@ import type {
   OpenAIToolCall,
   OpenAITool,
 } from './types.js'
-import { extractToolResultContent } from './toolArguments.js'
+import { joinText, mediaPart, toolResultParts, type MediaPart } from './media.js'
+import { chatReasoningReplay } from './reasoningReplay.js'
+import { applyRequestRules, outputFormatFor, type RequestRulesOptions } from './requestRules.js'
 import { cleanToolSchema } from './toolSchema.js'
 
 export function anthropicToOpenaiChat(
   body: AnthropicRequest,
-  options: { roundTripReasoningContent?: boolean; passThinkingToggle?: boolean } = {},
+  rules: ResolvedModelRules,
+  options: RequestRulesOptions = {},
 ): OpenAIChatRequest {
   const messages: OpenAIChatMessage[] = []
 
@@ -27,7 +31,7 @@ export function anthropicToOpenaiChat(
   }
 
   for (const msg of body.messages) {
-    convertMessage(msg, messages, options)
+    convertMessage(msg, messages, rules)
   }
 
   const result: OpenAIChatRequest = {
@@ -63,27 +67,28 @@ export function anthropicToOpenaiChat(
     result.tool_choice = convertToolChoice(body.tool_choice)
   }
 
-  if (body.thinking) {
-    const budget = body.thinking.budget_tokens
-    if (budget !== undefined) {
-      if (budget <= 1024) result.reasoning_effort = 'low'
-      else if (budget <= 8192) result.reasoning_effort = 'medium'
-      else result.reasoning_effort = 'high'
-    } else if (body.thinking.type === 'enabled') {
-      result.reasoning_effort = 'high'
-    }
-    if (options.passThinkingToggle) {
-      result.thinking = { type: body.thinking.type }
-    }
-  }
+  const format = outputFormatFor(body, rules)
+  if (format) result.response_format = { type: 'json_schema', json_schema: { name: 'output', schema: format.schema } }
 
+  applyRequestRules(result, body, rules, options)
   return result
+}
+
+function chatPart(part: MediaPart): OpenAIChatContentPart {
+  switch (part.kind) {
+    case 'text':
+      return { type: 'text', text: part.text }
+    case 'image':
+      return { type: 'image_url', image_url: { url: part.url } }
+    case 'file':
+      return { type: 'file', file: { filename: part.filename, file_data: part.fileData } }
+  }
 }
 
 function convertMessage(
   msg: AnthropicMessage,
   output: OpenAIChatMessage[],
-  options: { roundTripReasoningContent?: boolean },
+  rules: ResolvedModelRules,
 ): void {
   const content = msg.content
 
@@ -98,31 +103,37 @@ function convertMessage(
   }
 
   if (msg.role === 'user') {
-    convertUserMessage(content, output)
+    convertUserMessage(content, output, rules)
   } else {
-    convertAssistantMessage(content, output, options)
+    convertAssistantMessage(content, output, rules)
   }
 }
 
-function convertUserMessage(blocks: AnthropicContentBlock[], output: OpenAIChatMessage[]): void {
-  const contentParts: OpenAIChatContentPart[] = []
+function convertUserMessage(blocks: AnthropicContentBlock[], output: OpenAIChatMessage[], rules: ResolvedModelRules): void {
+  const toolAttachments: OpenAIChatContentPart[] = []
+  const ownParts: OpenAIChatContentPart[] = []
 
   for (const block of blocks) {
     if (block.type === 'text') {
-      contentParts.push({ type: 'text', text: block.text })
-    } else if (block.type === 'image') {
-      const url = `data:${block.source.media_type};base64,${block.source.data}`
-      contentParts.push({ type: 'image_url', image_url: { url } })
+      ownParts.push({ type: 'text', text: block.text })
+    } else if (block.type === 'image' || block.type === 'document') {
+      ownParts.push(chatPart(mediaPart(block, rules)))
     } else if (block.type === 'tool_result') {
-      const resultContent = extractToolResultContent(block.content)
+      const parts = toolResultParts(block.content, rules)
+      const attachments = parts.filter(part => part.kind !== 'text')
+      const note = attachments.length > 0 ? '[Attachments from this result are in the next user message.]' : ''
       output.push({
         role: 'tool',
         tool_call_id: block.tool_use_id,
-        content: resultContent,
+        content: [joinText(parts), note].filter(Boolean).join('\n'),
       })
+      if (attachments.length > 0) {
+        toolAttachments.push({ type: 'text', text: `[Attachments from tool result ${block.tool_use_id}]` }, ...attachments.map(chatPart))
+      }
     }
   }
 
+  const contentParts = [...toolAttachments, ...ownParts]
   if (contentParts.length > 0) {
     output.push({
       role: 'user',
@@ -136,17 +147,17 @@ function convertUserMessage(blocks: AnthropicContentBlock[], output: OpenAIChatM
 function convertAssistantMessage(
   blocks: AnthropicContentBlock[],
   output: OpenAIChatMessage[],
-  options: { roundTripReasoningContent?: boolean },
+  rules: ResolvedModelRules,
 ): void {
   let textContent = ''
-  let reasoningContent = ''
+  const thinkingBlocks: Extract<AnthropicContentBlock, { type: 'thinking' }>[] = []
   const toolCalls: OpenAIToolCall[] = []
 
   for (const block of blocks) {
     if (block.type === 'text') {
       textContent += block.text
-    } else if (block.type === 'thinking' && options.roundTripReasoningContent) {
-      reasoningContent += block.thinking
+    } else if (block.type === 'thinking') {
+      thinkingBlocks.push(block)
     } else if (block.type === 'tool_use') {
       toolCalls.push({
         id: block.id,
@@ -162,13 +173,11 @@ function convertAssistantMessage(
   const msg: OpenAIChatMessage = {
     role: 'assistant',
     content: textContent || null,
+    ...chatReasoningReplay(thinkingBlocks, rules),
   }
 
   if (toolCalls.length > 0) {
     msg.tool_calls = toolCalls
-  }
-  if (reasoningContent) {
-    msg.reasoning_content = reasoningContent
   }
 
   output.push(msg)

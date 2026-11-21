@@ -4,6 +4,7 @@ import { sessionService } from './sessionService.js'
 import { cleanSessionTitleSource, hasSessionTitleMarkup } from '../../utils/sessionTitleText.js'
 import { resolveUpstreamTarget, sendToUpstream } from '../upstream/client.js'
 import { describeFailure } from '../upstream/upstreamError.js'
+import { auxiliaryRequestFields, type AuxiliaryRequestFields } from './modelRules/auxiliaryRequest.js'
 
 const TITLE_MAX_LEN = 50
 const TITLE_MAX_OUTPUT_TOKENS = 100
@@ -82,13 +83,13 @@ export async function generateTitle(
     loggedModel = titleModel
     if (!titleModel) return fail('no model to use')
 
-    const shouldDisableThinking = await shouldDisableThinkingForTitle()
-    const result = await sendToUpstream(target, {
+    const thinkingFields = auxiliaryRequestFields(resolvedProvider, titleModel) ?? await officialTitleThinking()
+    const result = await sendToUpstream({ target, provider: resolvedProvider }, {
       model: titleModel,
       max_tokens: TITLE_MAX_OUTPUT_TOKENS,
       system: TITLE_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: trimmed.slice(0, 2000) }],
-      ...(shouldDisableThinking && { thinking: { type: 'disabled' } }),
+      ...thinkingFields,
     }, { timeoutMs: 15_000 })
 
     if (!result.ok) {
@@ -177,9 +178,9 @@ function looksLikeStructuredTitleFragment(text: string): boolean {
   )
 }
 
-async function shouldDisableThinkingForTitle(): Promise<boolean> {
+async function officialTitleThinking(): Promise<AuxiliaryRequestFields> {
   const settings = await new SettingsService().getUserSettings()
-  return settings.alwaysThinkingEnabled === false
+  return settings.alwaysThinkingEnabled === false ? { thinking: { type: 'disabled' } } : {}
 }
 
 export async function saveAiTitle(sessionId: string, title: string): Promise<boolean> {

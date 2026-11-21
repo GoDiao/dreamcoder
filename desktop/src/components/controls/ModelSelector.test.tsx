@@ -8,6 +8,8 @@ import { useProviderStore } from '../../stores/providerStore'
 import { useSessionRuntimeStore } from '../../stores/sessionRuntimeStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import type { ModelInfo } from '../../types/settings'
+import type { ResolvedModelRulesView } from '../../types/provider'
+import { resolvedView } from '../settings/resolvedViewFixture'
 import type { RuntimeSelection } from '../../types/runtime'
 
 const MODELS: ModelInfo[] = [
@@ -256,4 +258,66 @@ describe('ModelSelector', () => {
     expect(screen.getByRole('combobox', { name: /^Select model/ })).toBeDisabled()
     expect(screen.getByRole('combobox', { name: 'Effort: Medium' })).toBeDisabled()
   })
+
+  function seedResolvedView(view: Record<string, ResolvedModelRulesView>) {
+    useProviderStore.setState((state) => ({
+      providers: state.providers.map((provider) =>
+        provider.id === 'provider-a' ? { ...provider, apiFormat: 'openai_chat', resolvedModels: view } : provider),
+    }))
+  }
+
+  it('offers only the levels the model supports and shows the converted level in the trigger', async () => {
+    seedProviders()
+    seedResolvedView({ 'provider-main': resolvedView() })
+
+    render(<ModelSelector runtimeKey="session-1" />)
+
+    const effort = screen.getByRole('combobox', { name: 'Effort: High' })
+    expect(effort).toHaveTextContent('Effort High')
+    act(() => effort.focus())
+    fireEvent.keyDown(effort, { key: 'ArrowDown' })
+    const options = await screen.findAllByRole('option')
+    expect(options.map((option) => option.textContent)).toEqual(['Low', 'High', 'Max'])
+  })
+
+  it('converts the session effort ahead of the global effort through the model view', () => {
+    seedProviders()
+    useSettingsStore.setState({ effortLevel: 'low' })
+    seedResolvedView({ 'provider-main': resolvedView() })
+    mirrorRuntime('session-medium', { providerId: 'provider-a', modelId: 'provider-main', effort: 'medium' })
+
+    render(<ModelSelector runtimeKey="session-medium" />)
+
+    expect(screen.getByRole('combobox', { name: 'Effort: High' })).toBeInTheDocument()
+  })
+
+  it('hides the effort select when the model has no levels', () => {
+    seedProviders()
+    seedResolvedView({ 'provider-main': resolvedView({ effortLevels: [] }) })
+
+    render(<ModelSelector runtimeKey="session-1" />)
+
+    expect(screen.getByRole('combobox', { name: /^Select model/ })).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: /^Effort/ })).not.toBeInTheDocument()
+  })
+
+  it('marks dropdown models that use the generic defaults but not the trigger', async () => {
+    seedProviders()
+    seedResolvedView({
+      'provider-main': resolvedView({ usedFallback: true }),
+      'provider-fast': resolvedView({ usedFallback: false }),
+    })
+
+    render(<ModelSelector runtimeKey="session-1" />)
+
+    const combobox = screen.getByRole('combobox', { name: /^Select model/ })
+    expect(combobox).not.toHaveTextContent('Uses generic defaults')
+    act(() => combobox.focus())
+    fireEvent.keyDown(combobox, { key: 'ArrowDown' })
+    const groupA = await screen.findByRole('group', { name: /Provider A/ })
+    const [main, fast] = within(groupA).getAllByRole('option')
+    expect(main).toHaveTextContent('Uses generic defaults')
+    expect(fast).not.toHaveTextContent('Uses generic defaults')
+  })
 })
+

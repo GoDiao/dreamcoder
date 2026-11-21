@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="100 100 824 824"><defs><clipPath id="tile-only"><rect x="100" y="100" width="824" height="824" rx="185"/></clipPath></defs><g clip-path="url(#tile-only)">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#434c65"/>
+      <stop offset="1" stop-color="#13192b"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.32"/>
+      <stop offset="0.3" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0.08"/>
+    </linearGradient>
+    <radialGradient id="glow" gradientUnits="userSpaceOnUse" cx="641" cy="409" r="440">
+      <stop offset="0" stop-color="#ffe6b8" stop-opacity="0.15"/>
+      <stop offset="0.45" stop-color="#ffe6b8" stop-opacity="0.052"/>
+      <stop offset="1" stop-color="#ffe6b8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bloom" gradientUnits="userSpaceOnUse" cx="641" cy="409" r="130">
+      <stop offset="0" stop-color="#ffe6b8" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#ffe6b8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="prompt" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#fff8ea"/>
+      <stop offset="1" stop-color="#eed6a4"/>
+    </linearGradient>
+    <linearGradient id="star" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd27a"/>
+      <stop offset="1" stop-color="#eea445"/>
+    </linearGradient>
+    <filter id="tile-shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#000" flood-opacity="0.32"/>
+    </filter>
+    <filter id="glyph-shadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+    <clipPath id="tile-clip">
+      <rect x="100" y="100" width="824" height="824" rx="185"/>
+    </clipPath>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#tile)" filter="url(#tile-shadow)"/>
+  <g clip-path="url(#tile-clip)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#glow)"/>
+    <rect x="100" y="100" width="824" height="824" fill="url(#bloom)"/>
+  </g>
+  <rect x="102" y="102" width="820" height="820" rx="183" fill="none" stroke="url(#rim)" stroke-width="4"/>
+  <g filter="url(#glyph-shadow)">
+    <g transform="translate(100 100) scale(12.875) translate(-1 2)">
+      <path d="M15 17 L32 33 L15 49 A34 34 0 0 0 15 17 Z" fill="url(#prompt)" stroke="url(#prompt)" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M43 12.4 Q44.5 20.5 52.6 22 Q44.5 23.5 43 31.6 Q41.5 23.5 33.4 22 Q41.5 20.5 43 12.4 Z" fill="url(#star)" stroke="url(#star)" stroke-width="0.7" stroke-linejoin="round"/>
+    </g>
+  </g>
+</g></svg>

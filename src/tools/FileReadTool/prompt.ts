@@ -1,3 +1,5 @@
+import { getMainLoopModel } from '../../utils/model/model.js'
+import { getCliModelRules } from '../../utils/model/modelRules.js'
 import { isPDFSupported } from '../../utils/pdfUtils.js'
 import { BASH_TOOL_NAME } from '../BashTool/toolName.js'
 
@@ -37,13 +39,20 @@ Usage:
 - By default, it reads up to ${MAX_LINES_TO_READ} lines starting from the beginning of the file${maxSizeInstruction}
 ${offsetInstruction}
 ${lineFormat}
-- This tool allows Claude Code to read images (eg PNG, JPG, etc). When reading an image file the contents are presented visually as Claude Code is a multimodal LLM.${
-    isPDFSupported()
-      ? '\n- This tool can read PDF files (.pdf). For large PDFs (more than 10 pages), you MUST provide the pages parameter to read specific page ranges (e.g., pages: "1-5"). Reading a large PDF without the pages parameter will fail. Maximum 20 pages per request.'
-      : ''
-  }
+${getMediaInstructions()}
 - This tool can read Jupyter notebooks (.ipynb files) and returns all cells with their outputs, combining code, text, and visualizations.
 - This tool can only read files, not directories. To read a directory, use an ls command via the ${BASH_TOOL_NAME} tool.
-- You will regularly be asked to read screenshots. If the user provides a path to a screenshot, ALWAYS use this tool to view the file at the path. This tool will work with all temporary file paths.
 - If you read a file that exists but has empty contents you will receive a system reminder warning in place of file contents.`
+}
+
+function getMediaInstructions(): string {
+  const model = getMainLoopModel()
+  const pdfInstruction = isPDFSupported(model)
+    ? '\n- This tool can read PDF files (.pdf). For large PDFs (more than 10 pages), you MUST provide the pages parameter to read specific page ranges (e.g., pages: "1-5"). Reading a large PDF without the pages parameter will fail. Maximum 20 pages per request.'
+    : ''
+  if (getCliModelRules(model)?.image === false) {
+    return `- Images do not reach the current model: reading an image returns a short text note in its place. Do not describe an image you have not seen.${pdfInstruction}`
+  }
+  return `- This tool can read images (eg PNG, JPG, etc). When reading an image file the contents are presented visually.${pdfInstruction}
+- You will regularly be asked to read screenshots. If the user provides a path to a screenshot, ALWAYS use this tool to view the file at the path. This tool will work with all temporary file paths.`
 }

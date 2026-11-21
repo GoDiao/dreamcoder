@@ -347,7 +347,7 @@ export function getCompactUserSummaryMessage(
 ${formattedSummary}`
 
   if (transcriptPath) {
-    baseSummary += `\n\nIf you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: ${transcriptPath}`
+    baseSummary += `\n\nIf you need exact details from before compaction (code, error messages, output you produced), search the session transcript with Grep: ${transcriptPath}. It is a JSONL file, usually too large to Read in one call.`
   }
 
   if (recentMessagesPreserved) {

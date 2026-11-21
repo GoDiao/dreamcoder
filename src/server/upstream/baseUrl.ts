@@ -12,3 +12,7 @@ export function openaiUpstreamBaseUrl(baseUrl: string): string {
     || (last.toLowerCase() === 'openai' && VERSION_SEGMENT.test(segments.at(-2) ?? ''))
   return endsInVersion ? trimmed : `${trimmed}/v1`
 }
+
+export function hostnameOf(url: string): string {
+  return URL.parse(url)?.hostname ?? ''
+}

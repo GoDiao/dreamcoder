@@ -1,8 +1,21 @@
+import type { EffortLevel } from '../../../utils/effort.js'
+
+type ReasoningEffort = EffortLevel | 'none'
+
+export type ReasoningFields = {
+  thinking?: { type: 'enabled' | 'disabled' | 'adaptive' }
+  reasoning_effort?: ReasoningEffort
+  enable_thinking?: boolean
+  reasoning?: { effort: ReasoningEffort } | { enabled: true }
+}
+
 export type OpenAIChatMessage = {
   role: 'system' | 'user' | 'assistant' | 'tool'
   content?: string | OpenAIChatContentPart[] | null
   name?: string
   reasoning_content?: string
+  reasoning?: string
+  reasoning_details?: unknown[]
   tool_calls?: OpenAIToolCall[]
   tool_call_id?: string
 }
@@ -10,6 +23,7 @@ export type OpenAIChatMessage = {
 export type OpenAIChatContentPart =
   | { type: 'text'; text: string }
   | { type: 'image_url'; image_url: { url: string; detail?: string } }
+  | { type: 'file'; file: { filename: string; file_data: string } }
 
 export type OpenAIToolCall = {
   id: string
@@ -42,9 +56,8 @@ export type OpenAIChatRequest = {
   tools?: OpenAITool[]
   tool_choice?: unknown
   parallel_tool_calls?: boolean
-  reasoning_effort?: 'low' | 'medium' | 'high'
-  thinking?: { type: string }
-}
+  response_format?: { type: 'json_schema'; json_schema: { name: string; schema: Record<string, unknown> } }
+} & ReasoningFields
 
 export type OpenAIChatResponse = {
   id: string
@@ -57,6 +70,10 @@ export type OpenAIChatResponse = {
       role: string
       content: string | null
       tool_calls?: OpenAIToolCall[]
+      reasoning_content?: string
+      reasoning?: string
+      reasoning_details?: unknown[]
+      thinking_blocks?: unknown[]
     }
     finish_reason: string | null
     usage?: OpenAIChatUsage
@@ -105,11 +122,13 @@ export type OpenAIResponsesContentPart =
   | { type: 'input_text'; text: string }
   | { type: 'output_text'; text: string }
   | { type: 'input_image'; image_url: string }
+  | { type: 'input_file'; filename: string; file_data: string }
 
 export type OpenAIResponsesInputItem =
   | { type: 'message'; role: 'user' | 'assistant' | 'system'; content: string | OpenAIResponsesContentPart[] }
   | { type: 'function_call'; call_id: string; name: string; arguments: unknown }
-  | { type: 'function_call_output'; call_id: string; output: string }
+  | { type: 'function_call_output'; call_id: string; output: string | OpenAIResponsesContentPart[] }
+  | { type: 'reasoning'; summary: Array<{ type: 'summary_text'; text: string }>; encrypted_content: string }
 
 export type OpenAIResponsesRequest = {
   model: string
@@ -129,14 +148,16 @@ export type OpenAIResponsesRequest = {
   }>
   tool_choice?: unknown
   parallel_tool_calls?: boolean
-  reasoning?: { effort?: 'low' | 'medium' | 'high' }
+  reasoning?: { effort: ReasoningEffort }
+  include?: string[]
+  text?: { format: { type: 'json_schema'; name: string; schema: Record<string, unknown> } }
   prompt_cache_key?: string
 }
 
 export type OpenAIResponsesOutputItem =
   | { type: 'message'; role: string; content: Array<{ type: string; text?: string; refusal?: string }> }
   | { type: 'function_call'; id: string; call_id: string; name: string; arguments: unknown }
-  | { type: 'reasoning'; id: string; summary?: Array<{ type: string; text: string }> }
+  | { type: 'reasoning'; id: string; summary?: Array<{ type: string; text: string }>; encrypted_content?: string }
 
 export type OpenAIResponsesResponse = {
   id: string
@@ -162,6 +183,12 @@ export type AnthropicContentBlock =
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> | string; cache_control?: unknown }
   | { type: 'tool_result'; tool_use_id: string; content: string | AnthropicContentBlock[]; is_error?: boolean; cache_control?: unknown }
   | { type: 'thinking'; thinking: string; signature?: string }
+  | { type: 'document'; source: AnthropicDocumentSource; title?: string; cache_control?: unknown }
+
+type AnthropicDocumentSource =
+  | { type: 'base64'; media_type: string; data: string }
+  | { type: 'text'; media_type: string; data: string }
+  | { type: 'url'; url: string }
 
 export type AnthropicMessage = {
   role: 'user' | 'assistant'
@@ -188,7 +215,13 @@ export type AnthropicRequest = {
     type: string
     budget_tokens?: number
   }
+  output_config?: {
+    effort?: EffortLevel
+    format?: AnthropicOutputFormat
+  }
 }
+
+export type AnthropicOutputFormat = { type: 'json_schema'; schema: Record<string, unknown> }
 
 export type AnthropicResponse = {
   id: string

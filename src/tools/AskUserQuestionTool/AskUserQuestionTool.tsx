@@ -7,21 +7,23 @@ import { BLACK_CIRCLE } from 'src/constants/figures.js';
 import { getModeColor } from 'src/utils/permissions/PermissionMode.js';
 import { z } from 'zod/v4';
 import { Box, Text } from '../../ink.js';
-import type { Tool } from '../../Tool.js';
+import type { Tool, ToolInputJSONSchema } from '../../Tool.js';
 import { buildTool, type ToolDef } from '../../Tool.js';
 import { lazySchema } from '../../utils/lazySchema.js';
+import { zodToJsonSchema } from '../../utils/zodToJsonSchema.js';
 import { ASK_USER_QUESTION_TOOL_CHIP_WIDTH, ASK_USER_QUESTION_TOOL_NAME, ASK_USER_QUESTION_TOOL_PROMPT, DESCRIPTION, PREVIEW_FEATURE_PROMPT } from './prompt.js';
 const questionOptionSchema = lazySchema(() => z.object({
   label: z.string().describe('The display text for this option that the user will see and select. Should be concise (1-5 words) and clearly describe the choice.'),
   description: z.string().describe('Explanation of what this option means or what will happen if chosen. Useful for providing context about trade-offs or implications.'),
   preview: z.string().optional().describe('Optional preview content rendered when this option is focused. Use for mockups, code snippets, or visual comparisons that help users compare options. See the tool description for the expected content format.')
 }));
-const questionSchema = lazySchema(() => z.object({
+const questionSchemaFor = <Option extends z.ZodTypeAny,>(option: Option) => z.object({
   question: z.string().describe('The complete question to ask the user. Should be clear, specific, and end with a question mark. Example: "Which library should we use for date formatting?" If multiSelect is true, phrase it accordingly, e.g. "Which features do you want to enable?"'),
   header: z.string().describe(`Very short label displayed as a chip/tag (max ${ASK_USER_QUESTION_TOOL_CHIP_WIDTH} chars). Examples: "Auth method", "Library", "Approach".`),
-  options: z.array(questionOptionSchema()).min(2).max(4).describe(`The available choices for this question. Must have 2-4 options. Each option should be a distinct, mutually exclusive choice (unless multiSelect is enabled). There should be no 'Other' option, that will be provided automatically.`),
+  options: z.array(option).min(2).max(4).describe(`The available choices for this question. Must have 2-4 options. Each option should be a distinct, mutually exclusive choice (unless multiSelect is enabled). There should be no 'Other' option, that will be provided automatically.`),
   multiSelect: z.boolean().default(false).describe('Set to true to allow the user to select multiple options instead of just one. Use when choices are not mutually exclusive.')
-}));
+});
+const questionSchema = lazySchema(() => questionSchemaFor(questionOptionSchema()));
 const annotationsSchema = lazySchema(() => {
   const annotationSchema = z.object({
     preview: z.string().optional().describe('The preview content of the selected option, if the question used previews.'),
@@ -59,13 +61,22 @@ const commonFields = lazySchema(() => ({
     source: z.string().optional().describe('Optional identifier for the source of this question (e.g., "remember" for /remember command). Used for analytics tracking.')
   }).optional().describe('Optional metadata for tracking and analytics purposes. Not displayed to user.')
 }));
+const questionsFieldFor = <Question extends z.ZodTypeAny,>(question: Question) => z.array(question).min(1).max(4).describe('Questions to ask the user (1-4 questions)');
 const inputSchema = lazySchema(() => z.strictObject({
-  questions: z.array(questionSchema()).min(1).max(4).describe('Questions to ask the user (1-4 questions)'),
+  questions: questionsFieldFor(questionSchema()),
   ...commonFields()
 }).refine(UNIQUENESS_REFINE.check, {
   message: UNIQUENESS_REFINE.message
 }));
 type InputSchema = ReturnType<typeof inputSchema>;
+const modelInputJSONSchemaWithPreview = lazySchema(() => zodToJsonSchema(z.strictObject({
+  questions: questionsFieldFor(questionSchema())
+})) as ToolInputJSONSchema);
+const modelInputJSONSchemaWithoutPreview = lazySchema(() => zodToJsonSchema(z.strictObject({
+  questions: questionsFieldFor(questionSchemaFor(questionOptionSchema().omit({
+    preview: true
+  })))
+})) as ToolInputJSONSchema);
 const outputSchema = lazySchema(() => z.object({
   questions: z.array(questionSchema()).describe('The questions that were asked'),
   answers: z.record(z.string(), z.string()).describe('The answers provided by the user (question text -> answer string; multi-select answers are comma-separated)'),
@@ -243,6 +254,10 @@ export const AskUserQuestionTool: Tool<InputSchema, Output> = buildTool({
     };
   }
 } satisfies ToolDef<InputSchema, Output>);
+Object.defineProperty(AskUserQuestionTool, 'inputJSONSchema', {
+  enumerable: true,
+  get: (): ToolInputJSONSchema => getQuestionPreviewFormat() === undefined ? modelInputJSONSchemaWithoutPreview() : modelInputJSONSchemaWithPreview()
+});
 
 // Lightweight HTML fragment check. Not a parser — HTML5 parsers are
 // error-recovering by spec and accept anything. We're checking model intent

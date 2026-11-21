@@ -25,13 +25,12 @@
 | `apiKeyUrl` | 否 | 服务商管理 API 密钥的页面链接。 |
 | `authStrategy` | 否 | API 密钥的发送方式。它与 `apiFormat` 分开设置，可选值见下文。 |
 | `defaultEnv` | 否 | Provider 配置使用的非机密环境变量默认值。不要在此填写真实 API 密钥或其他秘密。 |
-| `modelContextWindows` | 否 | 按模型 ID 记录的已知上下文窗口大小。值必须是 16,000 至 10,000,000 之间的整数。 |
 
 [`src/server/types/provider.ts`](https://github.com/GoDiao/dreamcoder/blob/75d9b3bf7572c5feb7b44e4421a7dcb81bb7a21f/src/server/types/provider.ts) 定义了可用的 API 格式和认证方式。普通预设只能选择已有行为；新增格式或认证流程属于独立的运行时改动。
 
 ## 添加预设
 
-编辑前，请从服务商官方文档确认基础 URL、API 格式、认证要求、模型 ID 和上下文窗口。只添加有可靠来源且稳定的默认值，不要根据产品宣传名称猜测模型 ID 或上下文大小。
+编辑前，请从服务商官方文档确认基础 URL、API 格式、认证要求和模型 ID。只添加有可靠来源且稳定的默认值，不要根据产品宣传名称猜测模型 ID。上下文窗口、输出上限、思考档位这类模型事实不写在预设里，来自 [models.dev](https://models.dev)：随包快照在 `src/server/config/modelsDev.json`，应用每小时刷新一次。按模型的规则表 `src/server/config/modelRules.json` 只放 models.dev 没有的内容，以及有厂商文档证明的修正，每条注明来源（见 [model-rules.md](../features/harness/model-rules.md)）。
 
 将条目加入 `providerPresets.json`。以下缩略结构只展示必填字段；请用经过核实的服务商信息替换示例值：
 
@@ -69,7 +68,7 @@
 
 在 [`src/server/__tests__/provider-presets.test.ts`](https://github.com/GoDiao/dreamcoder/blob/75d9b3bf7572c5feb7b44e4421a7dcb81bb7a21f/src/server/__tests__/provider-presets.test.ts) 中增加断言，按新增 ID 查找预设，并验证官方文档支持的 URL、API 格式、初始模型及新增的可选默认值。该测试文件已经覆盖 `GET /api/providers/presets` 返回配置列表，也会校验部分预设与服务商发布的信息一致。保留关于 `lmstudio`、`ollama` 和 `custom` 顺序的断言。
 
-设置表单从同一个 `GET /api/providers/presets` 接口读取列表。选择预设时，表单会填入 URL、API 格式、认证方式、初始模型、快速模型和已知上下文窗口。相关界面逻辑位于 [`ProviderFormModal.tsx`](https://github.com/GoDiao/dreamcoder/blob/75d9b3bf7572c5feb7b44e4421a7dcb81bb7a21f/desktop/src/components/settings/ProviderFormModal.tsx)。普通预设不需要再添加一份独立 UI 注册表。
+设置表单从同一个 `GET /api/providers/presets` 接口读取列表。选择预设时，表单会填入 URL、API 格式、认证方式、初始模型和快速模型。相关界面逻辑位于 [`ProviderFormModal.tsx`](https://github.com/GoDiao/dreamcoder/blob/75d9b3bf7572c5feb7b44e4421a7dcb81bb7a21f/desktop/src/components/settings/ProviderFormModal.tsx)。普通预设不需要再添加一份独立 UI 注册表。
 
 在仓库根目录运行服务端定向测试：
 
@@ -94,7 +93,7 @@ bun run test -- --run src/components/settings/ProviderFormModal.test.tsx
 ## 提交前检查
 
 - 端点和模型默认值有服务商文档作为依据。
-- 可选认证、环境变量和上下文窗口字段符合现有 Schema，并有依据。
+- 可选认证和环境变量字段符合现有 Schema，并有依据。
 - 预设测试覆盖新条目，同时保留必要的顺序断言。
 - 服务端定向测试通过；若修改表单行为，相关桌面检查也通过。
 - 本机连接测试成功；如果无法运行，应在 PR 中说明原因。

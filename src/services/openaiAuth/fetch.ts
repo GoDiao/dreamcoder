@@ -8,6 +8,7 @@ import { anthropicToOpenaiResponses } from '../../server/proxy/transform/anthrop
 import { openaiResponsesToAnthropic } from '../../server/proxy/transform/openaiResponsesToAnthropic.js'
 import { openaiResponsesStreamToAnthropic } from '../../server/proxy/streaming/openaiResponsesStreamToAnthropic.js'
 import { openaiResponsesStreamToAnthropicResponse } from '../../server/proxy/streaming/openaiResponsesStreamToAnthropicResponse.js'
+import { resolveModelRules } from '../../server/services/modelRules/resolveModelRules.js'
 import { anthropicErrorResponse, UpstreamReplyError } from '../../server/upstream/upstreamError.js'
 import type { AnthropicRequest } from '../../server/proxy/transform/types.js'
 import { logForDebugging } from '../../utils/debug.js'
@@ -34,10 +35,14 @@ export function buildOpenAICodexFetch(
 
     const originalBody = await readAnthropicBody(input, init)
     const mappedModel = resolveOpenAICodexModel(originalBody.model)
-    const transformedBody = anthropicToOpenaiResponses({
-      ...originalBody,
-      model: mappedModel,
-    })
+    const rules = resolveModelRules(
+      { baseUrl: OPENAI_CODEX_API_ENDPOINT, apiFormat: 'openai_responses' },
+      mappedModel,
+    )
+    const { max_output_tokens: _unsupportedByCodex, ...transformedBody } = anthropicToOpenaiResponses(
+      { ...originalBody, model: mappedModel },
+      rules,
+    )
     const upstreamBody = {
       ...transformedBody,
       stream: true,
@@ -97,7 +102,7 @@ export function buildOpenAICodexFetch(
       }
 
       return new Response(
-        openaiResponsesStreamToAnthropic(upstream.body, mappedModel),
+        openaiResponsesStreamToAnthropic(upstream.body, mappedModel, rules),
         {
           status: 200,
           headers: {
@@ -111,8 +116,8 @@ export function buildOpenAICodexFetch(
 
     try {
       const responseBody = upstream.body && isEventStreamResponse(upstream)
-        ? await openaiResponsesStreamToAnthropicResponse(upstream.body, mappedModel)
-        : openaiResponsesToAnthropic(await upstream.json(), mappedModel)
+        ? await openaiResponsesStreamToAnthropicResponse(upstream.body, mappedModel, rules)
+        : openaiResponsesToAnthropic(await upstream.json(), mappedModel, rules)
       return Response.json(responseBody)
     } catch (error) {
       if (!(error instanceof UpstreamReplyError)) throw error

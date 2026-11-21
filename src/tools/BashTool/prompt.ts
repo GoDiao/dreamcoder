@@ -11,10 +11,6 @@ import {
   getDefaultBashTimeoutMs,
   getMaxBashTimeoutMs,
 } from '../../utils/timeouts.js'
-import {
-  getUndercoverInstructions,
-  isUndercover,
-} from '../../utils/undercover.js'
 import { AGENT_TOOL_NAME } from '../AgentTool/constants.js'
 import { FILE_EDIT_TOOL_NAME } from '../FileEditTool/constants.js'
 import { FILE_READ_TOOL_NAME } from '../FileReadTool/prompt.js'
@@ -40,42 +36,8 @@ function getBackgroundUsageNote(): string | null {
 }
 
 function getCommitAndPRInstructions(): string {
-  // Defense-in-depth: undercover instructions must survive even if the user
-  // has disabled git instructions entirely. Attribution stripping and model-ID
-  // hiding are mechanical and work regardless, but the explicit "don't blow
-  // your cover" instructions are the last line of defense against the model
-  // volunteering an internal codename in a commit message.
-  const undercoverSection =
-    process.env.USER_TYPE === 'ant' && isUndercover()
-      ? getUndercoverInstructions() + '\n'
-      : ''
+  if (!shouldIncludeGitInstructions()) return ''
 
-  if (!shouldIncludeGitInstructions()) return undercoverSection
-
-  // For ant users, use the short version pointing to skills
-  if (process.env.USER_TYPE === 'ant') {
-    const skillsSection = !isEnvTruthy(process.env.CLAUDE_CODE_SIMPLE)
-      ? `For git commits and pull requests, use the \`/commit\` and \`/commit-push-pr\` skills:
-- \`/commit\` - Create a git commit with staged changes
-- \`/commit-push-pr\` - Commit, push, and create a pull request
-
-These skills handle git safety protocols, proper commit message formatting, and PR creation.
-
-Before creating a pull request, run \`/simplify\` to review your changes, then test end-to-end (e.g. via \`/tmux\` for interactive features).
-
-`
-      : ''
-    return `${undercoverSection}# Git operations
-
-${skillsSection}IMPORTANT: NEVER skip hooks (--no-verify, --no-gpg-sign, etc) unless the user explicitly requests it.
-
-Use the gh command via the Bash tool for other GitHub-related tasks including working with issues, checks, and releases. If given a Github URL use the gh command to get the information needed.
-
-# Other common operations
-- View comments on a Github PR: gh api repos/foo/bar/pulls/123/comments`
-  }
-
-  // For external users, include full inline instructions
   const { commit: commitAttribution, pr: prAttribution } = getAttributionTexts()
 
   return `# Committing changes with git

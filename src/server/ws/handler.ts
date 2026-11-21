@@ -21,7 +21,7 @@ import {
   parseLocalCommand,
 } from '../transcript/classify.js'
 import { shouldCreateWorktreeForSessionLaunch } from '../services/repositoryLaunchService.js'
-import { EFFORT_LEVELS } from '../api/models.js'
+import { isEffortLevel } from '../../utils/effort.js'
 import { resolveProviderDefaultModel } from '../services/providerRuntimeEnv.js'
 import {
   clearPrewarmState,
@@ -755,7 +755,7 @@ async function handleSetRuntimeConfig(
   const modelId = typeof message.modelId === 'string' ? message.modelId.trim() : ''
   const effort =
     typeof message.effort === 'string' &&
-    (EFFORT_LEVELS as readonly string[]).includes(message.effort)
+    isEffortLevel(message.effort)
       ? message.effort
       : undefined
   // An empty model with an effort means "keep following the default provider
@@ -873,9 +873,12 @@ function handleStopGeneration(ws: ServerWebSocket<WebSocketData>) {
     store.apply(sessionId, { type: 'process_phase_changed', phase: 'stopping', generation })
 
     setTimeout(() => {
-      if (conversationService.getGeneration(sessionId) === generation && conversationService.hasSession(sessionId)) {
+      if (conversationService.getGeneration(sessionId) !== generation || !conversationService.hasSession(sessionId)) return
+      if (getPipeline(sessionId).stream.stopRequested) {
         console.log(`[WS] Force-killing CLI subprocess for session: ${sessionId}`)
         conversationService.stopSession(sessionId, generation)
+      } else {
+        store.apply(sessionId, { type: 'process_phase_changed', phase: 'running', generation })
       }
     }, 3_000)
   }

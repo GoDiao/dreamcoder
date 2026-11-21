@@ -22,6 +22,7 @@
     "build:showai-reader": "bun ../vendor/showai/build-reader.ts dist/showai-reader",
     "build:sidecars": "bun run ./scripts/build-sidecars.ts",
     "build:electron": "bun run ./scripts/build-electron.ts",
+    "build:icons": "bun run ./scripts/generate-icons.ts",
     "electron:install": "node node_modules/electron/install.js",
     "electron:dev": "bun run ./scripts/electron-dev.ts",
     "electron:start": "bun run build:electron && electron electron-dist",

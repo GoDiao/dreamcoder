@@ -1,6 +1,12 @@
 import { stringifyOpenAIToolArguments } from '../transform/toolArguments.js'
-import { mapResponsesStatus, mapResponsesUsage } from '../transform/openaiResponsesToAnthropic.js'
+import {
+  mapResponsesStatus,
+  mapResponsesUsage,
+  responsesReasoningSignature,
+  responsesReasoningText,
+} from '../transform/openaiResponsesToAnthropic.js'
 import type { OpenAIResponsesUsage } from '../transform/types.js'
+import type { ResolvedModelRules } from '../../types/modelRules.js'
 import {
   anthropicErrorBody,
   readProviderError,
@@ -11,12 +17,14 @@ import {
 import { parseSseJson, SseDecoder, type SseMessage } from './sse.js'
 
 type OpenBlock = { index: number; sent: boolean; closed: boolean }
+type ReasoningBlock = OpenBlock & { partDone: boolean }
 
 type StreamState = {
   nextContentIndex: number
   texts: Map<string, OpenBlock>
   tools: Map<string, OpenBlock>
-  reasoning: Map<string, OpenBlock>
+  reasoning: Map<string, ReasoningBlock>
+  rules: ResolvedModelRules
   model: string
   messageStarted: boolean
   messageStopped: boolean
@@ -30,6 +38,7 @@ function formatSse(event: string, data: unknown): string {
 export function openaiResponsesStreamToAnthropic(
   upstream: ReadableStream<Uint8Array>,
   model: string,
+  rules: ResolvedModelRules,
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder()
   const sse = new SseDecoder()
@@ -43,6 +52,7 @@ export function openaiResponsesStreamToAnthropic(
         texts: new Map(),
         tools: new Map(),
         reasoning: new Map(),
+        rules,
         model,
         messageStarted: false,
         messageStopped: false,
@@ -147,9 +157,43 @@ function textKey(data: Record<string, unknown>, contentIndex = data.content_inde
   return `${(data.output_index as number) ?? 0}:${(contentIndex as number) ?? 0}`
 }
 
+function closeReasoningBlocks(state: StreamState): void {
+  for (const block of state.reasoning.values()) closeBlock(state, block)
+}
+
+function reasoningBlock(state: StreamState, itemId: string): ReasoningBlock {
+  let block = state.reasoning.get(itemId)
+  if (!block || block.closed) {
+    block = { ...openBlock(state, { type: 'thinking', thinking: '' }), partDone: false }
+    state.reasoning.set(itemId, block)
+  }
+  return block
+}
+
+function sendThinking(state: StreamState, block: ReasoningBlock, text: string): void {
+  if (!text) return
+  const separator = block.partDone && block.sent ? '\n\n' : ''
+  block.partDone = false
+  sendDelta(state, block, { type: 'thinking_delta', thinking: separator + text })
+}
+
+function completeReasoning(state: StreamState, item: Record<string, unknown>): void {
+  const itemId = (item.id as string) || ''
+  const existing = state.reasoning.get(itemId)
+  if (existing?.closed) return
+  const signature = responsesReasoningSignature(item, state.rules)
+  const summary = responsesReasoningText(item)
+  if (!existing && !signature && !summary) return
+  const block = existing ?? reasoningBlock(state, itemId)
+  if (!existing) sendThinking(state, block, summary)
+  if (signature) sendDelta(state, block, { type: 'signature_delta', signature })
+  closeBlock(state, block)
+}
+
 function textBlock(state: StreamState, key: string): OpenBlock {
   let block = state.texts.get(key)
   if (!block) {
+    closeReasoningBlocks(state)
     block = openBlock(state, { type: 'text', text: '' })
     state.texts.set(key, block)
   }
@@ -160,6 +204,7 @@ function toolBlock(state: StreamState, item: Record<string, unknown>): OpenBlock
   const itemId = (item.id as string) || (item.call_id as string) || ''
   let block = state.tools.get(itemId)
   if (!block) {
+    closeReasoningBlocks(state)
     block = openBlock(state, {
       type: 'tool_use',
       id: (item.call_id as string) || itemId,
@@ -189,6 +234,10 @@ function completeOutputItem(state: StreamState, data: Record<string, unknown>): 
   const item = data.item as Record<string, unknown> | undefined
   if (item?.type === 'function_call') {
     completeTool(state, toolBlock(state, item), item.arguments)
+    return
+  }
+  if (item?.type === 'reasoning') {
+    completeReasoning(state, item)
     return
   }
   if (item?.type !== 'message' || !Array.isArray(item.content)) return
@@ -282,20 +331,16 @@ function processEvent(event: string, data: Record<string, unknown>, state: Strea
 
     case 'response.reasoning_summary_text.delta':
     case 'response.reasoning_text.delta': {
-      const itemId = (data.item_id as string) || ''
-      let block = state.reasoning.get(itemId)
-      if (!block || block.closed) {
-        block = openBlock(state, { type: 'thinking', thinking: '' })
-        state.reasoning.set(itemId, block)
-      }
-      sendDelta(state, block, { type: 'thinking_delta', thinking: (data.delta as string) || '' })
+      const delta = (data.delta as string) || ''
+      if (delta) sendThinking(state, reasoningBlock(state, (data.item_id as string) || ''), delta)
       break
     }
 
     case 'response.reasoning_summary_text.done':
     case 'response.reasoning_text.done':
     case 'response.reasoning_summary_part.done': {
-      closeBlock(state, state.reasoning.get((data.item_id as string) || ''))
+      const block = state.reasoning.get((data.item_id as string) || '')
+      if (block) block.partDone = true
       break
     }
 

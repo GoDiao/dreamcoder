@@ -6,19 +6,35 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Added
 
+- **Per-model settings for third-party models.** Each model in the provider form shows its context window, output limit, thinking levels and image and PDF support, and you can change any of them for that model. Known models (DeepSeek, Qwen, Kimi, GLM, MiniMax, GPT up to the GPT-6 family, Gemini, and Claude through a relay or OpenRouter) get their published values, and saving a provider also reads what the provider reports about its models. A model nobody knows gets a 128K window, does not think and shows no effort menu, and is marked as using generic defaults. Context windows you typed in yourself are kept (#264).
+- **Model data from models.dev.** Context windows, output limits, thinking modes and effort levels, and image and PDF support for known models now come from [models.dev](https://models.dev) instead of a hand-maintained list, so far more models have published values. The app ships a snapshot of it, refreshes it once an hour and keeps working from the last copy offline; the model settings show "models.dev" next to these values (#291).
 - **Provider preset contributor guide.** Adds English and Chinese instructions for adding a built-in provider preset, updating its API tests, and checking connectivity from the settings form (#260). Thanks @harshit3355.
 
 ### Changed
 
+- **New app icon.** The app, Dock, taskbar and tray icons and the logo inside the app are redrawn: a warm-white crescent prompt and an amber star on an ink-blue tile. On macOS the menu bar icon is now a template image, so it follows the light or dark menu bar. The interface colors are unchanged. (#292)
 - Thinking text in a streaming reply is batched like the reply text, so a long thinking block updates the conversation once per 50 ms instead of on every chunk (#258). Thanks @iruzen-dono.
 - **Providers in OpenAI format reuse their prompt cache.** Later turns of a session now hit the cache for about 99% of the input (measured on OpenRouter with GPT-4.1 mini and GLM-4.6), and cache hits that DeepSeek and Moonshot report are counted as cache reads (#262).
 - Providers in OpenAI format can run several tool calls in one step and get tool definitions without schema fields they do not use, and replies show the model you chose instead of the dated version the provider reports (#262).
 - Every request the app itself sends to a provider (through the local proxy, for session titles and for connection tests) is recorded in the diagnostics log with the provider, model, status, timings, the provider's request id and how it ended, including errors in the middle of a stream and clients that disconnect; never the key or the request body (#262).
 - **A stalled reply ends after the AI request timeout.** When a provider stops sending anything for longer than the timeout in the network settings, the agent gives up on that reply and starts it again, instead of waiting until you stop it. This now applies to every provider, whether it is reached directly or through the local proxy; keep-alive signals alone do not count as progress (#262).
 - Providers in OpenAI format can carry extra request headers and query parameters, such as Azure's `api-version`. The settings form does not offer them yet; for now they are set by editing the provider in `providers.json`. Authentication and the content type still come from the provider settings and override a header of the same name (#262).
+- **The effort you choose reaches the model.** The effort menu lists only the levels the current model supports and shows the level that is actually sent. A level the model lacks is sent as the next one up, so with the global effort left at its default (medium), DeepSeek and similar models get high. Models in OpenAI format now receive the effort and the thinking switch in the field their provider reads. On their Anthropic-format endpoints, Kimi and GLM no longer get an effort field they reject. Claude 4 and later models behind an Anthropic-format relay get the thinking mode, effort levels, context window and output limit Anthropic publishes for each of them, and search the web with Anthropic's own search tool (#264).
+- Multi-turn conversations with DeepSeek, OpenRouter and the Responses API keep the previous turn's reasoning, which tool calls on DeepSeek need. Images and PDFs reach models that accept them; other models get a note telling the agent the file was left out, and the Read tool's description says so. A reply's `<think>` text is shown as thinking instead of as part of the answer (#264).
+- Session titles, connection tests and the agent's own background requests turn thinking off on models that allow it and use the lowest effort level on models that always think (#264).
+- The provider form no longer has a Settings JSON editor. Saving a provider that is not the default no longer rewrites `settings.json` with that provider's address, key and models; only switching or saving the default provider updates it (#264).
+- The agent's instructions describe DreamCoder instead of Claude Code: the environment section no longer lists Claude models, Claude Code's products or `/fast`, and says replies are shown in the DreamCoder app; `/help` and feedback point to DreamCoder; the worktree tools, the Read tool and the `update-config` skill describe what the app actually does (#270).
+- Plan mode follows one procedure: the agent explores, asks you questions and writes the plan file as it goes, instead of being told in one place not to write any file and in another to launch planning subagents (#270).
+- With models other than Claude, notes that arrive in the middle of a turn (messages from other sessions, board notifications, reminders) are sent as their own message instead of being appended to the last tool result (#270).
+- The notice for a file that changed after the agent read it no longer claims you or a linter changed it or asks the agent to keep it from you, and shows at most about 2 KB of the change (#270).
 
 ### Fixed
 
+- Asking the agent to change a setting no longer fails: the `update-config` skill builds its settings reference again (#293). Thanks @KingEmma7.
+- **Saving a memory no longer asks for approval every time.** Writes to the project's memory folder are allowed like the instructions say, also in bypass mode (#270).
+- **Stopping a reply keeps the session's context.** Stop ends the agent process only when the reply has not stopped a few seconds after you press Stop, and a restarted agent keeps uploaded images and files, instruction files from subfolders and files restored after compaction, without adding a "Continue from where you left off." message (#270).
+- The agent knows the available skills again after compaction, gets only newly added skills when the skill folders change, and does not get the whole list again after a restart (#270).
+- **`/goal` keeps working until the goal is met.** Before, the turn ended at the first check that found the goal unmet. Each automatic continuation now tells the agent the goal, what is still missing and how many continuations are left. The turn ends and the goal stays active when the agent needs something only you can provide, or after 10 continuations in a row without a message from you (#270).
 - Session title generation tells the model to name the conversation instead of answering it, and to write the title in the user's language (#277).
 - A provider in OpenAI format whose base URL already ends in a version, such as `https://open.bigmodel.cn/api/paas/v4` or Gemini's `.../v1beta/openai`, works: requests, model lists and the connection test no longer add another `/v1`. Base URLs without a version still get `/v1` (#262).
 - A streamed reply through the local proxy is no longer cut off when the provider pauses for more than 60 seconds, and stopping a reply or deleting a session now also stops the request to the provider before it starts answering (#262).
@@ -33,6 +49,10 @@ All notable changes to DreamCoder will be documented in this file.
 - **A wrong API key or an empty balance is reported at once.** For providers that use an API key, the agent no longer retries authentication failures and quota or balance errors for minutes before showing them; it shows the provider's message right away (#263).
 - When the output limit cuts off a tool call in the middle of its arguments, the agent no longer runs the tool with missing arguments; the model is told the call was cut off and retries with smaller pieces (#263).
 - **A reply that breaks off in the middle is retried as a stream.** When a provider's stream fails partway, the agent removes the half-finished reply from the conversation, the app and the session history, and asks again with streaming, instead of switching to a slower request without streaming that long answers could not finish within the timeout. Retries before and during a stream share one limit (#263).
+
+### Removed
+
+- The status line setup agent and the `/statusline` command; they set up the terminal's `statusLine` setting, which the app does not run (#270).
 
 ## [0.9.0] — 2026-11-17
 

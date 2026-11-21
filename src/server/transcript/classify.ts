@@ -13,6 +13,7 @@ export const COMPACT_SUMMARY_PREFIX =
 
 const COMPACT_SUMMARY_CUTOFFS = [
   '\n\nIf you need specific details from before compaction',
+  '\n\nIf you need exact details from before compaction',
   '\n\nContinue the conversation from where it left off',
   '\nContinue the conversation from where it left off',
 ]

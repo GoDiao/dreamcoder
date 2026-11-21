@@ -1,3 +1,4 @@
+import { getCliModelRules } from '../../utils/model/modelRules.js'
 import { getSettings_DEPRECATED } from '../../utils/settings/settings.js'
 import type { SettingsJson } from '../../utils/settings/types.js'
 import type { Input, Output, SearchResult } from './WebSearchTool.js'
@@ -177,7 +178,10 @@ export function makeWebSearchUnavailableOutput(
 
 function canUseAnthropicNativeWebSearch(model: string | undefined): boolean {
   const key = normalizeModelKey(model)
-  return isLikelyClaudeModel(model) && (!key || !unsupportedNativeModels.has(key))
+  const native =
+    model !== undefined &&
+    (getCliModelRules(model)?.nativeWebSearch ?? isLikelyClaudeModel(model))
+  return native && (!key || !unsupportedNativeModels.has(key))
 }
 
 function normalizeModelKey(model: string | undefined): string | null {

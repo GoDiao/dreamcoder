@@ -459,18 +459,16 @@ export function prependUserContext(
   }
 
   return [
-    createUserMessage({
-      content: `<system-reminder>\nAs you answer the user's questions, you can use the following context:\n${Object.entries(
-        context,
-      )
-        .map(([key, value]) => `# ${key}\n${value}`)
-        .join('\n')}
-
-      IMPORTANT: this context may or may not be relevant to your tasks. You should not respond to this context unless it is highly relevant to your task.\n</system-reminder>\n`,
-      isMeta: true,
-    }),
+    createUserMessage({ content: formatUserContext(context), isMeta: true }),
     ...messages,
   ]
+}
+
+export function formatUserContext(context: { [k: string]: string }): string {
+  const sections = Object.entries(context)
+    .map(([key, value]) => `# ${key}\n${value}`)
+    .join('\n')
+  return `<system-reminder>\nThe following context was attached automatically at the start of the session. It is not part of the user's message; use it where it applies, and don't acknowledge it.\n${sections}\n</system-reminder>\n`
 }
 
 /**

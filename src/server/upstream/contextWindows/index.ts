@@ -1,24 +1,22 @@
 import { getProxyFetchOptions } from '../../../utils/proxy.js'
 import { getManualNetworkProxyUrl, type NetworkSettings } from '../../services/networkSettings.js'
-import { ModelContextWindowSchema, type DiscoveredProviderModel } from '../../types/provider.js'
-import { deepseekSource } from './deepseek.js'
+import { validFields } from '../../services/modelRules/validFields.js'
+import { DiscoveredModelSchema } from '../../types/modelRules.js'
+import type { DiscoveredProviderModel } from '../../types/provider.js'
 import { listedSource } from './listed.js'
 import { lmstudioSource } from './lmstudio.js'
 import { ollamaSource } from './ollama.js'
-import { qwenSource } from './qwen.js'
-import { warnLookupFailure, type ContextWindowRequest, type ContextWindowSource } from './source.js'
+import { warnLookupFailure, type ModelMetadataRequest, type ModelMetadataSource, type RawModelMetadata } from './source.js'
 
-const CONTEXT_WINDOW_SOURCES: ContextWindowSource[] = [
+const MODEL_METADATA_SOURCES: ModelMetadataSource[] = [
   listedSource,
   ollamaSource,
   lmstudioSource,
-  deepseekSource,
-  qwenSource,
 ]
 
 const LOOKUP_TIMEOUT_MS = 10_000
 
-type FillContextWindowsInput = {
+type FillModelMetadataInput = {
   baseUrl: string
   apiKey: string
   presetId?: string
@@ -26,10 +24,10 @@ type FillContextWindowsInput = {
   networkSettings: NetworkSettings
 }
 
-export async function fillContextWindows(models: DiscoveredProviderModel[], input: FillContextWindowsInput): Promise<void> {
+export async function fillModelMetadata(models: DiscoveredProviderModel[], input: FillModelMetadataInput): Promise<void> {
   const signal = AbortSignal.timeout(LOOKUP_TIMEOUT_MS)
   const proxy = getProxyFetchOptions({ proxyUrl: getManualNetworkProxyUrl(input.networkSettings) })
-  const request: ContextWindowRequest = {
+  const request: ModelMetadataRequest = {
     baseUrl: input.baseUrl,
     presetId: input.presetId,
     listed: input.listed,
@@ -49,18 +47,18 @@ export async function fillContextWindows(models: DiscoveredProviderModel[], inpu
     },
   }
   const modelIds = models.map((model) => model.id)
-  for (const source of CONTEXT_WINDOW_SOURCES) {
+  for (const source of MODEL_METADATA_SOURCES) {
     if (!source.matches(request)) continue
-    let windows: Map<string, unknown>
+    let metadata: Map<string, RawModelMetadata>
     try {
-      windows = await source.windows(request, modelIds)
+      metadata = await source.metadata(request, modelIds)
     } catch (err) {
       warnLookupFailure(source.id, {}, err)
       continue
     }
     for (const model of models) {
-      const contextWindow = ModelContextWindowSchema.safeParse(windows.get(model.id))
-      if (contextWindow.success) model.contextWindow = contextWindow.data
+      const raw = metadata.get(model.id)
+      if (raw) Object.assign(model, validFields(raw, DiscoveredModelSchema.shape))
     }
   }
 }

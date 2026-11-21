@@ -12,5 +12,4 @@ export type ProviderPreset = {
   apiKeyUrl?: string
   authStrategy?: ProviderAuthStrategy
   defaultEnv?: Record<string, string>
-  modelContextWindows?: Record<string, number>
 }

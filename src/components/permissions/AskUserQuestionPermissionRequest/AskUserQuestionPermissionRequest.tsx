@@ -17,7 +17,6 @@ import { maybeResizeAndDownsampleImageBlock } from '../../../utils/imageResizer.
 import { cacheImagePath, storeImage } from '../../../utils/imageStore.js';
 import { logError } from '../../../utils/log.js';
 import { applyMarkdown } from '../../../utils/markdown.js';
-import { isPlanModeInterviewPhaseEnabled } from '../../../utils/planModeV2.js';
 import { getPlanFilePath } from '../../../utils/plans.js';
 import type { PermissionRequestProps } from '../PermissionRequest.js';
 import { QuestionView } from './QuestionView.js';
@@ -270,7 +269,6 @@ function AskUserQuestionPermissionRequestBody(t0) {
           source: metadataSource as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           questionCount: questions.length,
           isInPlanMode,
-          interviewPhaseEnabled: isInPlanMode && isPlanModeInterviewPhaseEnabled()
         });
       }
       onDone();
@@ -309,7 +307,6 @@ function AskUserQuestionPermissionRequestBody(t0) {
           source: metadataSource as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           questionCount: questions.length,
           isInPlanMode,
-          interviewPhaseEnabled: isInPlanMode && isPlanModeInterviewPhaseEnabled()
         });
       }
       const imageBlocks = await convertImagesToBlocks(allImageAttachments);
@@ -347,7 +344,6 @@ Questions asked and answers provided:\n${questionsWithAnswers_0}`;
           source: metadataSource as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           questionCount: questions.length,
           isInPlanMode,
-          interviewPhaseEnabled: isInPlanMode && isPlanModeInterviewPhaseEnabled()
         });
       }
       const imageBlocks_0 = await convertImagesToBlocks(allImageAttachments);
@@ -375,7 +371,6 @@ Questions asked and answers provided:\n${questionsWithAnswers_0}`;
           questionCount: questions.length,
           answerCount: Object.keys(answersToSubmit).length,
           isInPlanMode,
-          interviewPhaseEnabled: isInPlanMode && isPlanModeInterviewPhaseEnabled()
         });
       }
       const annotations = {};

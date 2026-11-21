@@ -91,7 +91,9 @@ const teamMemPaths = feature('TEAMMEM')
 let hasLoggedInitialLoad = false
 
 const MEMORY_INSTRUCTION_PROMPT =
-  'Codebase and user instructions are shown below. Be sure to adhere to these instructions. IMPORTANT: These instructions OVERRIDE any default behavior and you MUST follow them exactly as written.'
+  "Codebase and user instructions are shown below. Follow them: they override your default behavior. When the user's own messages in this conversation conflict with them, the user's messages take precedence."
+const MEMORY_INDEX_PROMPT =
+  'The memory index below is not an instruction file. Use it as described in the auto memory section of the system prompt: entries can be outdated, so check them before relying on them.'
 // Recommended max character count for a memory file
 export const MAX_MEMORY_CHARACTER_COUNT = 40000
 
@@ -1155,6 +1157,10 @@ export function getLargeMemoryFiles(files: MemoryFileInfo[]): MemoryFileInfo[] {
   return files.filter(f => f.content.length > MAX_MEMORY_CHARACTER_COUNT)
 }
 
+function isMemoryIndexType(type: MemoryType): boolean {
+  return type === 'AutoMem' || type === 'TeamMem'
+}
+
 /**
  * When tengu_moth_copse is on, the findRelevantMemories prefetch surfaces
  * memory files via attachments, so the MEMORY.md index is no longer injected
@@ -1169,51 +1175,59 @@ export function filterInjectedMemoryFiles(
     false,
   )
   if (!skipMemoryIndex) return files
-  return files.filter(f => f.type !== 'AutoMem' && f.type !== 'TeamMem')
+  return files.filter(f => !isMemoryIndexType(f.type))
+}
+
+function describeMemoryFile(file: MemoryFileInfo): string {
+  const description =
+    file.type === 'Project'
+      ? ' (project instructions, checked into the codebase)'
+      : file.type === 'Local'
+        ? " (user's private project instructions, not checked in)"
+        : feature('TEAMMEM') && file.type === 'TeamMem'
+          ? ' (shared team memory, synced across the organization)'
+          : file.type === 'AutoMem'
+            ? " (user's auto-memory, persists across conversations)"
+            : " (user's private global instructions for all projects)"
+
+  const content = file.content.trim()
+  if (feature('TEAMMEM') && file.type === 'TeamMem') {
+    return `Contents of ${file.path}${description}:\n\n<team-memory-content source="shared">\n${content}\n</team-memory-content>`
+  }
+  return `Contents of ${file.path}${description}:\n\n${content}`
 }
 
 export const getClaudeMds = (
   memoryFiles: MemoryFileInfo[],
   filter?: (type: MemoryType) => boolean,
 ): string => {
-  const memories: string[] = []
   const skipProjectLevel = getFeatureValue_CACHED_MAY_BE_STALE(
     'tengu_paper_halyard',
     false,
   )
+  const included = memoryFiles.filter(
+    file =>
+      file.content &&
+      (!filter || filter(file.type)) &&
+      !(skipProjectLevel && (file.type === 'Project' || file.type === 'Local')),
+  )
+  const instructions = included.filter(file => !isMemoryIndexType(file.type))
+  const memoryIndex = included.filter(file => isMemoryIndexType(file.type))
 
-  for (const file of memoryFiles) {
-    if (filter && !filter(file.type)) continue
-    if (skipProjectLevel && (file.type === 'Project' || file.type === 'Local'))
-      continue
-    if (file.content) {
-      const description =
-        file.type === 'Project'
-          ? ' (project instructions, checked into the codebase)'
-          : file.type === 'Local'
-            ? " (user's private project instructions, not checked in)"
-            : feature('TEAMMEM') && file.type === 'TeamMem'
-              ? ' (shared team memory, synced across the organization)'
-              : file.type === 'AutoMem'
-                ? " (user's auto-memory, persists across conversations)"
-                : " (user's private global instructions for all projects)"
+  return [
+    instructions.length > 0
+      ? [MEMORY_INSTRUCTION_PROMPT, ...instructions.map(describeMemoryFile)].join('\n\n')
+      : null,
+    memoryIndex.length > 0
+      ? [MEMORY_INDEX_PROMPT, ...memoryIndex.map(describeMemoryFile)].join('\n\n')
+      : null,
+  ]
+    .filter(part => part !== null)
+    .join('\n\n')
+}
 
-      const content = file.content.trim()
-      if (feature('TEAMMEM') && file.type === 'TeamMem') {
-        memories.push(
-          `Contents of ${file.path}${description}:\n\n<team-memory-content source="shared">\n${content}\n</team-memory-content>`,
-        )
-      } else {
-        memories.push(`Contents of ${file.path}${description}:\n\n${content}`)
-      }
-    }
-  }
-
-  if (memories.length === 0) {
-    return ''
-  }
-
-  return `${MEMORY_INSTRUCTION_PROMPT}\n\n${memories.join('\n\n')}`
+export function getClaudeMdsForSubagent(memoryFiles: MemoryFileInfo[]): string {
+  return getClaudeMds(memoryFiles, type => !isMemoryIndexType(type))
 }
 
 /**

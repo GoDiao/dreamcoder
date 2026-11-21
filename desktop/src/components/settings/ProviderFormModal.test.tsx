@@ -1,12 +1,11 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProviderPreset } from '../../types/providerPreset'
-import type { ProviderModel, DiscoveredProviderModel, SavedProvider } from '../../types/provider'
+import type { ProviderModel, SavedProvider } from '../../types/provider'
+import { resolvedView } from './resolvedViewFixture'
 
 const providersApiMock = vi.hoisted(() => ({
-  getSettings: vi.fn(),
-  updateSettings: vi.fn(),
   discoverModels: vi.fn(),
 }))
 
@@ -16,6 +15,7 @@ vi.mock('../../api/providers.ts', () => ({
 
 import { useProviderStore } from '../../stores/providerStore'
 import { useSettingsStore } from '../../stores/settingsStore'
+import { useUIStore } from '../../stores/uiStore'
 import { ProviderFormModal } from './ProviderFormModal'
 
 const deepseekPreset: ProviderPreset = {
@@ -51,21 +51,21 @@ const fetchAllMock = vi.fn()
 
 const originalProviderState = useProviderStore.getState()
 const originalSettingsState = useSettingsStore.getState()
+const originalUIState = useUIStore.getState()
 
 afterEach(() => {
   useProviderStore.setState(originalProviderState, true)
   useSettingsStore.setState(originalSettingsState, true)
+  useUIStore.setState(originalUIState, true)
 })
 
 describe('ProviderFormModal create mode', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    providersApiMock.getSettings.mockResolvedValue({})
-    providersApiMock.updateSettings.mockResolvedValue(undefined)
     providersApiMock.discoverModels.mockResolvedValue({
       models: [{ id: 'model-new', name: 'New Model' }],
     })
-    createProviderMock.mockResolvedValue(createdProvider)
+    createProviderMock.mockResolvedValue({ provider: createdProvider })
     discoverModelsMock.mockResolvedValue([{ id: 'model-new', name: 'New Model' }])
     fetchAllMock.mockResolvedValue(undefined)
     useSettingsStore.setState({ locale: 'en', fetchAll: fetchAllMock })
@@ -82,21 +82,6 @@ describe('ProviderFormModal create mode', () => {
       fireEvent.click(add)
     })
   }
-
-  it('ignores settings responses from a previously selected preset', async () => {
-    let resolvePrevious!: (settings: Record<string, unknown>) => void
-    providersApiMock.getSettings.mockReturnValueOnce(new Promise((resolve) => { resolvePrevious = resolve }))
-    providersApiMock.getSettings.mockResolvedValueOnce({ env: { CUSTOM_SETTING: 'current' } })
-    const other: ProviderPreset = { ...deepseekPreset, id: 'other', name: 'Other', baseUrl: 'https://other.invalid' }
-    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="create" presets={[deepseekPreset, other]} />)
-    await waitFor(() => expect(providersApiMock.getSettings).toHaveBeenCalledTimes(1))
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Other' })) })
-    await waitFor(() => expect(document.querySelector('textarea')?.value).toContain('current'))
-    await act(async () => { resolvePrevious({ env: { CUSTOM_SETTING: 'stale' } }) })
-    const settings = JSON.parse(document.querySelector('textarea')!.value)
-    expect(settings.env.CUSTOM_SETTING).toBe('current')
-    expect(settings.env.ANTHROPIC_BASE_URL).toBe('https://other.invalid')
-  })
 
   it('passes the created provider to onCreated before closing', async () => {
     const order: string[] = []
@@ -297,12 +282,28 @@ describe('ProviderFormModal edit mode', () => {
     models,
     fastModel: 'model-5',
   }
+  const pendingProvider: SavedProvider = { ...provider, resolvedModels: {} }
+  const resolvedProvider: SavedProvider = {
+    ...provider,
+    apiFormat: 'openai_chat',
+    resolvedModels: {
+      'model-1': resolvedView({}),
+      'model-2': resolvedView({
+        contextWindow: 200000,
+        maxOutputTokens: 32000,
+        reasoning: { control: 'none' },
+        effortLevels: [],
+        appliedEffort: undefined,
+        usedFallback: true,
+        sources: { contextWindow: 'fallback', maxOutputTokens: 'fallback', reasoning: 'fallback', image: 'fallback', pdf: 'fallback', structuredOutput: 'fallback' },
+      }),
+    },
+  }
+  const refreshProviderModelsMock = vi.fn()
 
   beforeEach(() => {
     vi.clearAllMocks()
-    providersApiMock.getSettings.mockResolvedValue({ skipWebFetchPreflight: true })
-    providersApiMock.updateSettings.mockResolvedValue(undefined)
-    updateProviderMock.mockResolvedValue(provider)
+    updateProviderMock.mockResolvedValue({ provider })
     discoverModelsMock.mockResolvedValue([
       { id: 'discovered-1' },
       { id: 'discovered-2' },
@@ -313,110 +314,273 @@ describe('ProviderFormModal edit mode', () => {
     useProviderStore.setState({
       updateProvider: updateProviderMock,
       discoverModels: discoverModelsMock,
+      refreshProviderModels: refreshProviderModelsMock,
     })
   })
 
-  it('waits for settings before saving and preserves unrelated environment values', async () => {
-    let resolveSettings!: (settings: Record<string, unknown>) => void
-    providersApiMock.getSettings.mockReturnValueOnce(new Promise((resolve) => { resolveSettings = resolve }))
-    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />)
-    const save = screen.getByRole('button', { name: 'Save' })
-    await waitFor(() => expect(providersApiMock.getSettings).toHaveBeenCalledTimes(1))
-    expect(save).toBeDisabled()
-    fireEvent.click(save)
-    expect(providersApiMock.updateSettings).not.toHaveBeenCalled()
-    expect(updateProviderMock).not.toHaveBeenCalled()
-    fireEvent.change(screen.getByLabelText('Context window for model-1'), { target: { value: '64000' } })
-    await act(async () => { resolveSettings({ env: { CUSTOM_SETTING: 'preserve' } }) })
-    expect(save).toBeEnabled()
-    await act(async () => { fireEvent.click(save) })
-    expect(providersApiMock.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ env: expect.objectContaining({
-      CUSTOM_SETTING: 'preserve', CLAUDE_CODE_MODEL_CONTEXT_WINDOWS: JSON.stringify({ 'model-1': 64000 }),
-    }) }))
-    expect(updateProviderMock).toHaveBeenCalledTimes(1)
-  })
-
   it.each([
-    ['en', 'Save', 'Could not load settings. Close this form and try again.'],
-    ['zh', '保存', '无法加载设置，请关闭表单后重试。'],
-  ] as const)('blocks saving after settings fail to load in %s', async (locale, saveLabel, error) => {
-    useSettingsStore.setState({ locale })
-    providersApiMock.getSettings.mockRejectedValueOnce(new Error('offline'))
-    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />)
-    expect(await screen.findByRole('alert')).toHaveTextContent(error)
-    const save = screen.getByRole('button', { name: saveLabel })
-    expect(save).toBeDisabled()
-    fireEvent.click(save)
-    expect(providersApiMock.updateSettings).not.toHaveBeenCalled()
-    expect(updateProviderMock).not.toHaveBeenCalled()
-  })
-
-  it.each([
-    ['en', 'light', 'Context window for model-1', /Auto-compact/],
-    ['zh', 'dark', 'model-1 的上下文窗口', /自动压缩/],
-  ] as const)('shows context inputs in model rows in %s with the %s theme and no auto-compact settings', (locale, theme, label, section) => {
+    ['en', 'light', 'Model settings for model-1', 'Context window for model-1', /Auto-compact/],
+    ['zh', 'dark', 'model-1 的模型设置', 'model-1 的上下文窗口', /自动压缩/],
+  ] as const)('opens the per-model editor in %s with the %s theme and no auto-compact settings', (locale, theme, toggle, label, section) => {
     useSettingsStore.setState({ locale, theme })
-    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />)
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={resolvedProvider} presets={[deepseekPreset]} />)
+    expect(screen.queryByLabelText(label)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: toggle }))
     const input = screen.getByLabelText(label)
     expect(input).toBeVisible()
-    expect(input.closest('div.flex-wrap')).toHaveTextContent('model-1')
-    expect(screen.getAllByPlaceholderText(locale === 'en' ? 'e.g. 200000' : '例如 200000')).toHaveLength(models.length)
+    expect(screen.getByRole('button', { name: toggle })).toHaveAttribute('aria-expanded', 'true')
     expect(screen.queryByRole('button', { name: section })).not.toBeInTheDocument()
   })
 
-  it('fills only empty rows, preserves saved and pending typed values, and saves the row windows', async () => {
-    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={{ ...provider, modelContextWindows: { 'model-1': 64000 } }} presets={[deepseekPreset]} />)
-    await waitFor(() => expect(document.querySelector('textarea')?.value).toContain('ANTHROPIC_MODEL'))
-    let resolveDiscovery!: (models: DiscoveredProviderModel[]) => void
-    discoverModelsMock.mockReturnValueOnce(new Promise<DiscoveredProviderModel[]>((resolve) => { resolveDiscovery = resolve }))
-    fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
-    fireEvent.change(screen.getByLabelText('Context window for model-2'), { target: { value: '96000' } })
-    const fetched = models.map((model) => ({ ...model, contextWindow: 131072 }))
-    await act(async () => { resolveDiscovery(fetched) })
-    expect(screen.getByLabelText('Context window for model-1')).toHaveValue('64000')
-    expect(screen.getByLabelText('Context window for model-2')).toHaveValue('96000')
-    expect(screen.getByLabelText('Context window for model-3')).toHaveValue('131072')
-    fireEvent.change(screen.getByLabelText('Context window for model-4'), { target: { value: '' } })
-    discoverModelsMock.mockResolvedValueOnce(fetched.map((model) => ({ ...model, contextWindow: 262144 })))
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Fetch models' })) })
-    expect(screen.getByLabelText('Context window for model-2')).toHaveValue('96000')
-    expect(screen.getByLabelText('Context window for model-3')).toHaveValue('131072')
-    expect(screen.getByLabelText('Context window for model-4')).toHaveValue('262144')
-    const windows = { 'model-1': 64000, 'model-2': 96000, 'model-3': 131072, 'model-4': 262144, 'model-5': 131072 }
-    expect(JSON.parse(document.querySelector('textarea')!.value).env.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS).toBe(JSON.stringify(windows))
+  it('hides the model rules for a saved provider the server gives no rules, such as the official Anthropic API', () => {
+    const official: SavedProvider = { ...provider, baseUrl: 'https://api.anthropic.com', apiFormat: 'anthropic' }
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={official} presets={[deepseekPreset]} />)
+    expect(screen.queryByRole('button', { name: 'Model settings for model-1' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Model information appears after saving.')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Refresh model info' })).not.toBeInTheDocument()
+  })
+
+  it('summarizes the resolved rules on each card and marks models on the generic defaults', () => {
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={resolvedProvider} presets={[deepseekPreset]} />)
+    expect(screen.getByTestId('model-rules-summary-model-1')).toHaveTextContent('Window 1,048,576 · Output 65,536 · Thinking Low, High, Max · Images No · PDF No')
+    expect(screen.getByTestId('model-rules-summary-model-2')).toHaveTextContent('Thinking No thinking')
+    expect(screen.getByTestId('model-card-model-2')).toHaveTextContent('Uses generic defaults')
+    expect(screen.getByTestId('model-card-model-1')).not.toHaveTextContent('Uses generic defaults')
+  })
+
+  it('shows a saved thinking override as the server resolved it, and the values it replaced', () => {
+    const inheritedRules = resolvedView({
+      reasoning: { control: 'effort' },
+      effortLevels: ['low', 'medium', 'high'],
+      sources: { contextWindow: 'model', maxOutputTokens: 'model', reasoning: 'model', image: 'model', pdf: 'model', structuredOutput: 'model' },
+    })
+    const overridden: SavedProvider = {
+      ...resolvedProvider,
+      modelOverrides: { 'model-1': { reasoningLevels: [], image: true } },
+      resolvedModels: {
+        ...resolvedProvider.resolvedModels,
+        'model-1': {
+          ...inheritedRules,
+          reasoning: { control: 'always' },
+          effortLevels: [],
+          appliedEffort: undefined,
+          image: true,
+          sources: { ...inheritedRules.sources, reasoning: 'user', image: 'user' },
+          inherited: inheritedRules.inherited,
+        },
+      },
+    }
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={overridden} presets={[deepseekPreset]} />)
+    expect(screen.getByTestId('model-rules-summary-model-1')).toHaveTextContent('Thinking Always on')
+    fireEvent.click(screen.getByRole('button', { name: 'Model settings for model-1' }))
+    const editor = screen.getByTestId('model-rules-editor-model-1')
+    expect(editor).toHaveTextContent('Default: Low, Medium, High (built-in)')
+    expect(editor).toHaveTextContent('Default: No (built-in)')
+  })
+
+  it('starts the thinking choice from the default levels, so one click removes a level', () => {
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={resolvedProvider} presets={[deepseekPreset]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Model settings for model-1' }))
+    const thinking = screen.getByRole('toolbar', { name: 'Thinking for model-1' })
+    const pressed = () => within(thinking).getAllByRole('button').filter((button) => button.getAttribute('aria-pressed') === 'true').map((button) => button.textContent)
+    expect(pressed()).toEqual(['Low', 'High', 'Max'])
+    expect(screen.getByRole('button', { name: 'Restore default: Thinking' })).toBeDisabled()
+    fireEvent.click(within(thinking).getByRole('button', { name: 'High' }))
+    expect(pressed()).toEqual(['Low', 'Max'])
+    expect(screen.getByTestId('model-rules-summary-model-1')).toHaveTextContent('Thinking Low, Max')
+    fireEvent.click(within(thinking).getByRole('button', { name: 'High' }))
+    expect(screen.getByRole('button', { name: 'Restore default: Thinking' })).toBeDisabled()
+  })
+
+  it('groups the digits of an overridden number and saves the plain number', async () => {
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={resolvedProvider} presets={[deepseekPreset]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Model settings for model-1' }))
+    fireEvent.change(screen.getByLabelText('Context window for model-1'), { target: { value: '200000' } })
+    expect(screen.getByLabelText('Context window for model-1')).toHaveValue('200,000')
+    fireEvent.change(screen.getByLabelText('Context window for model-1'), { target: { value: '200,0001' } })
+    expect(screen.getByLabelText('Context window for model-1')).toHaveValue('2,000,001')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled())
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save' })) })
-    expect(updateProviderMock).toHaveBeenCalledWith(provider.id, expect.objectContaining({ models, modelContextWindows: windows }))
+    expect(updateProviderMock).toHaveBeenCalledWith(provider.id, expect.objectContaining({
+      modelOverrides: { 'model-1': { contextWindow: 2000001 } },
+    }))
   })
 
-  it('requests native metadata for the selected LM Studio preset', async () => {
-    const preset: ProviderPreset = { ...deepseekPreset, id: 'lmstudio', name: 'LM Studio', needsApiKey: false }
-    discoverModelsMock.mockResolvedValueOnce([{ id: 'model-1', contextWindow: 131072 }])
-    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={{ ...provider, presetId: 'lmstudio' }} presets={[preset]} />)
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Fetch models' })) })
-    expect(discoverModelsMock).toHaveBeenCalledWith(expect.objectContaining({ presetId: 'lmstudio' }))
-    expect(screen.getByLabelText('Context window for model-1')).toHaveValue('131072')
+  it('shows the inherited values and where they come from', () => {
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={resolvedProvider} presets={[deepseekPreset]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Model settings for model-1' }))
+    expect(screen.getByLabelText('Context window for model-1')).toHaveAttribute('placeholder', '1,048,576 · built-in')
+    expect(screen.getByLabelText('Max output tokens for model-1')).toHaveAttribute('placeholder', '65,536 · provider API')
+    const editor = screen.getByTestId('model-rules-editor-model-1')
+    expect(editor).toHaveTextContent('Default: Low, High, Max (built-in)')
+    expect(editor).toHaveTextContent('Default: No (generic default)')
+    expect(screen.getByRole('toolbar', { name: 'Thinking for model-1' })).toBeInTheDocument()
   })
 
-  it('fills a newly added discovered model and keeps preset context windows', async () => {
-    discoverModelsMock.mockResolvedValueOnce([
-      { id: 'model-new', name: 'New Model', contextWindow: 131072 },
-      { id: 'preset-model', contextWindow: 262144 },
-    ])
-    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[{ ...deepseekPreset, modelContextWindows: { 'preset-model': 64000 } }]} />)
-    await waitFor(() => expect(document.querySelector('textarea')?.value).toContain('ANTHROPIC_MODEL'))
+  it('labels values that come from models.dev', () => {
+    const fromModelsDev: SavedProvider = {
+      ...resolvedProvider,
+      resolvedModels: {
+        'model-1': resolvedView({
+          sources: { contextWindow: 'modelsDev', maxOutputTokens: 'modelsDev', reasoning: 'modelsDev', image: 'fallback', pdf: 'modelsDev', structuredOutput: 'modelsDev' },
+        }),
+      },
+    }
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={fromModelsDev} presets={[deepseekPreset]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Model settings for model-1' }))
+    expect(screen.getByLabelText('Context window for model-1')).toHaveAttribute('placeholder', '1,048,576 · models.dev')
+    expect(screen.getByTestId('model-rules-editor-model-1')).toHaveTextContent('Default: Low, High, Max (models.dev)')
+  })
+
+  it('saves edited overrides and keeps the fields the form does not edit', async () => {
+    const withHandWritten: SavedProvider = {
+      ...resolvedProvider,
+      modelOverrides: { 'model-1': { reasoningDialect: 'thinking_type', extraBody: { thinking: { keep: 'all' } } } },
+    }
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={withHandWritten} presets={[deepseekPreset]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Model settings for model-1' }))
+    fireEvent.change(screen.getByLabelText('Context window for model-1'), { target: { value: '200000' } })
+    fireEvent.change(screen.getByLabelText('Max output tokens for model-1'), { target: { value: '32000' } })
+    fireEvent.click(within(screen.getByRole('toolbar', { name: 'Thinking for model-1' })).getByRole('button', { name: 'Low' }))
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Images for model-1' })).getByRole('radio', { name: 'Supported' }))
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: 'PDF for model-1' })).getByRole('radio', { name: 'Not supported' }))
+    expect(screen.getByTestId('model-rules-summary-model-1')).toHaveTextContent('Window 200,000 · Output 32,000 · Thinking High, Max · Images Yes · PDF No')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled())
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save' })) })
+    expect(updateProviderMock).toHaveBeenCalledWith(provider.id, expect.objectContaining({
+      modelOverrides: {
+        'model-1': {
+          reasoningDialect: 'thinking_type',
+          extraBody: { thinking: { keep: 'all' } },
+          contextWindow: 200000,
+          maxOutputTokens: 32000,
+          reasoningLevels: ['high', 'max'],
+          image: true,
+          pdf: false,
+        },
+      },
+    }))
+  })
+
+  it('writes the two special thinking options', async () => {
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={resolvedProvider} presets={[deepseekPreset]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Model settings for model-1' }))
+    fireEvent.click(within(screen.getByRole('toolbar', { name: 'Thinking for model-1' })).getByRole('button', { name: 'No thinking' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Model settings for model-2' }))
+    const thinking2 = screen.getByRole('toolbar', { name: 'Thinking for model-2' })
+    fireEvent.click(within(thinking2).getByRole('button', { name: 'Low' }))
+    fireEvent.click(within(thinking2).getByRole('button', { name: 'Thinks, no levels' }))
+    expect(within(thinking2).getByRole('button', { name: 'Low' })).toHaveAttribute('aria-pressed', 'false')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled())
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save' })) })
+    expect(updateProviderMock).toHaveBeenCalledWith(provider.id, expect.objectContaining({
+      modelOverrides: { 'model-1': { reasoningLevels: 'off' }, 'model-2': { reasoningLevels: [] } },
+    }))
+  })
+
+  it('restores a single field to its default', async () => {
+    const withOverrides: SavedProvider = {
+      ...resolvedProvider,
+      modelOverrides: { 'model-1': { contextWindow: 64000, image: true, extraBody: { seed: 1 } } },
+    }
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={withOverrides} presets={[deepseekPreset]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Model settings for model-1' }))
+    expect(screen.getByLabelText('Context window for model-1')).toHaveValue('64,000')
+    expect(screen.getByRole('button', { name: 'Restore default: Max output tokens' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Restore default: Context window' }))
+    expect(screen.getByLabelText('Context window for model-1')).toHaveValue('')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled())
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save' })) })
+    expect(updateProviderMock).toHaveBeenCalledWith(provider.id, expect.objectContaining({
+      modelOverrides: { 'model-1': { image: true, extraBody: { seed: 1 } } },
+    }))
+  })
+
+  it('does not turn fetched model limits into overrides', async () => {
+    discoverModelsMock.mockResolvedValueOnce([{ id: 'model-new', name: 'New Model' }])
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />)
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Fetch models' })) })
     fireEvent.focus(screen.getByRole('combobox', { name: 'Model ID' }))
     fireEvent.click(screen.getByRole('option', { name: /New Model/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
-    expect(screen.getByLabelText('Context window for model-new')).toHaveValue('131072')
-    fireEvent.change(screen.getByRole('combobox', { name: 'Model ID' }), { target: { value: 'preset-model' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
-    expect(screen.getByLabelText('Context window for preset-model')).toHaveValue('64000')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save' })) })
     expect(updateProviderMock).toHaveBeenCalledWith(provider.id, expect.objectContaining({
-      modelContextWindows: { 'model-new': 131072, 'preset-model': 64000 },
-      models: [...models, { id: 'model-new', name: 'New Model' }, { id: 'preset-model' }],
+      modelOverrides: {},
+      models: [...models, { id: 'model-new', name: 'New Model' }],
     }))
+  })
+
+  it('requests native metadata for the selected LM Studio preset', async () => {
+    const preset: ProviderPreset = { ...deepseekPreset, id: 'lmstudio', name: 'LM Studio', needsApiKey: false }
+    discoverModelsMock.mockResolvedValueOnce([{ id: 'model-1' }])
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={{ ...provider, presetId: 'lmstudio' }} presets={[preset]} />)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Fetch models' })) })
+    expect(discoverModelsMock).toHaveBeenCalledWith(expect.objectContaining({ presetId: 'lmstudio' }))
+  })
+
+  it('refreshes model information in edit mode and shows why it failed', async () => {
+    refreshProviderModelsMock.mockResolvedValueOnce({ provider, modelDiscovery: { ok: false, error: 'HTTP 401' } })
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={pendingProvider} presets={[deepseekPreset]} />)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Refresh model info' })) })
+    expect(refreshProviderModelsMock).toHaveBeenCalledWith(provider.id)
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not read model information from the provider: HTTP 401')
+
+    refreshProviderModelsMock.mockResolvedValueOnce({ provider })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Refresh model info' })) })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Model information updated.')
+  })
+
+  it('uses the refreshed rules from the store', async () => {
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={pendingProvider} presets={[deepseekPreset]} />)
+    expect(screen.getByTestId('model-rules-summary-model-1')).toHaveTextContent('Model information appears after saving.')
+    act(() => { useProviderStore.setState({ providers: [resolvedProvider] }) })
+    expect(screen.getByTestId('model-rules-summary-model-1')).toHaveTextContent('Window 1,048,576')
+  })
+
+  it('shows one warning after saving when model information could not be read, saying when open sessions pick up changes', async () => {
+    const addToast = vi.fn()
+    useUIStore.setState({ addToast })
+    updateProviderMock.mockResolvedValueOnce({ provider, modelDiscovery: { ok: false, error: 'Unable to connect. Is the computer able to access the url?' } })
+    const onClose = vi.fn()
+    render(<ProviderFormModal open={true} onClose={onClose} mode="edit" provider={provider} presets={[deepseekPreset]} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled())
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save' })) })
+    expect(addToast.mock.calls).toEqual([[{
+      type: 'warning',
+      message: 'Saved. Open sessions use the new model settings after their next model switch or restart. Could not read model information from the provider: Unable to connect. Is the computer able to access the url?',
+    }]])
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('ends the warning with the provider error in Chinese', async () => {
+    const addToast = vi.fn()
+    useUIStore.setState({ addToast })
+    useSettingsStore.setState({ locale: 'zh' })
+    updateProviderMock.mockResolvedValueOnce({ provider, modelDiscovery: { ok: false, error: 'Unable to connect. Is the computer able to access the url?' } })
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: '保存' })).toBeEnabled())
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存' })) })
+    expect(addToast.mock.calls).toEqual([[{
+      type: 'warning',
+      message: '已保存。已打开的会话在下次切换模型或重新开始后使用新的模型设置。没能从提供方读取模型信息：Unable to connect. Is the computer able to access the url?',
+    }]])
+  })
+
+  it('shows one note after saving when model information was read', async () => {
+    const addToast = vi.fn()
+    useUIStore.setState({ addToast })
+    updateProviderMock.mockResolvedValueOnce({ provider })
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled())
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save' })) })
+    expect(addToast.mock.calls).toEqual([[{ type: 'info', message: 'Saved. Open sessions use the new model settings after their next model switch or restart.' }]])
+  })
+
+  it('does not show the refresh button when adding a provider', () => {
+    useProviderStore.setState({ createProvider: createProviderMock })
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="create" presets={[deepseekPreset]} />)
+    expect(screen.queryByRole('button', { name: 'Refresh model info' })).not.toBeInTheDocument()
   })
 
   it('shows the save error and keeps the modal open when saving fails', async () => {
@@ -432,7 +596,7 @@ describe('ProviderFormModal edit mode', () => {
     expect(await screen.findByText('Could not save: Base URL is invalid')).toBeInTheDocument()
     expect(onClose).not.toHaveBeenCalled()
 
-    updateProviderMock.mockResolvedValue(provider)
+    updateProviderMock.mockResolvedValue({ provider })
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled())
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -479,14 +643,31 @@ describe('ProviderFormModal edit mode', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled())
   })
 
+  it('validates the limits in the per-model editor', async () => {
+    render(<ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={pendingProvider} presets={[deepseekPreset]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Model settings for model-1' }))
+    const save = screen.getByRole('button', { name: 'Save' })
+    await waitFor(() => expect(save).toBeEnabled())
+    fireEvent.change(screen.getByLabelText('Context window for model-1'), { target: { value: '12.5' } })
+    expect(screen.getByText('Enter an integer.')).toBeInTheDocument()
+    expect(save).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Context window for model-1'), { target: { value: '200000' } })
+    fireEvent.change(screen.getByLabelText('Max output tokens for model-1'), { target: { value: '0' } })
+    expect(screen.getByText('Enter a positive integer.')).toBeInTheDocument()
+    expect(save).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Max output tokens for model-1'), { target: { value: '8192' } })
+    expect(save).toBeEnabled()
+  })
+
   it('enables saving after deleting a model with an invalid context window', async () => {
     render(
-      <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />,
+      <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={pendingProvider} presets={[deepseekPreset]} />,
     )
     fireEvent.change(screen.getByRole('combobox', { name: 'Model ID' }), {
       target: { value: 'test-b' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Model settings for test-b' }))
     fireEvent.change(screen.getByLabelText('Context window for test-b'), { target: { value: '1' } })
 
     const save = screen.getByRole('button', { name: 'Save' })
@@ -498,11 +679,10 @@ describe('ProviderFormModal edit mode', () => {
     await waitFor(() => expect(save).toBeEnabled())
   })
 
-  it('saves the reordered model list and generated main model', async () => {
+  it('saves the reordered model list', async () => {
     render(
       <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />,
     )
-    await waitFor(() => expect(document.querySelector('textarea')?.value).toContain('ANTHROPIC_MODEL'))
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Move model up' })[1]!)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled())
@@ -513,9 +693,6 @@ describe('ProviderFormModal edit mode', () => {
       provider.id,
       expect.objectContaining({ models: reordered }),
     ))
-    expect(providersApiMock.updateSettings).toHaveBeenCalledWith(expect.objectContaining({
-      env: expect.objectContaining({ ANTHROPIC_MODEL: 'model-2' }),
-    }))
   })
 
   it('clears the fast model when its row is deleted', async () => {
@@ -551,48 +728,6 @@ describe('ProviderFormModal edit mode', () => {
       provider.id,
       expect.objectContaining({ fastModel: null }),
     ))
-  })
-
-  it('keeps generated model settings read-only while preserving unrelated JSON edits', async () => {
-    const providerWithContext = {
-      ...provider,
-      modelContextWindows: { 'model-1': 32768 },
-    }
-    render(
-      <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={providerWithContext} presets={[deepseekPreset]} />,
-    )
-    const textarea = document.querySelector('textarea')
-    expect(textarea).not.toBeNull()
-    await waitFor(() => expect(textarea!.value).toContain('ANTHROPIC_MODEL'))
-
-    const settings = JSON.parse(textarea!.value) as { skipWebFetchPreflight: boolean; env: Record<string, string> }
-    settings.skipWebFetchPreflight = false
-    settings.env.ANTHROPIC_MODEL = 'changed-model'
-    settings.env.ANTHROPIC_DEFAULT_HAIKU_MODEL = 'changed-fast'
-    settings.env.ANTHROPIC_SMALL_FAST_MODEL = 'changed-fast'
-    settings.env.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS = JSON.stringify({ 'model-1': 999999 })
-    fireEvent.change(textarea!, { target: { value: JSON.stringify(settings, null, 2) } })
-    const rewritten = JSON.parse(textarea!.value) as { skipWebFetchPreflight: boolean; env: Record<string, string> }
-    expect(rewritten.skipWebFetchPreflight).toBe(false)
-    expect(rewritten.env.ANTHROPIC_MODEL).toBe('model-1')
-    expect(rewritten.env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe('model-5')
-    expect(rewritten.env.ANTHROPIC_SMALL_FAST_MODEL).toBe('model-5')
-    expect(JSON.parse(rewritten.env.CLAUDE_CODE_MODEL_CONTEXT_WINDOWS!)).toEqual({ 'model-1': 32768 })
-
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled())
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-
-    await waitFor(() => expect(updateProviderMock).toHaveBeenCalledWith(
-      provider.id,
-      expect.objectContaining({
-        models,
-        fastModel: 'model-5',
-        modelContextWindows: { 'model-1': 32768 },
-      }),
-    ))
-    expect(providersApiMock.updateSettings).toHaveBeenCalledWith(expect.objectContaining({
-      skipWebFetchPreflight: false,
-    }))
   })
 
   it('fetches with the current edit form values and announces the result count', async () => {
@@ -671,42 +806,6 @@ describe('ProviderFormModal edit mode', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
     expect(input).toHaveValue('')
     expect(screen.queryByRole('option', { name: /stale-model/ })).not.toBeInTheDocument()
-  })
-
-  it('resets discovery when a connection value changes in settings JSON', async () => {
-    render(
-      <ProviderFormModal open={true} onClose={vi.fn()} mode="edit" provider={provider} presets={[deepseekPreset]} />,
-    )
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
-    })
-    expect(screen.getByRole('status')).toHaveTextContent('2 models found')
-    const input = screen.getByRole('combobox', { name: 'Model ID' })
-    fireEvent.focus(input)
-    expect(screen.getByRole('option', { name: /discovered-1/ })).toBeInTheDocument()
-
-    let resolveDiscovery!: (models: ProviderModel[]) => void
-    const pendingDiscovery = new Promise<ProviderModel[]>((resolve) => {
-      resolveDiscovery = resolve
-    })
-    discoverModelsMock.mockReturnValueOnce(pendingDiscovery)
-    fireEvent.click(screen.getByRole('button', { name: 'Fetch models' }))
-
-    const textarea = document.querySelector('textarea')
-    expect(textarea).not.toBeNull()
-    const settings = JSON.parse(textarea!.value) as { env: Record<string, string> }
-    settings.env.ANTHROPIC_BASE_URL = 'https://json.example/anthropic'
-    fireEvent.change(textarea!, { target: { value: JSON.stringify(settings, null, 2) } })
-
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
-    expect(screen.queryByRole('option', { name: /discovered-1/ })).not.toBeInTheDocument()
-    await act(async () => {
-      resolveDiscovery([{ id: 'stale-json-model' }])
-      await pendingDiscovery
-    })
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
-    expect(screen.queryByRole('option', { name: /stale-json-model/ })).not.toBeInTheDocument()
   })
 
   it('announces empty discovery results and exposes discovery errors as alerts', async () => {
