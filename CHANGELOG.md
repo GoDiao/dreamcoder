@@ -30,7 +30,7 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Fixed
 
-- The `update-config` skill can generate its settings reference again when you ask it to change a setting (#282).
+- Asking the agent to change a setting no longer fails: the `update-config` skill builds its settings reference again (#293). Thanks @KingEmma7.
 - **Saving a memory no longer asks for approval every time.** Writes to the project's memory folder are allowed like the instructions say, also in bypass mode (#270).
 - **Stopping a reply keeps the session's context.** Stop ends the agent process only when the reply has not stopped a few seconds after you press Stop, and a restarted agent keeps uploaded images and files, instruction files from subfolders and files restored after compaction, without adding a "Continue from where you left off." message (#270).
 - The agent knows the available skills again after compaction, gets only newly added skills when the skill folders change, and does not get the whole list again after a restart (#270).
