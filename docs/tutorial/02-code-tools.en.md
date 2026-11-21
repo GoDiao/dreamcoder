@@ -75,7 +75,7 @@ In its next response the model proposes the change. `old_string` is the original
 }
 ```
 
-After writing the file, `Edit` returns `The file /example/src/app.ts has been updated successfully.`, and the file content becomes `export const value = 2`. The two calls belong to two separate model responses: the model sees the result of `Read` first, and only then can it write an `old_string` that matches the file.
+After writing the file, `Edit` returns `The file /example/src/app.ts has been updated successfully. The result is already in your context, so there is no need to read the file back.`, and the file content becomes `export const value = 2`. The two calls belong to two separate model responses: the model sees the result of `Read` first, and only then can it write an `old_string` that matches the file.
 
 ## Mapping to the DreamCoder source
 
@@ -128,7 +128,7 @@ If the model skips `Read` and proposes `toolu_edit_2` directly, the result is:
 }
 ```
 
-If `old_string` includes the line-number prefix (for example `1\texport const value = 1`), the text cannot be found in the file, and an error is also returned at this step.
+If `old_string` includes the line-number prefix (for example `1\texport const value = 1`), the exact text is not in the file; when every line carries the prefix, Edit strips it and searches again, goes ahead if that finds exactly one match, and otherwise returns an error at this step.
 
 ### Step 4: permission decision
 

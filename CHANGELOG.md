@@ -27,6 +27,7 @@ All notable changes to DreamCoder will be documented in this file.
 - Plan mode follows one procedure: the agent explores, asks you questions and writes the plan file as it goes, instead of being told in one place not to write any file and in another to launch planning subagents (#270).
 - With models other than Claude, notes that arrive in the middle of a turn (messages from other sessions, board notifications, reminders) are sent as their own message instead of being appended to the last tool result (#270).
 - The notice for a file that changed after the agent read it no longer claims you or a linter changed it or asks the agent to keep it from you, and shows at most about 2 KB of the change (#270).
+- **Fewer wasted steps when the agent reads and edits files.** Reading a file that is too large returns the first lines that fit and says which lines they are, instead of an error; a file attached with @ is cut the same way instead of at 2,000 lines. An edit still applies when the text the agent quotes differs from the file only in line-number prefixes, whitespace at the end of lines, indentation or written-out escapes, and the approval prompt shows the text that will actually be written. After such a partial read the agent can edit the file but cannot overwrite it, and a successful edit or write tells the agent not to read the file back (#299).
 
 ### Fixed
 

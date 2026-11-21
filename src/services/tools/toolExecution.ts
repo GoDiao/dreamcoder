@@ -1,4 +1,5 @@
 import { feature } from 'bun:bundle'
+import isEqual from 'lodash-es/isEqual.js'
 import type {
   ContentBlockParam,
   ToolResultBlockParam,
@@ -802,19 +803,18 @@ async function checkPermissionsAndCallTool(
   // tools overwrite file_path with expandPath — that mutation must not reach
   // call() because tool results embed the input path verbatim (e.g. "File
   // created successfully at: {path}"), and changing it alters the serialized
-  // transcript and VCR fixture hashes. If a hook/permission later returns a
-  // fresh updatedInput, callInput converges on it below — that replacement
-  // is intentional and should reach call().
+  // transcript and VCR fixture hashes.
   let callInput = processedInput
-  const backfilledClone =
-    tool.backfillObservableInput &&
+  const observedInput =
+    (tool.backfillObservableInput || tool.resolveApprovalInput) &&
     typeof processedInput === 'object' &&
     processedInput !== null
       ? ({ ...processedInput } as typeof processedInput)
       : null
-  if (backfilledClone) {
-    tool.backfillObservableInput!(backfilledClone as Record<string, unknown>)
-    processedInput = backfilledClone
+  if (observedInput) {
+    tool.backfillObservableInput?.(observedInput as Record<string, unknown>)
+    tool.resolveApprovalInput?.(observedInput as Record<string, unknown>)
+    processedInput = observedInput
   }
 
   let shouldPreventContinuation = false
@@ -1203,29 +1203,7 @@ async function checkPermissionsAndCallTool(
   const startTime = Date.now()
 
   startSessionActivity('tool_exec')
-  // If processedInput still points at the backfill clone, no hook/permission
-  // replaced it — pass the pre-backfill callInput so call() sees the model's
-  // original field values. Otherwise converge on the hook-supplied input.
-  // Permission/hook flows may return a fresh object derived from the
-  // backfilled clone (e.g. via inputSchema.parse). If its file_path matches
-  // the backfill-expanded value, restore the model's original so the tool
-  // result string embeds the path the model emitted — keeps transcript/VCR
-  // hashes stable. Other hook modifications flow through unchanged.
-  if (
-    backfilledClone &&
-    processedInput !== callInput &&
-    typeof processedInput === 'object' &&
-    processedInput !== null &&
-    'file_path' in processedInput &&
-    'file_path' in (callInput as Record<string, unknown>) &&
-    (processedInput as Record<string, unknown>).file_path ===
-      (backfilledClone as Record<string, unknown>).file_path
-  ) {
-    callInput = {
-      ...processedInput,
-      file_path: (callInput as Record<string, unknown>).file_path,
-    } as typeof processedInput
-  } else if (processedInput !== backfilledClone) {
+  if (!observedInput || !isEqual(processedInput, observedInput)) {
     callInput = processedInput
   }
   try {

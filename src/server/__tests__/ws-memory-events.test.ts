@@ -475,7 +475,7 @@ describe('WebSocket goal command events', () => {
 })
 
 describe('WebSocket stream event translation', () => {
-  it('keeps subagent parent linkage when later stream events omit the parent id', () => {
+  it('takes the tool input from the assistant message the CLI sends before the block stops', () => {
     const sessionId = `subagent-parent-${crypto.randomUUID()}`
 
     expect(translateCliMessage({
@@ -501,15 +501,15 @@ describe('WebSocket stream event translation', () => {
       event: {
         type: 'content_block_delta',
         index: 0,
-        delta: { type: 'input_json_delta', partial_json: '{"file_path":"src/App.tsx"}' },
+        delta: { type: 'input_json_delta', partial_json: '{"file_path":"src/App.tsx","pages":""}' },
       },
     }, sessionId)).toEqual([
-      { type: 'content_delta', toolInput: '{"file_path":"src/App.tsx"}' },
+      { type: 'content_delta', toolInput: '{"file_path":"src/App.tsx","pages":""}' },
     ])
 
     expect(translateCliMessage({
-      type: 'stream_event',
-      event: { type: 'content_block_stop', index: 0 },
+      type: 'assistant',
+      message: { content: [{ type: 'tool_use', id: 'read-1', name: 'Read', input: { file_path: 'src/App.tsx' } }] },
     }, sessionId)).toEqual([
       {
         type: 'tool_use_complete',
@@ -519,6 +519,11 @@ describe('WebSocket stream event translation', () => {
         parentToolUseId: 'agent-1',
       },
     ])
+
+    expect(translateCliMessage({
+      type: 'stream_event',
+      event: { type: 'content_block_stop', index: 0 },
+    }, sessionId)).toEqual([])
 
     expect(translateCliMessage({
       type: 'user',

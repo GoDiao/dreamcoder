@@ -2,13 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, jest, mock, spyOn } from '
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import type { ToolUseContext } from '../../Tool.js'
-import { getDefaultAppState } from '../../state/AppStateStore.js'
 import { FileEditTool } from '../../tools/FileEditTool/FileEditTool.js'
 import { FileReadTool } from '../../tools/FileReadTool/FileReadTool.js'
 import { FileWriteTool } from '../../tools/FileWriteTool/FileWriteTool.js'
+import { agentContext, allow, turn } from '../../tools/testing/agentContext.js'
 import { ARTIFACT_EDIT_LOCKS_ENV } from '../../utils/artifactEditLock.js'
-import { createFileStateCacheWithSizeLimit } from '../../utils/fileStateCache.js'
 import { setHostRequester } from '../../utils/hostRequests.js'
 import { artifactEditLocks, createArtifactEditLocks, type ArtifactEditLocks } from '../services/artifactEditLocks.js'
 import { conversationService } from '../services/conversationService.js'
@@ -34,25 +32,6 @@ const publish = (sessionId: string, event: SessionStateEvent) => {
 }
 const store = { apply: publish, applyIfPresent: publish }
 const waits = () => published.map(({ sessionId, event }) => (event.type === 'artifact_wait_changed' ? [sessionId, event.wait] : null)).filter(Boolean)
-
-const allow = (async () => ({ behavior: 'allow' })) as unknown as Parameters<typeof FileWriteTool.call>[2]
-const turn = { uuid: 'turn-1' } as unknown as Parameters<typeof FileWriteTool.call>[3]
-
-function agentContext(abortController = new AbortController()): ToolUseContext {
-  const appState = getDefaultAppState()
-  let fileHistory = appState.fileHistory
-  return {
-    updateFileHistoryState: (update: (state: typeof fileHistory) => typeof fileHistory) => {
-      fileHistory = update(fileHistory)
-    },
-    readFileState: createFileStateCacheWithSizeLimit(100),
-    abortController,
-    getAppState: () => appState,
-    setAppState: () => {},
-    options: { tools: [], commands: [], mcpClients: [], agentDefinitions: { activeAgents: [], allAgents: [] }, isNonInteractiveSession: true },
-    messages: [],
-  } as unknown as ToolUseContext
-}
 
 function useLocksAsHost() {
   setHostRequester(async <T,>(request: Record<string, unknown>, _schema: unknown, signal?: AbortSignal) => {
@@ -233,7 +212,7 @@ describe('an agent writing into an artifact the user is editing', () => {
     useLocksAsHost()
     await locks.hold(deckDir, 'tab')
     const abort = new AbortController()
-    const writing = FileWriteTool.call({ file_path: slidePath('agenda'), content: 'x' }, agentContext(abort), allow, turn)
+    const writing = FileWriteTool.call({ file_path: slidePath('agenda'), content: 'x' }, agentContext({ abortController: abort }), allow, turn)
     expect(await settled(writing)).toBe(false)
     abort.abort()
     await expect(writing).rejects.toThrow('aborted')

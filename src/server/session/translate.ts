@@ -19,10 +19,7 @@ import type { PendingPermission, SessionSlashCommand, SessionStateEvent } from '
 export type SessionStreamState = {
   hasReceivedStreamEvents: boolean
   activeBlockTypes: Map<number, 'text' | 'tool_use' | 'thinking'>
-  activeToolBlocks: Map<number, { toolName: string; toolUseId: string; inputJson: string; parentToolUseId?: string }>
   pendingLocalCommand?: { name: string; args: string }
-  pendingToolBlocks: Map<string, { toolName: string; toolUseId: string; parentToolUseId?: string }>
-  streamedToolUseIds: Set<string>
   toolParentUseIds: Map<string, string>
   showUiToolUseIds: Set<string>
   lastApiError?: {
@@ -41,10 +38,7 @@ export function createStreamState(): SessionStreamState {
   return {
     hasReceivedStreamEvents: false,
     activeBlockTypes: new Map(),
-    activeToolBlocks: new Map(),
     pendingLocalCommand: undefined,
-    pendingToolBlocks: new Map(),
-    streamedToolUseIds: new Set(),
     toolParentUseIds: new Map(),
     showUiToolUseIds: new Set(),
     lastApiError: undefined,
@@ -108,8 +102,8 @@ function replayedUserMessage(cliMsg: any): ServerMessage | null {
   return { type: 'user_message', id: cliMsg.uuid, content: text }
 }
 
-function unstreamedToolUse(streamState: SessionStreamState, cliMsg: any, block: any): ServerMessage {
-  const parentToolUseId = cliParentToolUseId(cliMsg)
+function completedToolUse(streamState: SessionStreamState, cliMsg: any, block: any): ServerMessage {
+  const parentToolUseId = cliParentToolUseId(cliMsg) ?? streamState.toolParentUseIds.get(block.id)
   rememberToolParentUseId(streamState, block.id, parentToolUseId)
   return { type: 'tool_use_complete', toolName: block.name, toolUseId: block.id, input: block.input, parentToolUseId }
 }
@@ -195,19 +189,8 @@ function translateMessages(
         for (const block of cliMsg.message.content) {
           if (block.type === 'tool_use' && block.name === SHOW_UI_TOOL_NAME) streamState.showUiToolUseIds.add(block.id)
           if (streamState.hasReceivedStreamEvents) {
-            if (block.type === 'tool_use' && streamState.pendingToolBlocks.has(block.id)) {
-              const pending = streamState.pendingToolBlocks.get(block.id)!
-              streamState.pendingToolBlocks.delete(block.id)
-              rememberToolParentUseId(streamState, block.id, pending.parentToolUseId)
-              messages.push({
-                type: 'tool_use_complete',
-                toolName: pending.toolName || block.name,
-                toolUseId: block.id,
-                input: block.input,
-                parentToolUseId: pending.parentToolUseId,
-              })
-            } else if (block.type === 'tool_use' && !streamState.streamedToolUseIds.has(block.id)) {
-              messages.push(unstreamedToolUse(streamState, cliMsg, block))
+            if (block.type === 'tool_use') {
+              messages.push(completedToolUse(streamState, cliMsg, block))
             }
           } else {
             if (block.type === 'thinking' && block.thinking) {
@@ -216,14 +199,12 @@ function translateMessages(
               messages.push({ type: 'content_start', blockType: 'text' })
               messages.push({ type: 'content_delta', text: block.text })
             } else if (block.type === 'tool_use') {
-              messages.push(unstreamedToolUse(streamState, cliMsg, block))
+              messages.push(completedToolUse(streamState, cliMsg, block))
             }
           }
         }
 
         streamState.hasReceivedStreamEvents = false
-        streamState.pendingToolBlocks.clear()
-        streamState.streamedToolUseIds.clear()
         if (typeof cliMsg.uuid === 'string' && hasTextBlock(cliMsg.message.content)) {
           messages.push({ type: 'message_id', id: cliMsg.uuid })
         }
@@ -311,13 +292,7 @@ function translateMessages(
             events.push({ type: 'turn_activity_reported', activity: 'tool' })
             const parentToolUseId = cliParentToolUseId(cliMsg)
             streamState.activeBlockTypes.set(index, 'tool_use')
-            if (contentBlock.id) streamState.streamedToolUseIds.add(contentBlock.id)
-            streamState.activeToolBlocks.set(index, {
-              toolName: contentBlock.name || '',
-              toolUseId: contentBlock.id || '',
-              inputJson: '',
-              parentToolUseId,
-            })
+            rememberToolParentUseId(streamState, contentBlock.id, parentToolUseId)
             return [{
               type: 'content_start',
               blockType: 'tool_use',
@@ -346,9 +321,6 @@ function translateMessages(
             return [{ type: 'content_delta', text: delta.text }]
           }
           if (delta.type === 'input_json_delta' && delta.partial_json) {
-            const index = event.index ?? 0
-            const toolBlock = streamState.activeToolBlocks.get(index)
-            if (toolBlock) toolBlock.inputJson += delta.partial_json
             return [{ type: 'content_delta', toolInput: delta.partial_json }]
           }
           if (delta.type === 'thinking_delta' && delta.thinking) {
@@ -358,40 +330,7 @@ function translateMessages(
         }
 
         case 'content_block_stop': {
-          const index = event.index ?? 0
-          const blockType = streamState.activeBlockTypes.get(index)
-          streamState.activeBlockTypes.delete(index)
-
-          if (blockType === 'tool_use') {
-            const toolBlock = streamState.activeToolBlocks.get(index)
-            streamState.activeToolBlocks.delete(index)
-            if (toolBlock) {
-              const parentToolUseId =
-                cliParentToolUseId(cliMsg) ?? toolBlock.parentToolUseId
-              let parsedInput = null
-              try { parsedInput = JSON.parse(toolBlock.inputJson) } catch {}
-
-              if (parsedInput !== null) {
-                rememberToolParentUseId(streamState, toolBlock.toolUseId, parentToolUseId)
-                return [{
-                  type: 'tool_use_complete',
-                  toolName: toolBlock.toolName,
-                  toolUseId: toolBlock.toolUseId,
-                  input: parsedInput,
-                  parentToolUseId,
-                }]
-              }
-
-              console.warn(
-                `[WS] Tool input JSON parse failed for ${toolBlock.toolName} (${toolBlock.toolUseId}), deferring to assistant message`,
-              )
-              streamState.pendingToolBlocks.set(toolBlock.toolUseId, {
-                toolName: toolBlock.toolName,
-                toolUseId: toolBlock.toolUseId,
-                parentToolUseId,
-              })
-            }
-          }
+          streamState.activeBlockTypes.delete(event.index ?? 0)
           return []
         }
 
@@ -466,9 +405,6 @@ function translateMessages(
       if (subtype === 'stream_retracted') {
         streamState.hasReceivedStreamEvents = false
         streamState.activeBlockTypes.clear()
-        streamState.activeToolBlocks.clear()
-        streamState.pendingToolBlocks.clear()
-        streamState.streamedToolUseIds.clear()
         events.push({ type: 'turn_activity_reported', activity: 'thinking' })
         return [{ type: 'reply_retracted' }]
       }

@@ -1,17 +1,3 @@
-/**
- * Read tool output limits.  Two caps apply to text reads:
- *
- *   | limit         | default | checks                    | cost          | on overflow     |
- *   |---------------|---------|---------------------------|---------------|-----------------|
- *   | maxSizeBytes  | 256 KB  | TOTAL FILE SIZE (not out) | 1 stat        | throws pre-read |
- *   | maxTokens     | 25000   | actual output tokens      | API roundtrip | throws post-read|
- *
- * Known mismatch: maxSizeBytes gates on total file size, not the slice.
- * Tested truncating instead of throwing for explicit-limit reads that
- * exceed the byte cap (#21841, Mar 2026).  Reverted: tool error rate
- * dropped but mean tokens rose — the throw path yields a ~100-byte error
- * tool-result while truncation yields ~25K tokens of content at the cap.
- */
 import memoize from 'lodash-es/memoize.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from 'src/services/analytics/growthbook.js'
 import { MAX_OUTPUT_SIZE } from 'src/utils/file.js'

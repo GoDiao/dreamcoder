@@ -56,7 +56,7 @@ async function request(history, file) {                         // 第 3 步
 {"type":"assistant","uuid":"a1","parentUuid":"u1","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_read_1","name":"Read","input":{"file_path":"/example/src/app.ts"}}]}}
 {"type":"user","uuid":"u2","parentUuid":"a1","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_read_1","content":"1\texport const value = 1"}]}}
 {"type":"assistant","uuid":"a2","parentUuid":"u2","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_edit_2","name":"Edit","input":{"file_path":"/example/src/app.ts","old_string":"export const value = 1","new_string":"export const value = 2"}}]}}
-{"type":"user","uuid":"u3","parentUuid":"a2","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_edit_2","content":"The file /example/src/app.ts has been updated successfully."}]}}
+{"type":"user","uuid":"u3","parentUuid":"a2","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_edit_2","content":"The file /example/src/app.ts has been updated successfully. The result is already in your context, so there is no need to read the file back."}]}}
 {"type":"assistant","uuid":"a3","parentUuid":"u3","message":{"role":"assistant","content":[{"type":"text","text":"已将 value 改为 2。"}]}}
 ```
 

@@ -104,10 +104,7 @@ const autoModeStateModule = feature('TRANSCRIPT_CLASSIFIER')
   ? (require('./permissions/autoModeState.js') as typeof import('./permissions/autoModeState.js'))
   : null
 /* eslint-enable @typescript-eslint/no-require-imports */
-import {
-  MAX_LINES_TO_READ,
-  FILE_READ_TOOL_NAME,
-} from 'src/tools/FileReadTool/prompt.js'
+import { FILE_READ_TOOL_NAME } from 'src/tools/FileReadTool/prompt.js'
 import { getDefaultFileReadingLimits } from 'src/tools/FileReadTool/limits.js'
 import { cacheKeys, type FileStateCache } from './fileStateCache.js'
 import {
@@ -293,10 +290,6 @@ export type FileAttachment = {
   type: 'file'
   filename: string
   content: FileReadToolOutput
-  /**
-   * Whether the file was truncated due to size limits
-   */
-  truncated?: boolean
   /** Path relative to CWD at creation time, for stable display */
   displayPath: string
 }
@@ -321,10 +314,6 @@ export type AlreadyReadFileAttachment = {
   type: 'already_read_file'
   filename: string
   content: FileReadToolOutput
-  /**
-   * Whether the file was truncated due to size limits
-   */
-  truncated?: boolean
   /** Path relative to CWD at creation time, for stable display */
   displayPath: string
 }
@@ -2086,7 +2075,13 @@ export async function getChangedFiles(
           return null
         }
 
-        const result = await FileReadTool.call(fileInput, toolUseContext)
+        const result = await FileReadTool.call(fileInput, {
+          ...toolUseContext,
+          fileReadingLimits: {
+            ...toolUseContext.fileReadingLimits,
+            failWhenOverLimit: true,
+          },
+        })
         // Extract only the changed section
         if (result.data.type === 'text') {
           const snippet = getSnippetForTwoFileDiff(
@@ -3068,49 +3063,6 @@ export async function generateFileAttachment(
       limit,
     }
 
-    async function readTruncatedFile(): Promise<
-      | FileAttachment
-      | CompactFileReferenceAttachment
-      | AlreadyReadFileAttachment
-      | null
-    > {
-      if (mode === 'compact') {
-        return {
-          type: 'compact_file_reference',
-          filename,
-          displayPath: relative(getCwd(), filename),
-        }
-      }
-
-      // Check deny rules before reading truncated file
-      const appState = toolUseContext.getAppState()
-      if (isFileReadDenied(filename, appState.toolPermissionContext)) {
-        return null
-      }
-
-      try {
-        // Read only the first MAX_LINES_TO_READ lines for files that are too large
-        const truncatedInput = {
-          file_path: filename,
-          offset: offset ?? 1,
-          limit: MAX_LINES_TO_READ,
-        }
-        const result = await FileReadTool.call(truncatedInput, toolUseContext)
-        logEvent(successEventName, {})
-
-        return {
-          type: 'file' as const,
-          filename,
-          content: result.data,
-          truncated: true,
-          displayPath: relative(getCwd(), filename),
-        }
-      } catch {
-        logEvent(errorEventName, {})
-        return null
-      }
-    }
-
     // Validate file path is valid
     const isValid = await FileReadTool.validateInput(fileInput, toolUseContext)
     if (!isValid.result) {
@@ -3128,10 +3080,15 @@ export async function generateFileAttachment(
       }
     } catch (error) {
       if (
-        error instanceof MaxFileReadTokenExceededError ||
-        error instanceof FileTooLargeError
+        mode === 'compact' &&
+        (error instanceof MaxFileReadTokenExceededError ||
+          error instanceof FileTooLargeError)
       ) {
-        return await readTruncatedFile()
+        return {
+          type: 'compact_file_reference',
+          filename,
+          displayPath: relative(getCwd(), filename),
+        }
       }
       throw error
     }

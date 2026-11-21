@@ -64,7 +64,7 @@ export const value = 1
 }
 ```
 
-`Edit` 执行前要经过两项检查：参数检查要求目标文件先被 `Read` 读过、读取后没有被改动，且 `old_string` 能在文件中找到（[第二篇](./02-code-tools.zh.md)）；权限检查在默认模式下可能要求用户确认（[第三篇](./03-permissions.zh.md)）。用户允许后，`Edit` 写入文件，返回 `tool_use_id` 为 `toolu_edit_2`、内容为 `The file /example/src/app.ts has been updated successfully.` 的结果。每个 `tool_result` 通过 `tool_use_id` 指回对应的 `tool_use`，这组对应关系在[第一篇](./01-execution-loop.zh.md#从-tool_use-到-tool_result)说明。
+`Edit` 执行前要经过两项检查：参数检查要求目标文件先被 `Read` 读过、读取后没有被改动，且 `old_string` 能在文件中找到（[第二篇](./02-code-tools.zh.md)）；权限检查在默认模式下可能要求用户确认（[第三篇](./03-permissions.zh.md)）。用户允许后，`Edit` 写入文件，返回 `tool_use_id` 为 `toolu_edit_2`、内容为 `The file /example/src/app.ts has been updated successfully. The result is already in your context, so there is no need to read the file back.` 的结果。每个 `tool_result` 通过 `tool_use_id` 指回对应的 `tool_use`，这组对应关系在[第一篇](./01-execution-loop.zh.md#从-tool_use-到-tool_result)说明。
 
 **第三次请求。** 程序再次追加消息并请求模型。模型回复“已将 `value` 改为 2”，没有工具调用，执行循环结束。文件变为：
 

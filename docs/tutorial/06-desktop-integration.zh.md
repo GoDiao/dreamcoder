@@ -155,7 +155,7 @@ CLI 的输出经 `/sdk/:sessionId` 回到 Sidecar，[`handleSdkPayload()`](https
 | CLI 消息 | 界面事件 |
 | --- | --- |
 | `stream_event` 中的文本增量 | `content_delta` |
-| 完整的 `tool_use` 内容块（来自流式事件的 `content_block_stop`，或 `assistant` 消息） | `tool_use_complete`，带工具名称、`toolUseId` 和参数 |
+| `assistant` 消息里完整的 `tool_use` 内容块 | `tool_use_complete`，带工具名称、`toolUseId` 和参数 |
 | 带 `tool_result` 的 `user` 消息 | `tool_result`，带 `toolUseId`、内容和 `isError`，界面据此对应此前显示的调用。[源码](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/ws/handler.ts#L1075) |
 | `control_request`（`can_use_tool`） | `permission_request`，见[第三篇](./03-permissions.zh.md) |
 | `result` | `message_complete`；执行出错时，前面可能还有一条 `error`。[源码](https://github.com/GoDiao/dreamcoder/blob/dba5b24c75be4e3c35cd42d082dc9a7f8b631087/src/server/ws/handler.ts#L1229) |

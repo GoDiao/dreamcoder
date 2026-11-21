@@ -22,6 +22,7 @@ import {
   FILE_NOT_FOUND_CWD_NOTE,
   findSimilarFile,
   getFileModificationTime,
+  readFileSyncCached,
   suggestPathUnderCwd,
   writeTextContent,
 } from '../../utils/file.js'
@@ -53,6 +54,7 @@ import { NOTEBOOK_EDIT_TOOL_NAME } from '../NotebookEditTool/constants.js'
 import {
   FILE_EDIT_TOOL_NAME,
   FILE_UNEXPECTEDLY_MODIFIED_ERROR,
+  NO_READ_BACK_NOTE,
 } from './constants.js'
 import { getEditToolDescription } from './prompt.js'
 import {
@@ -69,12 +71,8 @@ import {
   renderToolUseRejectedMessage,
   userFacingName,
 } from './UI.js'
-import {
-  areFileEditsInputsEquivalent,
-  findActualString,
-  getPatchForEdit,
-  preserveQuoteStyle,
-} from './utils.js'
+import { matchEdit } from './matchEdit.js'
+import { areFileEditsInputsEquivalent, getPatchForEdit } from './utils.js'
 import { refuseWriteAfterUserEdits } from '../../utils/artifactEditLock.js'
 
 // V8/Bun string length limit is ~2^30 characters (~1 billion). For typical
@@ -120,6 +118,7 @@ export const FileEditTool = buildTool({
       input.file_path = expandPath(input.file_path)
     }
   },
+  resolveApprovalInput: showMatchedStrings,
   async preparePermissionMatcher({ file_path }) {
     return pattern => matchWildcardPattern(pattern, file_path)
   },
@@ -313,9 +312,8 @@ export const FileEditTool = buildTool({
 
     const file = fileContent
 
-    // Use findActualString to handle quote normalization
-    const actualOldString = findActualString(file, old_string)
-    if (!actualOldString) {
+    const match = matchEdit(file, old_string, new_string, replace_all)
+    if (match.matches === 0) {
       return {
         result: false,
         behavior: 'ask',
@@ -327,17 +325,14 @@ export const FileEditTool = buildTool({
       }
     }
 
-    const matches = file.split(actualOldString).length - 1
-
-    // Check if we have multiple matches but replace_all is false
-    if (matches > 1 && !replace_all) {
+    if (match.matches > 1 && !replace_all) {
       return {
         result: false,
         behavior: 'ask',
-        message: `Found ${matches} matches of the string to replace, but replace_all is false. To replace all occurrences, set replace_all to true. To replace only one occurrence, please provide more context to uniquely identify the instance.\nString: ${old_string}`,
+        message: `Found ${match.matches} matches of the string to replace, but replace_all is false. To replace all occurrences, set replace_all to true. To replace only one occurrence, please provide more context to uniquely identify the instance.\nString: ${old_string}`,
         meta: {
           isFilePathAbsolute: String(isAbsolute(file_path)),
-          actualOldString,
+          actualOldString: match.oldString,
         },
         errorCode: 9,
       }
@@ -350,8 +345,8 @@ export const FileEditTool = buildTool({
       () => {
         // Simulate the edit to get the final content using the exact same logic as the tool
         return replace_all
-          ? file.replaceAll(actualOldString, new_string)
-          : file.replace(actualOldString, new_string)
+          ? file.replaceAll(match.oldString, match.newString)
+          : file.replace(match.oldString, match.newString)
       },
     )
 
@@ -359,7 +354,7 @@ export const FileEditTool = buildTool({
       return settingsValidationResult
     }
 
-    return { result: true, meta: { actualOldString } }
+    return { result: true, meta: { actualOldString: match.oldString } }
   },
   inputsEquivalent(input1, input2) {
     return areFileEditsInputsEquivalent(
@@ -470,16 +465,8 @@ export const FileEditTool = buildTool({
       }
     }
 
-    // 3. Use findActualString to handle quote normalization
-    const actualOldString =
-      findActualString(originalFileContents, old_string) || old_string
-
-    // Preserve curly quotes in new_string when the file uses them
-    const actualNewString = preserveQuoteStyle(
-      old_string,
-      actualOldString,
-      new_string,
-    )
+    const { oldString: actualOldString, newString: actualNewString } =
+      matchEdit(originalFileContents, old_string, new_string, replace_all)
 
     // 4. Generate patch
     const { patch, updatedFile } = getPatchForEdit({
@@ -520,11 +507,13 @@ export const FileEditTool = buildTool({
     notifyVscodeFileUpdated(absoluteFilePath, originalFileContents, updatedFile)
 
     // 6. Update read timestamp, to invalidate stale writes
+    const truncated = readFileState.get(absoluteFilePath)?.truncated
     readFileState.set(absoluteFilePath, {
       content: updatedFile,
       timestamp: getFileModificationTime(absoluteFilePath),
       offset: undefined,
       limit: undefined,
+      ...(truncated && { truncated }),
     })
 
     // 7. Log events
@@ -569,6 +558,7 @@ export const FileEditTool = buildTool({
       structuredPatch: patch,
       userModified: userModified ?? false,
       replaceAll: replace_all,
+      ...(actualNewString !== new_string && { matchAdjusted: true }),
       ...(gitDiff && { gitDiff }),
     }
     return {
@@ -576,28 +566,56 @@ export const FileEditTool = buildTool({
     }
   },
   mapToolResultToToolResultBlockParam(data: FileEditOutput, toolUseID) {
-    const { filePath, userModified, replaceAll } = data
+    const { filePath, userModified, replaceAll, matchAdjusted } = data
     const modifiedNote = userModified
       ? '.  The user modified your proposed changes before accepting them. '
       : ''
+    const readBackNote =
+      userModified || matchAdjusted ? '' : ` ${NO_READ_BACK_NOTE}`
 
     if (replaceAll) {
       return {
         tool_use_id: toolUseID,
         type: 'tool_result',
-        content: `The file ${filePath} has been updated${modifiedNote}. All occurrences were successfully replaced.`,
+        content: `The file ${filePath} has been updated${modifiedNote}. All occurrences were successfully replaced.${readBackNote}`,
       }
     }
 
     return {
       tool_use_id: toolUseID,
       type: 'tool_result',
-      content: `The file ${filePath} has been updated successfully${modifiedNote}.`,
+      content: `The file ${filePath} has been updated successfully${modifiedNote}.${readBackNote}`,
     }
   },
 } satisfies ToolDef<ReturnType<typeof inputSchema>, FileEditOutput>)
 
 // --
+
+function showMatchedStrings(input: Record<string, unknown>): void {
+  const { file_path, old_string, new_string, replace_all } = input
+  if (
+    typeof file_path !== 'string' ||
+    typeof old_string !== 'string' ||
+    typeof new_string !== 'string'
+  ) {
+    return
+  }
+  let fileContent: string
+  try {
+    fileContent = readFileSyncCached(file_path)
+  } catch (error) {
+    if (!isENOENT(error)) {
+      logError(error)
+    }
+    return
+  }
+  const replaceAll = replace_all === true
+  const match = matchEdit(fileContent, old_string, new_string, replaceAll)
+  if (match.matches === 1 || (replaceAll && match.matches > 1)) {
+    input.old_string = match.oldString
+    input.new_string = match.newString
+  }
+}
 
 function readFileForEdit(absoluteFilePath: string): {
   content: string

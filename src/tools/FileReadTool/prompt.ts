@@ -9,6 +9,34 @@ export const FILE_READ_TOOL_NAME = 'Read'
 export const FILE_UNCHANGED_STUB =
   'File unchanged since last read. The content from the earlier Read tool_result in this conversation is still current — refer to that instead of re-reading.'
 
+const READ_TRUNCATED_NOTE_START =
+  '<system-reminder>This read stopped early to fit the size limit'
+
+const READ_TRUNCATED_RANGE = /^: it returned lines \d+-(\d+) of (\d+)\./
+
+export function readTruncatedNote(
+  firstLine: number,
+  lastLine: number,
+  totalLines: number,
+): string {
+  return `\n\n${READ_TRUNCATED_NOTE_START}: it returned lines ${firstLine}-${lastLine} of ${totalLines}. Use offset and limit to read other parts of the file, for example offset ${lastLine + 1} for what follows.</system-reminder>`
+}
+
+export function readTruncatedRange(
+  result: string,
+): { lastLine: number; totalLines: number } | null {
+  const start = result.indexOf(READ_TRUNCATED_NOTE_START)
+  if (start === -1) {
+    return null
+  }
+  const range = READ_TRUNCATED_RANGE.exec(
+    result.slice(start + READ_TRUNCATED_NOTE_START.length),
+  )
+  return range
+    ? { lastLine: Number(range[1]), totalLines: Number(range[2]) }
+    : null
+}
+
 export const MAX_LINES_TO_READ = 2000
 
 export const DESCRIPTION = 'Read a file from the local filesystem.'
