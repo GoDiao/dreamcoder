@@ -45,7 +45,7 @@ import {
   getAdditionalDirectoriesForClaudeMd,
   getOriginalCwd,
 } from '../bootstrap/state.js'
-import { truncateEntrypointContent } from '../memdir/memdir.js'
+import { EMPTY_ENTRYPOINT_NOTICE, truncateEntrypointContent } from '../memdir/memdir.js'
 import { getAutoMemEntrypoint, isAutoMemoryEnabled } from '../memdir/paths.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growthbook.js'
 import {
@@ -1199,26 +1199,25 @@ function describeMemoryFile(file: MemoryFileInfo): string {
 
 export async function getEmptyAutoMemoryNotice(
   memoryFiles: MemoryFileInfo[],
-): Promise<string | null> {
-  if (
-    !isAutoMemoryEnabled() ||
-    getFeatureValue_CACHED_MAY_BE_STALE('tengu_moth_copse', false)
-  ) {
-    return null
-  }
+): Promise<MemoryFileInfo | null> {
+  if (!isAutoMemoryEnabled()) return null
 
-  const emptyNotice =
-    'Your MEMORY.md is currently empty. When you save new memories, they will appear here.'
   const entry = memoryFiles.find(file => file.type === 'AutoMem')
-  if (entry) {
-    return entry.content.trim() ? null : emptyNotice
+  if (entry?.content.trim()) return null
+
+  if (!entry) {
+    try {
+      await getFsImplementation().stat(getAutoMemEntrypoint())
+      return null
+    } catch (error) {
+      if (getErrnoCode(error) !== 'ENOENT') return null
+    }
   }
 
-  try {
-    await getFsImplementation().stat(getAutoMemEntrypoint())
-    return null
-  } catch (error) {
-    return getErrnoCode(error) === 'ENOENT' ? emptyNotice : null
+  return {
+    path: entry?.path ?? getAutoMemEntrypoint(),
+    type: 'AutoMem',
+    content: EMPTY_ENTRYPOINT_NOTICE,
   }
 }
 
