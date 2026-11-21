@@ -53,6 +53,10 @@ function sessionTargetId(to: string): string {
   return to.slice(SESSION_ADDRESS_PREFIX.length).trim()
 }
 
+function isSubagentReference(to: string, context: ToolUseContext): boolean {
+  return toAgentId(to) !== null || context.getAppState().agentNameRegistry.has(to)
+}
+
 function describeRecipient(): string {
   const sessionAddress = `"${SESSION_ADDRESS_PREFIX}<id>" for another session (use ListSessions to discover)`
   if (!isAgentSwarmsEnabled()) return `Recipient: ${sessionAddress}`
@@ -645,7 +649,7 @@ export const SendMessageTool: Tool<InputSchema, SendMessageToolOutput> =
       return { behavior: 'allow' as const, updatedInput: input }
     },
 
-    async validateInput(input, _context) {
+    async validateInput(input, context) {
       if (input.to.trim().length === 0) {
         return {
           result: false,
@@ -653,7 +657,11 @@ export const SendMessageTool: Tool<InputSchema, SendMessageToolOutput> =
           errorCode: 9,
         }
       }
-      if (!isSessionAddress(input.to) && !isAgentSwarmsEnabled()) {
+      if (
+        !isSessionAddress(input.to) &&
+        !isAgentSwarmsEnabled() &&
+        !isSubagentReference(input.to, context)
+      ) {
         return {
           result: false,
           message: `to must be a session address: "${SESSION_ADDRESS_PREFIX}<id>"`,

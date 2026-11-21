@@ -15,7 +15,10 @@ afterEach(() => {
   teams.restore()
 })
 
-const validate = (input: Record<string, unknown>) => SendMessageTool.validateInput!(input as never, {} as never)
+const validate = (input: Record<string, unknown>) =>
+  SendMessageTool.validateInput!(input as never, {
+    getAppState: () => ({ agentNameRegistry: new Map(), tasks: {} }),
+  } as never)
 const run = (input: Record<string, unknown>) =>
   SendMessageTool.call(input as never, {} as never, undefined as never, undefined as never)
 
