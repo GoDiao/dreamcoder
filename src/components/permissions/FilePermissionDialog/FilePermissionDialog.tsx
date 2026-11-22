@@ -3,7 +3,6 @@ import React, { useMemo } from 'react';
 import { useDiffInIDE } from '../../../hooks/useDiffInIDE.js';
 import { Box, Text } from '../../../ink.js';
 import type { ToolUseContext } from '../../../Tool.js';
-import { getLanguageName } from '../../../utils/cliHighlight.js';
 import { getCwd } from '../../../utils/cwd.js';
 import { getFsImplementation, safeResolvePath } from '../../../utils/fsOperations.js';
 import { expandPath } from '../../../utils/path.js';
@@ -62,11 +61,7 @@ export function FilePermissionDialog<T extends ToolInput = ToolInput>({
   workerBadge,
   languageName: languageNameOverride
 }: FilePermissionDialogProps<T>): React.ReactNode {
-  // Derive from path unless caller provided an explicit override (NotebookEdit
-  // passes 'python'/'markdown' from cell_type). getLanguageName is async;
-  // downstream UnaryEvent.language_name and logPermissionEvent already accept
-  // Promise<string>. useMemo keeps the promise stable across renders.
-  const languageName = useMemo(() => languageNameOverride ?? (path ? getLanguageName(path) : 'none'), [languageNameOverride, path]);
+  const languageName = languageNameOverride ?? (path ? 'unknown' : 'none');
   const unaryEvent = useMemo(() => ({
     completion_type: completionType,
     language_name: languageName
