@@ -5,7 +5,6 @@
 import figures from 'figures';
 import type { TaskStatus } from 'src/Task.js';
 import type { InProcessTeammateTaskState } from 'src/tasks/InProcessTeammateTask/types.js';
-import { isPanelAgentTask } from 'src/tasks/LocalAgentTask/LocalAgentTask.js';
 import { isBackgroundTask, type TaskState } from 'src/tasks/types.js';
 import type { DeepImmutable } from 'src/types/utils.js';
 import { summarizeRecentActivities } from 'src/utils/collapseReadSearch.js';
@@ -96,7 +95,7 @@ export function shouldHideTasksFooter(tasks: {
   if (!showSpinnerTree) return false;
   let hasVisibleTask = false;
   for (const t of Object.values(tasks) as TaskState[]) {
-    if (!isBackgroundTask(t) || "external" === 'ant' && isPanelAgentTask(t)) {
+    if (!isBackgroundTask(t)) {
       continue;
     }
     hasVisibleTask = true;

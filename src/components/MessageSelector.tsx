@@ -88,7 +88,7 @@ export function MessageSelector({
   // Per-option feedback state; Select's internal inputValues Map persists
   // per-option text independently, so sharing one variable would desync.
   const [summarizeFromFeedback, setSummarizeFromFeedback] = useState('');
-  const [summarizeUpToFeedback, setSummarizeUpToFeedback] = useState('');
+  const [summarizeUpToFeedback] = useState('');
 
   // Generate options with summarize as input type for inline context
   function getRestoreOptions(canRestoreCode: boolean): OptionWithDescription<RestoreOption>[] {
@@ -119,14 +119,6 @@ export function MessageSelector({
       ...summarizeInputProps,
       onChange: setSummarizeFromFeedback
     });
-    if ("external" === 'ant') {
-      baseOptions.push({
-        value: 'summarize_up_to',
-        label: 'Summarize up to here',
-        ...summarizeInputProps,
-        onChange: setSummarizeUpToFeedback
-      });
-    }
     baseOptions.push({
       value: 'nevermind',
       label: 'Never mind'

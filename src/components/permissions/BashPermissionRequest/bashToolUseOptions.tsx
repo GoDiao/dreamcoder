@@ -1,21 +1,11 @@
 import { BASH_TOOL_NAME } from '../../../tools/BashTool/toolName.js';
 import { extractOutputRedirections } from '../../../utils/bash/commands.js';
-import { isClassifierPermissionsEnabled } from '../../../utils/permissions/bashClassifier.js';
 import type { PermissionDecisionReason } from '../../../utils/permissions/PermissionResult.js';
 import type { PermissionUpdate } from '../../../utils/permissions/PermissionUpdateSchema.js';
 import { shouldShowAlwaysAllowOptions } from '../../../utils/permissions/permissionsLoader.js';
 import type { OptionWithDescription } from '../../CustomSelect/select.js';
 import { generateShellSuggestionsLabel } from '../shellPermissionHelpers.js';
 export type BashToolUseOption = 'yes' | 'yes-apply-suggestions' | 'yes-prefix-edited' | 'yes-classifier-reviewed' | 'no';
-
-/**
- * Check if a description already exists in the allow list.
- * Compares lowercase and trailing-whitespace-trimmed versions.
- */
-function descriptionAlreadyExists(description: string, existingDescriptions: string[]): boolean {
-  const normalized = description.toLowerCase().trimEnd();
-  return existingDescriptions.some(existing => existing.toLowerCase().trimEnd() === normalized);
-}
 
 /**
  * Strip output redirections so filenames don't show as commands in the label.
@@ -103,28 +93,6 @@ export function bashToolUseOptions({
           value: 'yes-apply-suggestions'
         });
       }
-    }
-
-    // Add classifier-reviewed option if enabled, the initial description was
-    // non-empty, the description doesn't already exist in the allow list,
-    // and the decision reason is NOT a server-side classifier block
-    // (prompt-based rules don't help when the server-side classifier triggers first).
-    // Skip when the editable prefix option is already shown — they serve the
-    // same role and having two identical-looking "don't ask again" inputs is confusing.
-    const editablePrefixShown = options.some(o => o.value === 'yes-prefix-edited');
-    if ("external" === 'ant' && !editablePrefixShown && isClassifierPermissionsEnabled() && onClassifierDescriptionChange && !initialClassifierDescriptionEmpty && !descriptionAlreadyExists(classifierDescription ?? '', existingAllowDescriptions) && decisionReason?.type !== 'classifier') {
-      options.push({
-        type: 'input',
-        label: 'Yes, and don\u2019t ask again for',
-        value: 'yes-classifier-reviewed',
-        placeholder: 'describe what to allow...',
-        initialValue: classifierDescription ?? '',
-        onChange: onClassifierDescriptionChange,
-        allowEmptySubmitToCancel: true,
-        showLabelWithValue: true,
-        labelValueSeparator: ': ',
-        resetCursorOnUpdate: true
-      });
     }
   }
   if (noInputMode) {
