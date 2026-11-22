@@ -1,5 +1,4 @@
 import * as fs from 'fs/promises'
-import { homedir } from 'os'
 import { join } from 'path'
 import { logEvent } from '../services/analytics/index.js'
 import { CACHE_PATHS } from './cachePaths.js'
@@ -431,110 +430,6 @@ export async function cleanupOldDebugLogs(): Promise<CleanupResult> {
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
 
 /**
- * Clean up old npm cache entries for Anthropic packages.
- * This helps reduce disk usage since we publish many dev versions per day.
- * Only runs once per day for Ant users.
- */
-export async function cleanupNpmCacheForAnthropicPackages(): Promise<void> {
-  const markerPath = join(getClaudeConfigHomeDir(), '.npm-cache-cleanup')
-
-  try {
-    const stat = await fs.stat(markerPath)
-    if (Date.now() - stat.mtimeMs < ONE_DAY_MS) {
-      logForDebugging('npm cache cleanup: skipping, ran recently')
-      return
-    }
-  } catch {
-    // File doesn't exist, proceed with cleanup
-  }
-
-  try {
-    await lockfile.lock(markerPath, { retries: 0, realpath: false })
-  } catch {
-    logForDebugging('npm cache cleanup: skipping, lock held')
-    return
-  }
-
-  logForDebugging('npm cache cleanup: starting')
-
-  const npmCachePath = join(homedir(), '.npm', '_cacache')
-
-  const NPM_CACHE_RETENTION_COUNT = 5
-
-  const startTime = Date.now()
-  try {
-    const cacache = await import('cacache')
-    const cutoff = startTime - ONE_DAY_MS
-
-    // Stream index entries and collect all Anthropic package entries.
-    // Previous implementation used cacache.verify() which does a full
-    // integrity check + GC of the ENTIRE cache — O(all content blobs).
-    // On large caches this took 60+ seconds and blocked the event loop.
-    const stream = cacache.ls.stream(npmCachePath)
-    const anthropicEntries: { key: string; time: number }[] = []
-    for await (const entry of stream as AsyncIterable<{
-      key: string
-      time: number
-    }>) {
-      if (entry.key.includes('@anthropic-ai/claude-')) {
-        anthropicEntries.push({ key: entry.key, time: entry.time })
-      }
-    }
-
-    // Group by package name (everything before the last @version separator)
-    const byPackage = new Map<string, { key: string; time: number }[]>()
-    for (const entry of anthropicEntries) {
-      const atVersionIdx = entry.key.lastIndexOf('@')
-      const pkgName =
-        atVersionIdx > 0 ? entry.key.slice(0, atVersionIdx) : entry.key
-      const existing = byPackage.get(pkgName) ?? []
-      existing.push(entry)
-      byPackage.set(pkgName, existing)
-    }
-
-    // Remove entries older than 1 day OR beyond the top N most recent per package
-    const keysToRemove: string[] = []
-    for (const [, entries] of byPackage) {
-      entries.sort((a, b) => b.time - a.time) // newest first
-      for (let i = 0; i < entries.length; i++) {
-        const entry = entries[i]!
-        if (entry.time < cutoff || i >= NPM_CACHE_RETENTION_COUNT) {
-          keysToRemove.push(entry.key)
-        }
-      }
-    }
-
-    await Promise.all(
-      keysToRemove.map(key => cacache.rm.entry(npmCachePath, key)),
-    )
-
-    await fs.writeFile(markerPath, new Date().toISOString())
-
-    const durationMs = Date.now() - startTime
-    if (keysToRemove.length > 0) {
-      logForDebugging(
-        `npm cache cleanup: Removed ${keysToRemove.length} old @anthropic-ai entries in ${durationMs}ms`,
-      )
-    } else {
-      logForDebugging(`npm cache cleanup: completed in ${durationMs}ms`)
-    }
-    logEvent('tengu_npm_cache_cleanup', {
-      success: true,
-      durationMs,
-      entriesRemoved: keysToRemove.length,
-    })
-  } catch (error) {
-    logError(error as Error)
-    logEvent('tengu_npm_cache_cleanup', {
-      success: false,
-      durationMs: Date.now() - startTime,
-    })
-  } finally {
-    await lockfile.unlock(markerPath, { realpath: false }).catch(() => {})
-  }
-}
-
-/**
  * Throttled wrapper around cleanupOldVersions for recurring cleanup in long-running sessions.
  * Uses a marker file and lock to ensure it runs at most once per 24 hours,
  * and does not block if another process is already running cleanup.
@@ -595,8 +490,5 @@ export async function cleanupOldMessageFilesInBackground(): Promise<void> {
   const removedWorktrees = await cleanupStaleAgentWorktrees(getCutoffDate())
   if (removedWorktrees > 0) {
     logEvent('tengu_worktree_cleanup', { removed: removedWorktrees })
-  }
-  if (process.env.USER_TYPE === 'ant') {
-    await cleanupNpmCacheForAnthropicPackages()
   }
 }

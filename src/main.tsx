@@ -611,11 +611,7 @@ export async function main() {
         enableConfigs
       } = await import('./utils/config.js');
       enableConfigs();
-      const {
-        handleUrlSchemeLaunch
-      } = await import('./utils/deepLink/protocolHandler.js');
-      const urlSchemeResult = await handleUrlSchemeLaunch();
-      process.exit(urlSchemeResult ?? 1);
+      process.exit(1);
     }
   }
 
