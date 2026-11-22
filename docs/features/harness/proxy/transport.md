@@ -20,7 +20,7 @@
   1. 服务端用 `Bun.serve({ idleTimeout: 60 })` 启动（src/server/index.ts:152-155），`/proxy/` 路由和其他路由共用这个设置（src/server/index.ts:349-366）。
   2. 代理处理函数先 `await sendToUpstream(...)`，拿到上游响应头之后才返回 `Response`（src/server/proxy/handler.ts:64-85）。非流式请求要等上游完整返回（src/server/upstream/client.ts:103-116）。
   3. 流式转换器只在上游有可转换的数据时才向 CLI 写字节：chat 流跳过空行和 `:` 开头的注释行（src/server/proxy/streaming/openaiChatStreamToAnthropic.ts:88-90），Responses 流只处理 `event:`/`data:` 行（src/server/proxy/streaming/openaiResponsesStreamToAnthropic.ts:61-99）。代理自己不发心跳或 `ping` 事件。
-  4. Responses 请求不设 `reasoning.summary`（src/server/proxy/transform/anthropicToOpenaiResponses.ts:17-60），所以 OpenAI 推理模型思考期间不会有 `reasoning_summary_text.delta` 事件（推断：依据 OpenAI 的事件语义）。
+  4. Responses 请求在思考开启时带 `reasoning.summary: "auto"`（src/server/proxy/transform/requestRules.ts:38），思考期间可能有 `reasoning_summary_text.delta` 事件，但上游不保证每次都发，所以仍可能有超过 60 秒没有字节的间隔（推断：依据 OpenAI 的事件语义）。
   5. 实验 `idle.ts` 证实：只要连续约 60 秒没有字节写给 CLI，不论处理函数是否已返回，Bun 都会关闭这条连接。
   6. CLI 收到连接关闭：响应头之前的失败按连接错误重试（src/services/api/withRetry.ts:753-755），最多 10 次；流中途断开则改发非流式请求（src/services/api/claude.ts:2552-2601），非流式请求也走代理、也受 60 秒限制。
   7. 设置里的「AI 请求超时」（5–600 秒，src/server/services/networkSettings.ts:13-15）同时传给代理和 CLI（`API_TIMEOUT_MS`，src/server/services/networkSettings.ts:76-78；src/services/api/client.ts:214）。在代理路径上，超过 60 秒的设置值不起作用。
