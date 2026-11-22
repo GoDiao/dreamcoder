@@ -382,7 +382,7 @@ export function annotateBoundaryWithPreservedSegment(
  * User instructions come first; hook instructions are appended.
  * Empty strings normalize to undefined.
  */
-export function mergeHookInstructions(
+function mergeHookInstructions(
   userInstructions: string | undefined,
   hookInstructions: string | undefined,
 ): string | undefined {

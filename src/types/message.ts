@@ -193,7 +193,7 @@ export type SystemAgentsKilledMessage = SystemMessageBase & {
   isMeta?: boolean
 }
 
-export type SystemApiMetricsMessage = SystemMessageBase & {
+type SystemApiMetricsMessage = SystemMessageBase & {
   subtype: 'api_metrics'
   ttftMs: number
   otps: number

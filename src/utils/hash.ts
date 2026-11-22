@@ -24,23 +24,3 @@ export function hashContent(content: string): string {
   const crypto = require('crypto') as typeof import('crypto')
   return crypto.createHash('sha256').update(content).digest('hex')
 }
-
-/**
- * Hash two strings without allocating a concatenated temp string. Bun path
- * seed-chains wyhash (hash(a) feeds as seed to hash(b)); Node path uses
- * incremental SHA-256 update. Seed-chaining naturally disambiguates
- * ("ts","code") vs ("tsc","ode") so no separator is needed under Bun.
- */
-export function hashPair(a: string, b: string): string {
-  if (typeof Bun !== 'undefined') {
-    return Bun.hash(b, Bun.hash(a)).toString()
-  }
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const crypto = require('crypto') as typeof import('crypto')
-  return crypto
-    .createHash('sha256')
-    .update(a)
-    .update('\0')
-    .update(b)
-    .digest('hex')
-}
