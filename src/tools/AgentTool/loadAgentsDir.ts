@@ -137,7 +137,7 @@ export type BuiltInAgentDefinition = BaseAgentDefinition & {
   source: 'built-in'
   baseDir: 'built-in'
   callback?: () => void
-  getSystemPrompt: (params: {
+  getSystemPrompt: (params?: {
     toolUseContext: Pick<ToolUseContext, 'options'>
   }) => string
 }
