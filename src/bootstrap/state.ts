@@ -1565,40 +1565,6 @@ export function addSlowOperation(operation: string, durationMs: number): void {
   }
 }
 
-const EMPTY_SLOW_OPERATIONS: ReadonlyArray<{
-  operation: string
-  durationMs: number
-  timestamp: number
-}> = []
-
-export function getSlowOperations(): ReadonlyArray<{
-  operation: string
-  durationMs: number
-  timestamp: number
-}> {
-  // Most common case: nothing tracked. Return a stable reference so the
-  // caller's setState() can bail via Object.is instead of re-rendering at 2fps.
-  if (STATE.slowOperations.length === 0) {
-    return EMPTY_SLOW_OPERATIONS
-  }
-  const now = Date.now()
-  // Only allocate a new array when something actually expired; otherwise keep
-  // the reference stable across polls while ops are still fresh.
-  if (
-    STATE.slowOperations.some(op => now - op.timestamp >= SLOW_OPERATION_TTL_MS)
-  ) {
-    STATE.slowOperations = STATE.slowOperations.filter(
-      op => now - op.timestamp < SLOW_OPERATION_TTL_MS,
-    )
-    if (STATE.slowOperations.length === 0) {
-      return EMPTY_SLOW_OPERATIONS
-    }
-  }
-  // Safe to return directly: addSlowOperation() reassigns STATE.slowOperations
-  // before pushing, so the array held in React state is never mutated.
-  return STATE.slowOperations
-}
-
 export function getMainThreadAgentType(): string | undefined {
   return STATE.mainThreadAgentType
 }

@@ -267,15 +267,6 @@ export default class Ink {
     // onRecoverableError
     noop // onDefaultTransitionIndicator
     );
-    if ("production" === 'development') {
-      reconciler.injectIntoDevTools({
-        bundleType: 0,
-        // Reporting React DOM's version, not Ink's
-        // See https://github.com/facebook/react/issues/16666#issuecomment-532639905
-        version: '16.13.1',
-        rendererPackageName: 'ink'
-      });
-    }
   }
   private handleResume = () => {
     if (!this.options.stdout.isTTY) {

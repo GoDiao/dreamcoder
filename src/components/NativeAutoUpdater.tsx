@@ -1,7 +1,6 @@
 import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { logEvent } from 'src/services/analytics/index.js';
-import { logForDebugging } from 'src/utils/debug.js';
 import { logError } from 'src/utils/log.js';
 import { useInterval } from 'usehooks-ts';
 import { useUpdateNotification } from '../hooks/useUpdateNotification.js';
@@ -72,10 +71,6 @@ export function NativeAutoUpdater({
   isUpdatingRef.current = isUpdating;
   const checkForUpdates = React.useCallback(async () => {
     if (isUpdatingRef.current) {
-      return;
-    }
-    if ("production" === 'test' || "production" === 'development') {
-      logForDebugging('NativeAutoUpdater: Skipping update check in test/dev environment');
       return;
     }
     if (isAutoUpdaterDisabled()) {
