@@ -12,8 +12,6 @@
  * Called via dynamic import by useReplBridge (auto-start) and print.ts
  * (SDK -p mode via query.enableRemoteControl).
  */
-
-import { feature } from 'bun:bundle'
 import { hostname } from 'os'
 import { getOriginalCwd, getSessionId } from '../bootstrap/state.js'
 import type { SDKMessage } from '../entrypoints/agentSdkTypes.js'
@@ -470,19 +468,7 @@ export async function initReplBridge(
       ? process.env.CLAUDE_BRIDGE_SESSION_INGRESS_URL
       : baseUrl
 
-  // Assistant-mode sessions advertise a distinct worker_type so the web UI
-  // can filter them into a dedicated picker. KAIROS guard keeps the
-  // assistant module out of external builds entirely.
-  let workerType: BridgeWorkerType = 'claude_code'
-  if (feature('KAIROS')) {
-    /* eslint-disable @typescript-eslint/no-require-imports */
-    const { isAssistantMode } =
-      require('../assistant/index.js') as typeof import('../assistant/index.js')
-    /* eslint-enable @typescript-eslint/no-require-imports */
-    if (isAssistantMode()) {
-      workerType = 'claude_code_assistant'
-    }
-  }
+  const workerType: BridgeWorkerType = 'claude_code'
 
   // 6. Delegate. BridgeCoreHandle is a structural superset of
   // ReplBridgeHandle (adds writeSdkMessages which REPL callers don't use),

@@ -152,23 +152,6 @@ export function useReplBridge(messages: Message[], setMessages: (action: React.S
             shouldShowAppUpgradeMessage
           } = await import('../bridge/envLessBridgeConfig.js');
 
-          // Assistant mode: perpetual bridge session — claude.ai shows one
-          // continuous conversation across CLI restarts instead of a new
-          // session per invocation. initBridgeCore reads bridge-pointer.json
-          // (the same crash-recovery file #20735 added) and reuses its
-          // {environmentId, sessionId} via reuseEnvironmentId +
-          // api.reconnectSession(). Teardown skips archive/deregister/
-          // pointer-clear so the session survives clean exits, not just
-          // crashes. Non-assistant bridges clear the pointer on teardown
-          // (crash-recovery only).
-          let perpetual = false;
-          if (feature('KAIROS')) {
-            const {
-              isAssistantMode
-            } = await import('../assistant/index.js');
-            perpetual = isAssistantMode();
-          }
-
           // When a user message arrives from claude.ai, inject it into the REPL.
           // Preserves the original UUID so that when the message is forwarded
           // back to CCR, it matches the original — avoiding duplicate messages.
@@ -190,14 +173,6 @@ export function useReplBridge(messages: Message[], setMessages: (action: React.S
                 resolveAndPrepend
               } = await import('../bridge/inboundAttachments.js');
               let sanitized = fields.content;
-              if (feature('KAIROS_GITHUB_WEBHOOKS')) {
-                /* eslint-disable @typescript-eslint/no-require-imports */
-                const {
-                  sanitizeInboundWebhookContent
-                } = require('../bridge/webhookSanitizer.js') as typeof import('../bridge/webhookSanitizer.js');
-                /* eslint-enable @typescript-eslint/no-require-imports */
-                sanitized = sanitizeInboundWebhookContent(fields.content);
-              }
               const content = await resolveAndPrepend(msg, sanitized);
               const preview = typeof content === 'string' ? content.slice(0, 80) : `[${content.length} content blocks]`;
               logForDebugging(`[bridge:repl] Injecting inbound user message: ${preview}${uuid ? ` uuid=${uuid}` : ''}`);
@@ -476,8 +451,7 @@ export function useReplBridge(messages: Message[], setMessages: (action: React.S
             initialMessages: messages.length > 0 ? messages : undefined,
             getMessages: () => messagesRef.current,
             previouslyFlushedUUIDs: flushedUUIDsRef.current,
-            initialName: replBridgeInitialName,
-            perpetual
+            initialName: replBridgeInitialName
           });
           if (cancelled) {
             // Effect was cancelled while initReplBridge was in flight.
@@ -609,7 +583,7 @@ export function useReplBridge(messages: Message[], setMessages: (action: React.S
             // assistant mode) falls back to v1 at initReplBridge.ts — skip the
             // v2-only upgrade nudge for them. Own try/catch so a cosmetic
             // GrowthBook hiccup doesn't hit the outer init-failure handler.
-            const upgradeNudge = !perpetual ? await shouldShowAppUpgradeMessage().catch(() => false) : false;
+            const upgradeNudge = await shouldShowAppUpgradeMessage().catch(() => false);
             if (cancelled) return;
             setMessages(prev_18 => [...prev_18, createBridgeStatusMessage(url, upgradeNudge ? 'Please upgrade to the latest version of the Claude mobile app to see your Remote Control sessions.' : undefined)]);
             logForDebugging(`[bridge:repl] Hook initialized, session=${handle_0.bridgeSessionId}`);

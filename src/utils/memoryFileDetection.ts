@@ -91,28 +91,6 @@ export function isAutoMemFile(filePath: string): boolean {
   return false
 }
 
-export type MemoryScope = 'personal' | 'team'
-
-/**
- * Determine which memory store (if any) a path belongs to.
- *
- * Team dir is a subdirectory of memdir (getTeamMemPath = join(getAutoMemPath, 'team')),
- * so a team path matches both isTeamMemFile and isAutoMemFile. Check team first.
- *
- * Use this for scope-keyed telemetry where a single event name distinguishes
- * by scope field — the existing tengu_memdir_* / tengu_team_mem_* event-name
- * hierarchy handles the overlap differently (team writes intentionally fire both).
- */
-export function memoryScopeForPath(filePath: string): MemoryScope | null {
-  if (feature('TEAMMEM') && teamMemPaths!.isTeamMemFile(filePath)) {
-    return 'team'
-  }
-  if (isAutoMemFile(filePath)) {
-    return 'personal'
-  }
-  return null
-}
-
 /**
  * Check if a file path is within an agent memory directory.
  */

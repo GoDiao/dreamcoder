@@ -865,10 +865,6 @@ let configCacheMisses = 0
 // rates surface in the UI before they corrupt ~/.claude.json.
 let globalConfigWriteCount = 0
 
-export function getGlobalConfigWriteCount(): number {
-  return globalConfigWriteCount
-}
-
 export const CONFIG_WRITE_DISPLAY_THRESHOLD = 20
 
 function reportConfigCacheStats(): void {

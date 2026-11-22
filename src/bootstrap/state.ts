@@ -229,10 +229,6 @@ type State = {
   // enabled, keep sending the header so cooldown enter/exit doesn't
   // double-bust the prompt cache. The `speed` body param stays dynamic.
   fastModeHeaderLatched: boolean | null
-  // Sticky-on latch for the cache-editing beta header. Once cached
-  // microcompact is first enabled, keep sending the header so mid-session
-  // GrowthBook/settings toggles don't bust the prompt cache.
-  cacheEditingHeaderLatched: boolean | null
   // Sticky-on latch for clearing thinking from prior tool loops. Triggered
   // when >1h since last API call (confirmed cache miss — no cache-hit
   // benefit to keeping thinking). Once latched, stays on so the newly-warmed
@@ -405,7 +401,6 @@ function getInitialState(): State {
     // Beta header latches (null = not yet triggered)
     afkModeHeaderLatched: null,
     fastModeHeaderLatched: null,
-    cacheEditingHeaderLatched: null,
     thinkingClearLatched: null,
     // Current prompt ID
     promptId: null,
@@ -581,10 +576,6 @@ export function addToToolDuration(duration: number): void {
   STATE.turnToolCount++
 }
 
-export function getTurnHookDurationMs(): number {
-  return STATE.turnHookDurationMs
-}
-
 export function addToTurnHookDuration(duration: number): void {
   STATE.turnHookDurationMs += duration
   STATE.turnHookCount++
@@ -595,25 +586,9 @@ export function resetTurnHookDuration(): void {
   STATE.turnHookCount = 0
 }
 
-export function getTurnHookCount(): number {
-  return STATE.turnHookCount
-}
-
-export function getTurnToolDurationMs(): number {
-  return STATE.turnToolDurationMs
-}
-
 export function resetTurnToolDuration(): void {
   STATE.turnToolDurationMs = 0
   STATE.turnToolCount = 0
-}
-
-export function getTurnToolCount(): number {
-  return STATE.turnToolCount
-}
-
-export function getTurnClassifierDurationMs(): number {
-  return STATE.turnClassifierDurationMs
 }
 
 export function addToTurnClassifierDuration(duration: number): void {
@@ -624,10 +599,6 @@ export function addToTurnClassifierDuration(duration: number): void {
 export function resetTurnClassifierDuration(): void {
   STATE.turnClassifierDurationMs = 0
   STATE.turnClassifierCount = 0
-}
-
-export function getTurnClassifierCount(): number {
-  return STATE.turnClassifierCount
 }
 
 export function getStatsStore(): {
@@ -1729,14 +1700,6 @@ export function setFastModeHeaderLatched(v: boolean): void {
   STATE.fastModeHeaderLatched = v
 }
 
-export function getCacheEditingHeaderLatched(): boolean | null {
-  return STATE.cacheEditingHeaderLatched
-}
-
-export function setCacheEditingHeaderLatched(v: boolean): void {
-  STATE.cacheEditingHeaderLatched = v
-}
-
 export function getThinkingClearLatched(): boolean | null {
   return STATE.thinkingClearLatched
 }
@@ -1752,7 +1715,6 @@ export function setThinkingClearLatched(v: boolean): void {
 export function clearBetaHeaderLatches(): void {
   STATE.afkModeHeaderLatched = null
   STATE.fastModeHeaderLatched = null
-  STATE.cacheEditingHeaderLatched = null
   STATE.thinkingClearLatched = null
 }
 

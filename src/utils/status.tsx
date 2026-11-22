@@ -24,9 +24,6 @@ export type Property = {
   value: React.ReactNode | Array<string>;
 };
 export type Diagnostic = React.ReactNode;
-export function buildSandboxProperties(): Property[] {
-  return [];
-}
 export function buildIDEProperties(mcpClients: MCPServerConnection[], ideInstallationStatus: IDEExtensionInstallationStatus | null = null, theme: ThemeName): Property[] {
   const ideClient = mcpClients?.find(client => client.name === 'ide');
   if (ideInstallationStatus) {

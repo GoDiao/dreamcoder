@@ -86,9 +86,6 @@ export function useMemorySurvey(messages: Message[], isLoading: boolean, hasActi
       survey_type: 'memory'
     });
   }, []);
-  const shouldShowTranscriptPrompt = useCallback((selected_0: FeedbackSurveyResponse) => {
-    return false;
-  }, []);
   const onTranscriptPromptShown = useCallback((appearanceId_1: string) => {
     logEvent(MEMORY_SURVEY_EVENT, {
       event_type: 'transcript_prompt_appeared' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -134,7 +131,6 @@ export function useMemorySurvey(messages: Message[], isLoading: boolean, hasActi
     hideThanksAfterMs: HIDE_THANKS_AFTER_MS,
     onOpen,
     onSelect,
-    shouldShowTranscriptPrompt,
     onTranscriptPromptShown,
     onTranscriptSelect
   });

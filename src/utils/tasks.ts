@@ -66,8 +66,6 @@ export function notifyTasksUpdated(): void {
   }
 }
 
-export const TASK_STATUSES = ['pending', 'in_progress', 'completed'] as const
-
 export const TaskStatusSchema = lazySchema(() =>
   z.enum(['pending', 'in_progress', 'completed']),
 )
@@ -858,5 +856,3 @@ export async function unassignTeammateTasks(
     notificationMessage,
   }
 }
-
-export const DEFAULT_TASKS_MODE_TASK_LIST_ID = 'tasklist'

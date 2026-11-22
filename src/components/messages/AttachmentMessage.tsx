@@ -98,21 +98,7 @@ export function AttachmentMessage({
       </Box>;
   }
 
-  // skill_discovery rendered here (not in the switch) so the 'skill_discovery'
-  // string literal stays inside a feature()-guarded block. A case label can't
-  // be conditionally eliminated; an if-body can.
-  if (feature('EXPERIMENTAL_SKILL_SEARCH')) {
-    if (attachment.type === 'skill_discovery') {
-      if (attachment.skills.length === 0) return null;
-      const names = attachment.skills.map(s => s.shortId ? `${s.name} [${s.shortId}]` : s.name).join(', ');
-      return <Line>
-          <Text bold>{attachment.skills.length}</Text> relevant{' '}
-          {plural(attachment.skills.length, 'skill')}: {names}
-        </Line>;
-    }
-  }
-
-  // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check -- teammate_mailbox/skill_discovery handled before switch
+  // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check -- teammate_mailbox handled before switch
   switch (attachment.type) {
     case 'directory':
       return <Line>
@@ -338,10 +324,10 @@ export function AttachmentMessage({
       // a case) or render nothing (add to the array). Messages.tsx pre-filters
       // these so this branch is defense-in-depth for other render paths.
       //
-      // skill_discovery and teammate_mailbox are handled BEFORE the switch in
-      // runtime-gated blocks (feature() / isAgentSwarmsEnabled()) that TS can't
-      // narrow through — excluded here via type union (compile-time only, no emit).
-      attachment.type satisfies NullRenderingAttachmentType | 'skill_discovery' | 'teammate_mailbox';
+      // teammate_mailbox is handled BEFORE the switch in a runtime-gated block
+      // (isAgentSwarmsEnabled()) that TS can't narrow through — excluded here
+      // via type union (compile-time only, no emit).
+      attachment.type satisfies NullRenderingAttachmentType | 'teammate_mailbox';
       return null;
   }
 }

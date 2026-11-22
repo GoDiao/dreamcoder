@@ -14,16 +14,6 @@ const bunTarget = mapTargetTripleToBun(targetTriple)
 
 await prepareRipgrep(repoRoot, targetTriple)
 
-console.log('[build-sidecars] scanning for missing imports...')
-const scanProc = Bun.spawn(
-  ['bun', 'run', path.join(desktopRoot, 'scripts/scan-missing-imports.ts')],
-  { cwd: repoRoot, stdout: 'inherit', stderr: 'inherit' },
-)
-const scanExit = await scanProc.exited
-if (scanExit !== 0) {
-  throw new Error(`[build-sidecars] scan-missing-imports failed (exit ${scanExit})`)
-}
-
 await mkdir(binariesDir, { recursive: true })
 
 await compileExecutable({

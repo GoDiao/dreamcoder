@@ -1,6 +1,5 @@
 // @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
-import { feature } from 'bun:bundle';
 import * as React from 'react';
 import { Box, Text } from '../ink.js';
 import type { ContextData } from '../utils/analyzeContext.js';
@@ -8,68 +7,8 @@ import { generateContextSuggestions } from '../utils/contextSuggestions.js';
 import { getDisplayPath } from '../utils/file.js';
 import { formatTokens } from '../utils/format.js';
 import { getSourceDisplayName, type SettingSource } from '../utils/settings/constants.js';
-import { plural } from '../utils/stringUtils.js';
 import { ContextSuggestions } from './ContextSuggestions.js';
 const RESERVED_CATEGORY_NAME = 'Autocompact buffer';
-
-/**
- * One-liner for the legend header showing what context-collapse has done.
- * Returns null when nothing's summarized/staged so we don't add visual
- * noise in the common case. This is the one place a user can see that
- * their context was rewritten — the <collapsed> placeholders are isMeta
- * and don't appear in the conversation view.
- */
-function CollapseStatus() {
-  const $ = _c(2);
-  if (feature("CONTEXT_COLLAPSE")) {
-    let t0;
-    let t1;
-    if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
-      t1 = Symbol.for("react.early_return_sentinel");
-      bb0: {
-        const {
-          getStats,
-          isContextCollapseEnabled
-        } = require("../services/contextCollapse/index.js") as typeof import('../services/contextCollapse/index.js');
-        if (!isContextCollapseEnabled()) {
-          t1 = null;
-          break bb0;
-        }
-        const s = getStats();
-        const {
-          health: h
-        } = s;
-        const parts = [];
-        if (s.collapsedSpans > 0) {
-          parts.push(`${s.collapsedSpans} ${plural(s.collapsedSpans, "span")} summarized (${s.collapsedMessages} msgs)`);
-        }
-        if (s.stagedSpans > 0) {
-          parts.push(`${s.stagedSpans} staged`);
-        }
-        const summary = parts.length > 0 ? parts.join(", ") : h.totalSpawns > 0 ? `${h.totalSpawns} ${plural(h.totalSpawns, "spawn")}, nothing staged yet` : "waiting for first trigger";
-        let line2 = null;
-        if (h.totalErrors > 0) {
-          line2 = <Text color="warning">Collapse errors: {h.totalErrors}/{h.totalSpawns} spawns failed{h.lastError ? ` (last: ${h.lastError.slice(0, 60)})` : ""}</Text>;
-        } else {
-          if (h.emptySpawnWarningEmitted) {
-            line2 = <Text color="warning">Collapse idle: {h.totalEmptySpawns} consecutive empty runs</Text>;
-          }
-        }
-        t0 = <><Text dimColor={true}>Context strategy: collapse ({summary})</Text>{line2}</>;
-      }
-      $[0] = t0;
-      $[1] = t1;
-    } else {
-      t0 = $[0];
-      t1 = $[1];
-    }
-    if (t1 !== Symbol.for("react.early_return_sentinel")) {
-      return t1;
-    }
-    return t0;
-  }
-  return null;
-}
 
 // Order for displaying source groups: Project > User > Managed > Plugin > Built-in
 const SOURCE_DISPLAY_ORDER = ['Project', 'User', 'Managed', 'Plugin', 'Built-in'];
@@ -204,7 +143,7 @@ export function ContextVisualization(t0) {
     let t17;
     let t18;
     if ($[35] === Symbol.for("react.memo_cache_sentinel")) {
-      t16 = <CollapseStatus />;
+      t16 = null;
       t17 = <Text> </Text>;
       t18 = <Text dimColor={true} italic={true}>Estimated usage by category</Text>;
       $[35] = t16;

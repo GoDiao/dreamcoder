@@ -59,11 +59,6 @@ const LEGACY_BRIEF_TOOL_NAME: string | null =
         require('../tools/BriefTool/prompt.js') as typeof import('../tools/BriefTool/prompt.js')
       ).LEGACY_BRIEF_TOOL_NAME
     : null
-const SEND_USER_FILE_TOOL_NAME: string | null = feature('KAIROS')
-  ? (
-      require('../tools/SendUserFileTool/prompt.js') as typeof import('../tools/SendUserFileTool/prompt.js')
-    ).SEND_USER_FILE_TOOL_NAME
-  : null
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 /**
@@ -330,9 +325,7 @@ function isTerminalToolResult(
     for (const b of msg.message.content) {
       if (b.type === 'tool_use' && b.id === toolUseId) {
         return (
-          b.name === BRIEF_TOOL_NAME ||
-          b.name === LEGACY_BRIEF_TOOL_NAME ||
-          b.name === SEND_USER_FILE_TOOL_NAME
+          b.name === BRIEF_TOOL_NAME || b.name === LEGACY_BRIEF_TOOL_NAME
         )
       }
     }

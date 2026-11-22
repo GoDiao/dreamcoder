@@ -25,7 +25,6 @@ import {
   detectSessionFileType,
   detectSessionPatternType,
   isAutoMemFile,
-  memoryScopeForPath,
 } from './memoryFileDetection.js'
 
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -34,9 +33,6 @@ const teamMemPaths = feature('TEAMMEM')
   : null
 const teamMemWatcher = feature('TEAMMEM')
   ? (require('../services/teamMemorySync/watcher.js') as typeof import('../services/teamMemorySync/watcher.js'))
-  : null
-const memoryShapeTelemetry = feature('MEMORY_SHAPE_TELEMETRY')
-  ? (require('../memdir/memoryShapeTelemetry.js') as typeof import('../memdir/memoryShapeTelemetry.js'))
   : null
 
 /* eslint-enable @typescript-eslint/no-require-imports */
@@ -204,22 +200,6 @@ async function handleSessionFileAccess(
         logEvent('tengu_team_mem_file_write', { ...subagentProps })
         teamMemWatcher?.notifyTeamMemoryWrite()
         break
-    }
-  }
-
-  if (feature('MEMORY_SHAPE_TELEMETRY') && filePath) {
-    const scope = memoryScopeForPath(filePath)
-    if (
-      scope !== null &&
-      (input.tool_name === FILE_EDIT_TOOL_NAME ||
-        input.tool_name === FILE_WRITE_TOOL_NAME)
-    ) {
-      memoryShapeTelemetry!.logMemoryWriteShape(
-        input.tool_name,
-        input.tool_input,
-        filePath,
-        scope,
-      )
     }
   }
 
