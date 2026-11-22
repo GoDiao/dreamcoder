@@ -59,6 +59,8 @@ export function allowsOwnArtifactWrite(
   return operationType !== 'read' && mode !== 'plan' && isOwnArtifactWrite(paths)
 }
 
-export function isHardDenial(reason: PermissionDecisionReason | undefined): boolean {
+export function isHardDenial(
+  reason: PermissionDecisionReason | undefined,
+): reason is PermissionDecisionReason {
   return reason?.type === 'rule' || (reason?.type === 'other' && reason.hardDeny === true)
 }

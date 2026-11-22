@@ -376,8 +376,10 @@ function baseCreateAssistantMessage({
     message: {
       id: randomUUID(),
       container: null,
+      diagnostics: null,
       model: SYNTHETIC_MODEL,
       role: 'assistant',
+      stop_details: null,
       stop_reason: 'stop_sequence',
       stop_sequence: '',
       type: 'message',

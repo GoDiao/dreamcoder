@@ -5,6 +5,7 @@ import * as path from 'path'
 import { getOriginalCwd, setCwdState, setOriginalCwd } from '../../bootstrap/state.js'
 import * as mcpClient from '../../services/mcp/client.js'
 import * as mcpConfig from '../../services/mcp/config.js'
+import type { ScopedMcpServerConfig } from '../../services/mcp/types.js'
 import {
   _setGlobalConfigCacheForTesting,
   getGlobalConfig,
@@ -89,14 +90,19 @@ describe('MCP API', () => {
     originalRequestControl = conversationService.requestControl.bind(conversationService)
     originalHasSession = conversationService.hasSession.bind(conversationService)
 
-    connectSpy = spyOn(mcpClient, 'connectToServer').mockImplementation(async (name, config) => ({
-      name,
-      type: 'connected',
-      client: {} as never,
-      capabilities: {},
-      config,
-      cleanup: mock(async () => {}),
-    }))
+    connectSpy = spyOn(mcpClient, 'connectToServer').mockImplementation(
+      Object.assign(
+        async (name: string, config: ScopedMcpServerConfig) => ({
+          name,
+          type: 'connected' as const,
+          client: {} as never,
+          capabilities: {},
+          config,
+          cleanup: mock(async () => {}),
+        }),
+        { cache: mcpClient.connectToServer.cache },
+      ),
+    )
   })
 
   it('serves the validated curated catalog without reading or changing MCP config', async () => {
@@ -219,7 +225,7 @@ describe('MCP API', () => {
   })
 
   describe('confirmed stdio creation', () => {
-    const scopes = ['local', 'project', 'user'] as const
+    const scopes: Array<'local' | 'project' | 'user'> = ['local', 'project', 'user']
     type EditableScope = typeof scopes[number]
     let previousNodeEnv: string | undefined
 
@@ -820,7 +826,7 @@ describe('MCP API', () => {
 
   it('reconnects plugin-scoped MCP servers exposed via the merged server list', async () => {
     const pluginServerName = 'plugin:telegram:telegram'
-    const pluginServerConfig = {
+    const pluginServerConfig: ScopedMcpServerConfig = {
       scope: 'dynamic',
       type: 'stdio',
       command: 'bun',
@@ -829,7 +835,7 @@ describe('MCP API', () => {
         CLAUDE_PLUGIN_ROOT: '/tmp/telegram-plugin',
       },
       pluginSource: 'telegram@claude-plugins-official',
-    } as const
+    }
 
     getClaudeCodeMcpConfigsSpy = spyOn(mcpConfig, 'getClaudeCodeMcpConfigs').mockResolvedValue({
       servers: {
@@ -839,7 +845,6 @@ describe('MCP API', () => {
     })
 
     reconnectSpy = spyOn(mcpClient, 'reconnectMcpServerImpl').mockResolvedValue({
-      name: pluginServerName,
       client: {
         name: pluginServerName,
         type: 'connected',
@@ -848,6 +853,8 @@ describe('MCP API', () => {
         config: pluginServerConfig,
         cleanup: mock(async () => {}),
       },
+      tools: [],
+      commands: [],
     })
 
     const reconnect = makeRequest('POST', `/api/mcp/${encodeURIComponent(pluginServerName)}/reconnect`, {
@@ -865,14 +872,14 @@ describe('MCP API', () => {
 
   it('returns a failed server state when reconnect preflight fails on the host machine', async () => {
     const pluginServerName = 'plugin:telegram:telegram'
-    const pluginServerConfig = {
+    const pluginServerConfig: ScopedMcpServerConfig = {
       scope: 'dynamic',
       type: 'stdio',
       command: 'npx',
       args: ['telegram-mcp'],
       env: {},
       pluginSource: 'telegram@claude-plugins-official',
-    } as const
+    }
 
     getClaudeCodeMcpConfigsSpy = spyOn(mcpConfig, 'getClaudeCodeMcpConfigs').mockResolvedValue({
       servers: {
@@ -887,7 +894,6 @@ describe('MCP API', () => {
     })
 
     reconnectSpy = spyOn(mcpClient, 'reconnectMcpServerImpl').mockResolvedValue({
-      name: pluginServerName,
       client: {
         name: pluginServerName,
         type: 'connected',
@@ -896,6 +902,8 @@ describe('MCP API', () => {
         config: pluginServerConfig,
         cleanup: mock(async () => {}),
       },
+      tools: [],
+      commands: [],
     })
 
     const reconnect = makeRequest('POST', `/api/mcp/${encodeURIComponent(pluginServerName)}/reconnect`, {

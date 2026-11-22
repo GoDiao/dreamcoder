@@ -344,7 +344,7 @@ function buildPreservedMetadataEntries(
   forkSessionId: UUID,
   ownWorkspace: boolean,
 ): RawEntry[] {
-  return sourceEntries.flatMap((entry) => {
+  return sourceEntries.flatMap<RawEntry>((entry) => {
     if (isSessionMetaEntry(entry)) {
       const inherited: SessionMetaEntry = { ...entry }
       delete inherited.parent

@@ -126,4 +126,31 @@ describe('deletePluginCache', () => {
     const healed = JSON.parse(await fs.readFile(installedPluginsPath, 'utf-8'))
     expect(healed.plugins[pluginId][0].installPath).toBe(newInstallPath)
   })
+
+  test('keeps installed plugins when an entry has no version', async () => {
+    const pluginId = 'unversioned-plugin@local-market'
+    const installPath = path.join(tempDir, 'unversioned-plugin')
+    const installedPluginsPath = path.join(
+      tempDir,
+      '.claude',
+      'plugins',
+      'installed_plugins.json',
+    )
+    await fs.mkdir(path.dirname(installedPluginsPath), { recursive: true })
+    await fs.writeFile(
+      installedPluginsPath,
+      JSON.stringify({
+        version: 2,
+        plugins: {
+          [pluginId]: [{ scope: 'user', installPath }],
+        },
+      }),
+      'utf-8',
+    )
+    clearInstalledPluginsCache()
+
+    const loaded = loadInstalledPluginsV2()
+
+    expect(loaded.plugins[pluginId]?.[0]?.installPath).toBe(installPath)
+  })
 })

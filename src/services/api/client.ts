@@ -229,7 +229,7 @@ export async function getAnthropicClient({
         ? process.env.ANTHROPIC_SMALL_FAST_MODEL_AWS_REGION
         : getAWSRegion()
 
-    const bedrockArgs: ConstructorParameters<typeof AnthropicBedrock>[0] = {
+    const bedrockArgs = {
       ...ARGS,
       awsRegion,
       ...(isEnvTruthy(process.env.CLAUDE_CODE_SKIP_BEDROCK_AUTH) && {
@@ -246,17 +246,23 @@ export async function getAnthropicClient({
         ...bedrockArgs.defaultHeaders,
         Authorization: `Bearer ${process.env.AWS_BEARER_TOKEN_BEDROCK}`,
       }
-    } else if (!isEnvTruthy(process.env.CLAUDE_CODE_SKIP_BEDROCK_AUTH)) {
-      // Refresh auth and get credentials with cache clearing
-      const cachedCredentials = await refreshAndGetAwsCredentials()
-      if (cachedCredentials) {
-        bedrockArgs.awsAccessKey = cachedCredentials.accessKeyId
-        bedrockArgs.awsSecretKey = cachedCredentials.secretAccessKey
-        bedrockArgs.awsSessionToken = cachedCredentials.sessionToken
-      }
     }
+    // Refresh auth and get credentials with cache clearing
+    const cachedCredentials =
+      !process.env.AWS_BEARER_TOKEN_BEDROCK &&
+      !isEnvTruthy(process.env.CLAUDE_CODE_SKIP_BEDROCK_AUTH)
+        ? await refreshAndGetAwsCredentials()
+        : null
+    const bedrockClient = cachedCredentials
+      ? new AnthropicBedrock({
+          ...bedrockArgs,
+          awsAccessKey: cachedCredentials.accessKeyId,
+          awsSecretKey: cachedCredentials.secretAccessKey,
+          awsSessionToken: cachedCredentials.sessionToken,
+        })
+      : new AnthropicBedrock(bedrockArgs)
     // we have always been lying about the return type - this doesn't support batching or models
-    return new AnthropicBedrock(bedrockArgs) as unknown as Anthropic
+    return bedrockClient as unknown as Anthropic
   }
   if (isEnvTruthy(process.env.CLAUDE_CODE_USE_FOUNDRY)) {
     const { AnthropicFoundry } = await import('@anthropic-ai/foundry-sdk')

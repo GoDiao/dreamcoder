@@ -45,7 +45,7 @@ import type { AppState } from './state/AppState.js'
 import { type Tools, type ToolUseContext, toolMatchesName } from './Tool.js'
 import type { AgentDefinition } from './tools/AgentTool/loadAgentsDir.js'
 import { SYNTHETIC_OUTPUT_TOOL_NAME } from './tools/SyntheticOutputTool/SyntheticOutputTool.js'
-import type { Message } from './types/message.js'
+import type { Message, SystemLocalCommandMessage } from './types/message.js'
 import type { OrphanedPermission } from './types/textInputTypes.js'
 import { createAbortController } from './utils/abortController.js'
 import type { AttributionState } from './utils/commitAttribution.js'
@@ -1257,11 +1257,13 @@ function* localGoalCommandOutputMessages(
   }
 }
 
-function toSDKLocalCommandOutputMessage(message: Message): SDKMessage {
+function toSDKLocalCommandOutputMessage(
+  message: SystemLocalCommandMessage,
+): SDKMessage {
   return {
     type: 'system',
     subtype: 'local_command_output',
-    content: message.type === 'system' ? stripAnsi(message.content) : '',
+    content: stripAnsi(message.content),
     uuid: message.uuid,
     session_id: getSessionId(),
   } as SDKMessage

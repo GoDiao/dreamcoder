@@ -11,6 +11,7 @@ import { getModelStrings } from 'src/utils/model/modelStrings.js'
 import { isEnvTruthy } from 'src/utils/envUtils.js'
 import { toolToAPISchema } from 'src/utils/api.js'
 import type { AgentDefinition } from 'src/tools/AgentTool/loadAgentsDir.js'
+import type { Message } from 'src/types/message.js'
 
 const DEFAULT_API_VERSION = '2025-04-01-preview'
 
@@ -199,7 +200,7 @@ function contentBlocksToText(content: unknown): string {
     .join('\n')
 }
 
-export function buildAzureOpenAIInput(messages: Array<{ type: string; message: { content: unknown } }>): OpenAIMessage[] {
+export function buildAzureOpenAIInput(messages: Message[]): OpenAIMessage[] {
   const inputs: OpenAIMessage[] = []
 
   for (const msg of messages) {
@@ -290,7 +291,7 @@ function mapOutputItemToBlocks(item: OpenAIResponseOutputItem): BetaContentBlock
       if (!content || typeof content !== 'object') continue
       if (content.type === 'output_text' || content.type === 'text') {
         const text = content.text ?? ''
-        blocks.push({ type: 'text', text })
+        blocks.push({ type: 'text', text, citations: null })
       }
     }
   }
@@ -328,7 +329,7 @@ export function parseAzureOpenAIResponse(response: OpenAIResponse): {
   }
 
   if (contentBlocks.length === 0 && response.output_text) {
-    contentBlocks.push({ type: 'text', text: response.output_text })
+    contentBlocks.push({ type: 'text', text: response.output_text, citations: null })
   }
 
   const usage: BetaUsage = {
@@ -351,7 +352,7 @@ export function parseAzureOpenAIResponse(response: OpenAIResponse): {
 export async function requestAzureOpenAI(params: {
   model: string
   systemPrompt: string
-  messages: Array<{ type: string; message: { content: unknown } }>
+  messages: Message[]
   tools: Tools
   toolChoice?: { type?: string; name?: string }
   maxOutputTokens: number

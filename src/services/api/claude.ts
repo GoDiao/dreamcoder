@@ -942,7 +942,7 @@ function getPreviousRequestIdFromMessages(
 }
 
 function isMedia(
-  block: BetaContentBlockParam,
+  block: { type: string },
 ): block is BetaImageBlockParam | BetaRequestDocumentBlock {
   return block.type === "image" || block.type === "document";
 }
@@ -1057,10 +1057,16 @@ async function* queryModel(
       const assistantMessage: AssistantMessage = {
         message: {
           id: result.responseId ?? randomUUID(),
+          container: null,
+          context_management: null,
+          diagnostics: null,
           model: options.model,
           role: "assistant",
           content: result.content,
+          stop_details: null,
           stop_reason: result.stopReason,
+          stop_sequence: null,
+          type: "message",
           usage: result.usage,
         },
         requestId: result.responseId ?? undefined,

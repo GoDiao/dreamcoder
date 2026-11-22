@@ -199,6 +199,7 @@ const reconciler = createReconciler<
   DOMElement,
   DOMElement,
   TextNode,
+  unknown,
   DOMElement,
   unknown,
   unknown,
@@ -207,7 +208,12 @@ const reconciler = createReconciler<
   null, // UpdatePayload - not used in React 19
   NodeJS.Timeout,
   -1,
-  null
+  null,
+  unknown,
+  unknown,
+  unknown,
+  unknown,
+  unknown
 >({
   getRootHostContext: () => ({ isInsideText: false }),
   prepareForCommit: () => {
@@ -451,6 +457,25 @@ const reconciler = createReconciler<
   suspendInstance(): void {},
   waitForCommitToBeReady(): null {
     return null
+  },
+  maySuspendCommitOnUpdate(): boolean {
+    return false
+  },
+  maySuspendCommitInSyncRender(): boolean {
+    return false
+  },
+  suspendOnActiveViewTransition(): void {},
+  getSuspendedCommitReason(): null {
+    return null
+  },
+  rendererVersion: MACRO.VERSION,
+  rendererPackageName: 'ink',
+  extraDevToolsConfig: null,
+  bindToConsole(methodName: string, args: unknown[]) {
+    return () => {
+      const method: unknown = Reflect.get(console, methodName)
+      if (typeof method === 'function') Reflect.apply(method, console, args)
+    }
   },
   NotPendingTransition: null,
   HostTransitionContext: {

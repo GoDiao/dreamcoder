@@ -121,7 +121,7 @@ async function captureTerminalShellEnvironment(
     `printf '%s\\0' ${quoteForShell(TERMINAL_ENV_MARKER)}`,
     'env -0',
   ].join('\n')
-  const captureEnv = {
+  const captureEnv: Record<string, string> = {
     ...baseEnv,
     SHELL: shellPath,
     PS1: '',

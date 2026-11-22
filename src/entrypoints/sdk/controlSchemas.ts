@@ -7,6 +7,7 @@
  * SDK consumers should use coreSchemas.ts instead.
  */
 
+import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod/v4'
 import { lazySchema } from '../../utils/lazySchema.js'
 import {
@@ -34,7 +35,9 @@ import {
 // ============================================================================
 
 // JSONRPCMessage from @modelcontextprotocol/sdk - treat as unknown
-export const JSONRPCMessagePlaceholder = lazySchema(() => z.unknown())
+export const JSONRPCMessagePlaceholder = lazySchema(() =>
+  z.custom<JSONRPCMessage>(),
+)
 
 // ============================================================================
 // Hook Callback Types

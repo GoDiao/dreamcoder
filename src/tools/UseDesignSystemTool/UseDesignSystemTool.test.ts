@@ -38,8 +38,8 @@ afterEach(async () => {
 })
 
 const exists = (path: string) => stat(path).then(() => true, () => false)
-const validate = (input: Record<string, unknown>) => UseDesignSystemTool.validateInput!(input as never, {} as never)
-const run = (input: Record<string, unknown>) => UseDesignSystemTool.call(input as never, {} as never, undefined as never, undefined as never)
+const validate = (input: Record<string, unknown>) => UseDesignSystemTool.validateInput!(input as never)
+const run = (input: Record<string, unknown>) => UseDesignSystemTool.call(input as never)
 
 describe('UseDesignSystem validation and permission', () => {
   test('accepts an id from the library and rejects an unknown one', async () => {
@@ -61,7 +61,7 @@ describe('UseDesignSystem validation and permission', () => {
   })
 
   test('asks the user with the name and the destination, and is excluded from sub-agents', async () => {
-    const permission = await UseDesignSystemTool.checkPermissions({ id: 'alpha' } as never, {} as never)
+    const permission = await UseDesignSystemTool.checkPermissions({ id: 'alpha' } as never)
     expect(permission.behavior).toBe('ask')
     expect(permission.behavior === 'ask' && permission.message).toContain('Name of alpha')
     expect(permission.behavior === 'ask' && permission.message).toContain(join(project, 'dc_artifacts', 'systems'))

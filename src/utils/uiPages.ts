@@ -8,6 +8,7 @@ import { componentSignature } from '../../vendor/showai/src/portable/component-s
 import g2Fields from '../../vendor/showai/resources/catalog/g2-fields.json'
 import type { PageOperation, ShowDocument } from '../../vendor/showai/src/core/model.js'
 import { collectCustomComponentRefs } from '../../vendor/showai/src/components/custom/contract.js'
+import type { JsonSchema } from '../../vendor/showai/src/components/custom/types.js'
 import {
   compileHtmlBlock,
   CUSTOM_BLOCK_KIND,
@@ -347,7 +348,7 @@ export async function changeUiPage(
   return writeRevision(sessionDir, input.pageId, current.revision + 1, document, components)
 }
 
-type CatalogEntry = { kind: string; name?: string; description?: string; propsSchema?: unknown; examples?: unknown }
+type CatalogEntry = { kind: string; name?: string; description?: string; propsSchema?: JsonSchema; examples?: unknown }
 type ComponentGuide = { reuse?: unknown; usage?: unknown }
 type Catalog = { entries: CatalogEntry[]; guides: Record<string, ComponentGuide> }
 
