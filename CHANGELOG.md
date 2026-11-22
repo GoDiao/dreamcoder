@@ -31,6 +31,7 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Fixed
 
+- Task reminders now count complete model responses instead of individual streamed content blocks, so they no longer appear after only a few requests (#274).
 - The main session now tells the agent when its memory index is empty or has not been created yet (#296). Thanks @Benson-BS.
 - Asking the agent to change a setting no longer fails: the `update-config` skill builds its settings reference again (#293). Thanks @KingEmma7.
 - **Saving a memory no longer asks for approval every time.** Writes to the project's memory folder are allowed like the instructions say, also in bypass mode (#270).
