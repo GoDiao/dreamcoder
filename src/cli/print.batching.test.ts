@@ -1,10 +1,14 @@
 import { describe, expect, test } from 'bun:test'
+import type { UserMessageOrigin } from '../entrypoints/sdk/coreSchemas.js'
 import type { QueuedCommand } from '../types/textInputTypes.js'
 import { canBatchWith, mergeBatchedCommands } from './print.js'
 
+type SessionOrigin = Extract<UserMessageOrigin, { kind: 'session' }>
+type KanbanOrigin = Extract<UserMessageOrigin, { kind: 'kanban' }>
+
 const session = (
   sessionId: string,
-  purpose = 'message',
+  purpose: SessionOrigin['purpose'] = 'message',
   summary?: string,
 ): QueuedCommand => ({
   mode: 'prompt',
@@ -14,7 +18,7 @@ const session = (
 
 const human: QueuedCommand = { mode: 'prompt', value: 'x' }
 
-const kanban = (card: number, purpose = 'comment', project = '/repo'): QueuedCommand => ({
+const kanban = (card: number, purpose: KanbanOrigin['purpose'] = 'comment', project = '/repo'): QueuedCommand => ({
   mode: 'prompt',
   value: 'x',
   origin: { kind: 'kanban', project, card: { id: card, title: `Card ${card}` }, purpose },
@@ -65,13 +69,13 @@ describe('mergeBatchedCommands', () => {
 
   test('keeps the reports of every merged command in order', () => {
     const merged = mergeBatchedCommands([
-      { mode: 'prompt', value: 'first', uuid: 'u1', reports: [report('r1')] },
-      { mode: 'prompt', value: 'second', uuid: 'u2' },
-      { mode: 'prompt', value: 'third', uuid: 'u3', reports: [report('r2'), report('r3')] },
+      { mode: 'prompt', value: 'first', uuid: '00000000-0000-4000-8000-000000000001', reports: [report('r1')] },
+      { mode: 'prompt', value: 'second', uuid: '00000000-0000-4000-8000-000000000002' },
+      { mode: 'prompt', value: 'third', uuid: '00000000-0000-4000-8000-000000000003', reports: [report('r2'), report('r3')] },
     ])
 
     expect(merged.value).toBe('first\nsecond\nthird')
-    expect(merged.uuid).toBe('u3')
+    expect(merged.uuid).toBe('00000000-0000-4000-8000-000000000003')
     expect(merged.reports?.map(r => r.id)).toEqual(['r1', 'r2', 'r3'])
   })
 })

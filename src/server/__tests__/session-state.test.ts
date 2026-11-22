@@ -465,6 +465,7 @@ describe('session persistence', () => {
       workDir: '/repo',
       projectRoot: '/repo',
       workDirExists: true,
+      pendingReports: [],
     })
     const writes: unknown[] = []
     spyOn(sessionService, 'appendSessionRuntimeConfig').mockImplementation(async (_id, runtime) => {
@@ -514,6 +515,7 @@ describe('session persistence', () => {
       workDir: '/repo',
       projectRoot: '/repo',
       workDirExists: true,
+      pendingReports: [],
     })
     const store = new SessionStateStore()
     const uninstall = installSessionPersistence(store)

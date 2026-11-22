@@ -3,7 +3,7 @@ import { AGENT_TEAMS_ENV, applyAgentTeamsSetting } from '../services/agentTeamsE
 
 describe('agent teams env', () => {
   test('follows the desktop switch, not the inherited shell value', () => {
-    const inherited = { [AGENT_TEAMS_ENV]: '1', PATH: '/bin' }
+    const inherited: Record<string, string | undefined> = { [AGENT_TEAMS_ENV]: '1', PATH: '/bin' }
     applyAgentTeamsSetting(inherited, {})
     expect(inherited).toEqual({ PATH: '/bin' })
 

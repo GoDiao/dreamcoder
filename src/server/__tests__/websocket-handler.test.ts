@@ -153,7 +153,7 @@ describe('WebSocket handler session isolation', () => {
   it('keeps disconnected sessions alive longer while user input is pending', () => {
     const sessionId = `permission-disconnect-${crypto.randomUUID()}`
     const ws = makeClientSocket(sessionId)
-    const setTimeoutSpy = spyOn(globalThis, 'setTimeout').mockImplementation(() => 0 as any)
+    const setTimeoutSpy = spyOn(globalThis, 'setTimeout').mockImplementation((() => 0) as unknown as typeof setTimeout)
     sessionStateStore.apply(sessionId, {
       type: 'permission_request_opened',
       at: 1,
@@ -396,7 +396,7 @@ describe('WebSocket permission mode updates', () => {
 
     const resolving = resolveSessionPermissionMode(ws.data.sessionId)
     handleWebSocket.message(ws, JSON.stringify({ type: 'set_permission_mode', mode: 'plan' }))
-    finishRead({ permissionMode: 'default', title: null, workDir: '/tmp', projectRoot: null, workDirExists: true })
+    finishRead({ permissionMode: 'default', title: null, workDir: '/tmp', projectRoot: null, workDirExists: true, pendingReports: [] })
 
     expect(await resolving).toBe('plan')
     expect(await resolveSessionPermissionMode(ws.data.sessionId)).toBe('plan')
@@ -425,6 +425,7 @@ describe('WebSocket permission mode updates', () => {
     const sessionId = `permission-mode-${crypto.randomUUID()}`
     spyOn(sessionService, 'getSessionRestoreInfo').mockResolvedValue({
       permissionMode: 'plan', title: null, workDir: '/tmp', projectRoot: null, workDirExists: true,
+      pendingReports: [],
     })
     spyOn(SettingsService.prototype, 'getPermissionMode').mockResolvedValue('acceptEdits')
 
@@ -443,6 +444,7 @@ describe('WebSocket permission mode updates', () => {
     const ws = makeClientSocket(`permission-mode-${crypto.randomUUID()}`)
     spyOn(sessionService, 'getSessionRestoreInfo').mockResolvedValue({
       permissionMode: 'plan', title: null, workDir: '/tmp', projectRoot: null, workDirExists: true,
+      pendingReports: [],
     })
 
     handleWebSocket.open(ws)

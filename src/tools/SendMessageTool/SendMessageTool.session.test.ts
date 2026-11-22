@@ -72,7 +72,7 @@ describe('SendMessage to a session', () => {
     await run({ to: 'session:abc', message: '\n  first   line here\nsecond line' })
     await run({ to: 'session:abc', message: long })
     await run({ to: 'session:abc', summary: 'own words', message: 'body' })
-    expect(requests.map((request) => (request as { summary: string }).summary)).toEqual([
+    expect(requests.map((request) => request.summary)).toEqual([
       'first line here',
       `${'x'.repeat(80)}…`,
       'own words',

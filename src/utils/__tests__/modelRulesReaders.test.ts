@@ -130,7 +130,8 @@ describe('without DREAMCODER_MODEL_RULES the CLI keeps its Claude logic', () => 
 
   test('a settings effortLevel change still updates the session effort', () => {
     const prev: AppState = { ...getDefaultAppState(), effortValue: 'high' }
-    const spy = spyOn(settings, 'getInitialSettings').mockReturnValue({ ...prev.settings, effortLevel: 'low' })
+    const initialSettings = settings.getInitialSettings()
+    const spy = spyOn(settings, 'getInitialSettings').mockReturnValue({ ...initialSettings, effortLevel: 'low' })
     let next: AppState = prev
     try {
       applySettingsChange('userSettings', update => {
@@ -223,7 +224,8 @@ describe('with DREAMCODER_MODEL_RULES the CLI reads the rules', () => {
 
   test('a settings effortLevel change does not replace the session effort', () => {
     const prev: AppState = { ...getDefaultAppState(), effortValue: 'high' }
-    const spy = spyOn(settings, 'getInitialSettings').mockReturnValue({ ...prev.settings, effortLevel: 'low' })
+    const initialSettings = settings.getInitialSettings()
+    const spy = spyOn(settings, 'getInitialSettings').mockReturnValue({ ...initialSettings, effortLevel: 'low' })
     let next: AppState = prev
     try {
       applySettingsChange('userSettings', update => {

@@ -26,7 +26,7 @@ function toolResultTurn(model: string) {
   const turn = forApi.find(
     message => Array.isArray(message.message.content) && message.message.content.some(block => block.type === 'tool_result'),
   )!
-  return turn.message.content as Array<{ type: string; content?: unknown; text?: string }>
+  return turn.message.content as Array<{ type: string; tool_use_id?: string; content?: unknown; text?: string }>
 }
 
 describe('messages of the compaction request', () => {

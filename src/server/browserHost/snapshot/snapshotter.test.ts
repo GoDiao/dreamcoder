@@ -133,7 +133,7 @@ describe('createSnapshotter', () => {
   })
 
   test('passes scroll arguments to the program and maps the result', async () => {
-    const page = { ok: true, moved: 720, position: 1440, maxPosition: 3000, total: 3800, area: null }
+    const page = { ok: true as const, moved: 720, position: 1440, maxPosition: 3000, total: 3800, area: null }
     const area = { ...page, area: 'div "Comments"' }
     const fake = fakeCdp((call) => evaluated(String(call.params?.expression).includes('"amount":null') ? page : area))
     const snapshotter = createSnapshotter(fake.cdp)

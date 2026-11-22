@@ -11,18 +11,19 @@ const emit = (event: { sessionId: string; phase: 'stopped' | 'failed' }) =>
   (conversationService as unknown as LifecycleEmitter).emitProcessEvent({ ...event, generation: 1 })
 
 function connectHost(token: string) {
-  const socket = {
+  const fake = {
     data: createBrowserHostSocketData(),
     readyState: 1,
     sent: [] as unknown[],
     send(payload: string) {
-      this.sent.push(JSON.parse(payload))
+      fake.sent.push(JSON.parse(payload))
       return payload.length
     },
     close() {
-      this.readyState = 3
+      fake.readyState = 3
     },
-  } as unknown as ServerWebSocket<BrowserHostSocketData>
+  }
+  const socket = fake as unknown as ServerWebSocket<BrowserHostSocketData>
   browserHostChannel.setToken(token)
   browserHostChannel.open(socket)
   browserHostChannel.message(socket, JSON.stringify({ type: 'hello', token, protocol: BROWSER_HOST_PROTOCOL_VERSION }))

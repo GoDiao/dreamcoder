@@ -39,7 +39,7 @@ describe('QueryEngine when a stream is retried', () => {
     const toolUse = reply([{ type: 'tool_use', id: 'toolu_1', name: 'Missing', input: {} }] as never)
     const final = reply('Done.')
     let calls = 0
-    modelSpy = spyOn(claudeApi, 'queryModelWithStreaming').mockImplementation(async function* ({ options }) {
+    modelSpy = spyOn(claudeApi, 'queryModelWithStreaming').mockImplementation(async function* ({ options }: Parameters<typeof claudeApi.queryModelWithStreaming>[0]) {
       calls += 1
       if (calls > 1) {
         yield final

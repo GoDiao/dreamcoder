@@ -98,9 +98,12 @@ describe('truncated tool arguments', () => {
 
     expect(calls).toHaveLength(0)
     expect(updates).toHaveLength(1)
-    const [result] = (updates[0]!.message as { message: { content: Array<Record<string, unknown>> } }).message.content
+    const update = updates[0]!.message
+    if (update?.type !== 'user' || !Array.isArray(update.message.content)) throw new Error('expected a tool result message')
+    const [result] = update.message.content
     expect(result).toMatchObject({ type: 'tool_result', tool_use_id: 'toolu_1', is_error: true })
-    expect(String(result!.content)).toContain(`received ${truncated.length} characters`)
-    expect(String(result!.content)).toContain('cut off by the output token limit')
+    const resultContent = result?.type === 'tool_result' ? result.content : undefined
+    expect(String(resultContent)).toContain(`received ${truncated.length} characters`)
+    expect(String(resultContent)).toContain('cut off by the output token limit')
   })
 })

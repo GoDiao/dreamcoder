@@ -748,7 +748,7 @@ describe('ProviderService', () => {
       const originalEntrypoint = process.env.CLAUDE_CODE_ENTRYPOINT
       delete process.env.CLAUDE_CODE_ENTRYPOINT
       const calls: Array<{ body: Record<string, unknown> }> = []
-      globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
+      globalThis.fetch = Object.assign(mock(async (_url: string | URL | Request, init?: RequestInit) => {
         calls.push({ body: JSON.parse(String(init?.body)) as Record<string, unknown> })
         return new Response(JSON.stringify({
           id: 'chatcmpl-1',
@@ -761,7 +761,7 @@ describe('ProviderService', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         })
-      }) as typeof fetch
+      }), { preconnect: fetch.preconnect })
 
       try {
         const svc = new ProviderService()
@@ -798,7 +798,7 @@ describe('ProviderService', () => {
       const originalEntrypoint = process.env.CLAUDE_CODE_ENTRYPOINT
       delete process.env.CLAUDE_CODE_ENTRYPOINT
       const calls: Array<{ body: Record<string, unknown> }> = []
-      globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
+      globalThis.fetch = Object.assign(mock(async (_url: string | URL | Request, init?: RequestInit) => {
         calls.push({ body: JSON.parse(String(init?.body)) as Record<string, unknown> })
         return new Response(JSON.stringify({
           id: 'chatcmpl-1',
@@ -811,7 +811,7 @@ describe('ProviderService', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         })
-      }) as typeof fetch
+      }), { preconnect: fetch.preconnect })
 
       try {
         const svc = new ProviderService()
@@ -845,12 +845,12 @@ describe('ProviderService', () => {
     ] as const)('sends the CLI session id as prompt_cache_key for %s: %p', async (apiFormat, expected) => {
       const originalFetch = globalThis.fetch
       const bodies: Array<Record<string, unknown>> = []
-      globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
+      globalThis.fetch = Object.assign(mock(async (_url: string | URL | Request, init?: RequestInit) => {
         bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>)
         return Response.json(apiFormat === 'openai_chat'
           ? { id: 'c', object: 'chat.completion', created: 0, model: 'gpt-4', choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }] }
           : { id: 'r', object: 'response', model: 'gpt-4', status: 'completed', output: [] })
-      }) as typeof fetch
+      }), { preconnect: fetch.preconnect })
 
       try {
         const provider = await new ProviderService().addProvider(sampleInput({ apiFormat }))
@@ -1027,10 +1027,10 @@ describe('ProviderService', () => {
     test('should use preset default auth for saved no-key Anthropic-compatible providers', async () => {
       const originalFetch = globalThis.fetch
       const calls: Array<{ headers: Record<string, string> }> = []
-      globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
+      globalThis.fetch = Object.assign(mock(async (_url: string | URL | Request, init?: RequestInit) => {
         calls.push({ headers: init?.headers as Record<string, string> })
         return anthropicStreamResponse('lmstudio-model')
-      }) as typeof fetch
+      }), { preconnect: fetch.preconnect })
 
       try {
         const svc = new ProviderService()
@@ -1057,13 +1057,13 @@ describe('ProviderService', () => {
     test('should use auth strategy headers for Anthropic-compatible tests', async () => {
       const originalFetch = globalThis.fetch
       const calls: Array<{ url: string; headers: Record<string, string> }> = []
-      globalThis.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
+      globalThis.fetch = Object.assign(mock(async (url: string | URL | Request, init?: RequestInit) => {
         calls.push({
           url: String(url),
           headers: init?.headers as Record<string, string>,
         })
         return anthropicStreamResponse('model-main')
-      }) as typeof fetch
+      }), { preconnect: fetch.preconnect })
 
       try {
         const svc = new ProviderService()
@@ -1103,7 +1103,7 @@ describe('ProviderService', () => {
     test('tests OpenAI Chat providers through the same streaming path as chat', async () => {
       const originalFetch = globalThis.fetch
       const calls: Array<{ url: string; body: Record<string, unknown> }> = []
-      globalThis.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
+      globalThis.fetch = Object.assign(mock(async (url: string | URL | Request, init?: RequestInit) => {
         calls.push({ url: String(url), body: JSON.parse(String(init?.body)) as Record<string, unknown> })
         const chunk = {
           id: 'c1',
@@ -1116,7 +1116,7 @@ describe('ProviderService', () => {
           status: 200,
           headers: { 'Content-Type': 'text/event-stream' },
         })
-      }) as typeof fetch
+      }), { preconnect: fetch.preconnect })
 
       try {
         const svc = new ProviderService()
@@ -1281,9 +1281,9 @@ describe('ProviderService', () => {
       const originalFetch = globalThis.fetch
       const originalSetTimeout = globalThis.setTimeout
       const timeoutCalls: Array<number | undefined> = []
-      globalThis.fetch = mock(async (_url: string | URL | Request, _init?: RequestInit) => {
+      globalThis.fetch = Object.assign(mock(async (_url: string | URL | Request, _init?: RequestInit) => {
         return anthropicStreamResponse('model-main')
-      }) as typeof fetch
+      }), { preconnect: fetch.preconnect })
       globalThis.setTimeout = ((handler: TimerHandler, ms?: number, ...args: unknown[]) => {
         timeoutCalls.push(ms)
         return originalSetTimeout(handler, ms, ...args)

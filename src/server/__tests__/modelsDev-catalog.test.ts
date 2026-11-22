@@ -208,7 +208,7 @@ describe('lookupModelsDevModel providers', () => {
 describe('modelsDevRuleFields', () => {
   const thinking = (model: ModelsDevModel) => modelsDevRuleFields(model).reasoning
 
-  test.each([
+  test.each<[string, unknown, ReturnType<typeof thinking>]>([
     ['no reasoning', { reasoning: false }, { control: 'none', levels: [] }],
     ['reasoning without options', { reasoning: true }, { control: 'always', levels: [] }],
     ['toggle', { reasoning: true, reasoning_options: [{ type: 'toggle' }] }, { control: 'toggle', levels: [] }],
@@ -219,7 +219,7 @@ describe('modelsDevRuleFields', () => {
     ['budget and toggle', { reasoning: true, reasoning_options: [{ type: 'toggle' }, { type: 'budget_tokens' }] }, { control: 'toggle', levels: [] }],
     ['budget and effort', { reasoning: true, reasoning_options: [{ type: 'effort', values: ['low', 'high'] }, { type: 'budget_tokens' }] }, { control: 'effort', levels: ['low', 'high'] }],
     ['effort with only unknown levels', { reasoning: true, reasoning_options: [{ type: 'effort', values: ['xhigh'] }] }, { control: 'always', levels: [] }],
-  ] as const)('%s', (_name, model, expected) => {
+  ])('%s', (_name, model, expected) => {
     expect(thinking(model as ModelsDevModel)).toEqual(expected)
   })
 

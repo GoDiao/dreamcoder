@@ -5,8 +5,8 @@ import * as path from 'node:path'
 import { diagnosticsService } from '../services/diagnosticsService.js'
 import type { UserMessageOrigin } from '../../entrypoints/sdk/coreSchemas.js'
 import type { SessionParent } from '../../utils/sessionBranching.js'
-import type { SessionFact } from '../services/kanbanModel.js'
-import { createKanban, KanbanError, type KanbanService, type KanbanServiceErrorCode } from '../services/kanbanService.js'
+import type { KanbanServiceErrorCode, SessionFact } from '../services/kanbanModel.js'
+import { createKanban, KanbanError, type KanbanService } from '../services/kanbanService.js'
 
 const configDirAtLoad = process.env.DREAMCODER_CONFIG_DIR
 const human = { kind: 'human' } as const

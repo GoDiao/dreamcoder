@@ -16,14 +16,14 @@ let originalFetch: typeof globalThis.fetch
 let calls: Call[]
 
 function mockFetch(respond: () => Response) {
-  globalThis.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
+  globalThis.fetch = Object.assign(mock(async (url: string | URL | Request, init?: RequestInit) => {
     calls.push({
       url: String(url),
       headers: init?.headers as Record<string, string>,
       body: JSON.parse(String(init?.body)) as Record<string, unknown>,
     })
     return respond()
-  }) as typeof fetch
+  }), { preconnect: fetch.preconnect })
 }
 
 function target(overrides?: Partial<UpstreamTarget>): UpstreamTarget {

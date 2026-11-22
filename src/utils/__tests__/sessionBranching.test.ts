@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'bun:test'
-import type { SerializedMessage } from '../../types/logs.js'
 import { deriveFirstPrompt, SessionBranchingError } from '../sessionBranching.js'
 
 describe('sessionBranching', () => {
@@ -10,7 +9,7 @@ describe('sessionBranching', () => {
         role: 'user',
         content: '  first line\n\nsecond    line  ',
       },
-    } as SerializedMessage
+    } as unknown as Parameters<typeof deriveFirstPrompt>[0]
 
     expect(deriveFirstPrompt(message)).toBe('first line second line')
   })

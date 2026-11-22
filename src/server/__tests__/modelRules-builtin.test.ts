@@ -39,7 +39,7 @@ function snapshotModel(modelId: string) {
   return lookupModelsDevModel(snapshotIndex, '', modelId)?.model
 }
 
-function setFields(rules: ModelRuleFields, fields: readonly (keyof ModelRuleFields)[]): string[] {
+function setFields<K extends keyof ModelRuleFields>(rules: ModelRuleFields, fields: readonly K[]): K[] {
   return fields.filter(field => rules[field] !== undefined)
 }
 

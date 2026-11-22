@@ -1451,7 +1451,7 @@ export class WorkspaceService {
     return { kind: 'ok', diff: result.stdout }
   }
 
-  private async runGit(
+  protected async runGit(
     workDir: string,
     args: string[],
   ): Promise<GitCommandResult> {

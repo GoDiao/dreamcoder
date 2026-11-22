@@ -47,7 +47,8 @@ describe('skill listing derived from the conversation history', () => {
     const delta = announce(['slides', 'design', 'release'], history)
 
     expect(delta).toMatchObject({ skillNames: ['release'], isInitial: false })
-    expect(delta!.content).not.toContain('slides')
+    if (delta?.type !== 'skill_listing') throw new Error('expected a skill listing')
+    expect(delta.content).not.toContain('slides')
   })
 
   test('after compaction removes the earlier listing, the full list is sent again', () => {

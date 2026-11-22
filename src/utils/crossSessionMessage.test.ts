@@ -160,7 +160,8 @@ describe('createSessionReportMessages', () => {
     expect(messages.map(message => message.origin)).toEqual([first, second])
     expect(messages[0]!.message.content).toBe(wrapCrossSessionBody('first body', first))
     expect(messages[1]!.message.content).toBe(wrapCrossSessionBody('second body', second))
-    expect(messages.map(message => message.uuid)).toEqual(['report-1', 'report-2'])
+    const uuids: string[] = messages.map(message => message.uuid)
+    expect(uuids).toEqual(['report-1', 'report-2'])
   })
 
   test('makes nothing for no reports', () => {
@@ -174,7 +175,7 @@ describe('SDK user message reports', () => {
     message: { role: 'user', content: 'hi' },
     parent_tool_use_id: null,
   }
-  const report = { id: 'report-1', message: 'progress', origin: { ...origin, purpose: 'report', summary: 'half way' } }
+  const report = { id: 'report-1', message: 'progress', origin: { ...origin, purpose: 'report' as const, summary: 'half way' } }
 
   test('survive schema parsing with the summary on the origin', () => {
     const parsed = SDKUserMessageSchema().parse({ ...base, reports: [report] })

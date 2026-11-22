@@ -4,12 +4,12 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import type { Candidate } from './candidates'
 import type { Curation } from './convert'
-import { buildMessages, readDrafts, renderReview, runDescribe, sanitizeHtml, validateModelDraft, type ModelDeps } from './describe'
+import { buildMessages, readDrafts, renderReview, runDescribe, sanitizeHtml, validateModelDraft, type ModelDeps, type ModelDraft } from './describe'
 
 const KEY = 'redaction-test-value-0123456789'
 const MODEL = 'vendor/model-x'
 
-const good = (overrides: Record<string, unknown> = {}) => ({
+const goodDraft: ModelDraft = {
   fit: 'page',
   fitReason: 'A web page.',
   category: 'web',
@@ -20,8 +20,9 @@ const good = (overrides: Record<string, unknown> = {}) => ({
   tags: ['demo', 'landing', 'marketing'],
   prompt: { en: 'Keep the hero and the pricing grid.', zh: '保留主视觉和定价栅格。' },
   style: { en: 'Light and airy with one blue accent.', zh: '明亮疏朗，只有一种蓝色强调。' },
-  ...overrides,
-})
+}
+
+const good = (overrides: Record<string, unknown> = {}) => ({ ...goodDraft, ...overrides })
 
 const skill = `---
 name: demo
@@ -166,7 +167,7 @@ describe('sanitizeHtml', () => {
 
 describe('validateModelDraft', () => {
   it('accepts a complete answer', () => {
-    expect(validateModelDraft(good())).toEqual({ draft: good() })
+    expect(validateModelDraft(good())).toEqual({ draft: goodDraft })
   })
 
   it('names every problem it finds', () => {

@@ -9,7 +9,7 @@ import {
   readActiveProviderManagedEnv,
   resolveProviderDefaultModel,
 } from '../services/providerRuntimeEnv.js'
-import type { SavedProvider } from '../types/provider.js'
+import type { ApiFormat, SavedProvider } from '../types/provider.js'
 
 let tmpDir: string
 
@@ -66,9 +66,8 @@ describe('providerRuntimeEnv', () => {
       apiKey: 'key',
       baseUrl: 'https://api.example.com',
       apiFormat: 'anthropic',
+      runtimeKind: 'anthropic_compatible',
       models: [{ id: 'model-main' }, { id: 'model-selected' }],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
     } satisfies SavedProvider
 
     expect(resolveProviderDefaultModel(provider, {
@@ -139,11 +138,11 @@ describe('providerRuntimeEnv', () => {
     })
   })
 
-  test.each([
+  test.each<[ApiFormat, string | undefined]>([
     ['openai_chat', '1'],
     ['openai_responses', '1'],
     ['anthropic', undefined],
-  ] as const)('marks providers reached through the local proxy (%s)', (apiFormat, expected) => {
+  ])('marks providers reached through the local proxy (%s)', (apiFormat, expected) => {
     const env = buildProviderManagedEnv({
       id: 'p1',
       presetId: 'custom',
@@ -155,6 +154,6 @@ describe('providerRuntimeEnv', () => {
       models: [{ id: 'model-main' }],
     })
 
-    expect(env.DREAMCODER_PROVIDER_PROXIED).toBe(expected)
+    expect(Object.hasOwn(env, 'DREAMCODER_PROVIDER_PROXIED') ? env.DREAMCODER_PROVIDER_PROXIED : undefined).toBe(expected)
   })
 })

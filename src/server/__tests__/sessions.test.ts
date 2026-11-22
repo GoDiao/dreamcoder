@@ -123,13 +123,6 @@ async function writeLegacySlashCommand(
   )
 }
 
-function git(cwd: string, ...args: string[]): string {
-  return execFileSync('git', args, {
-    cwd,
-    encoding: 'utf8',
-  })
-}
-
 async function createWorkspaceApiGitRepo(baseDir: string): Promise<string> {
   const workDir = path.join(
     baseDir,
@@ -147,29 +140,6 @@ async function createWorkspaceApiGitRepo(baseDir: string): Promise<string> {
   git(workDir, 'commit', '-m', 'initial')
 
   await fs.writeFile(path.join(workDir, 'tracked.txt'), 'before\nafter\n')
-
-  return workDir
-}
-
-async function createCleanGitRepo(baseDir: string): Promise<string> {
-  const workDir = path.join(
-    baseDir,
-    `repo-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-  )
-
-  await fs.mkdir(workDir, { recursive: true })
-  git(workDir, 'init')
-  git(workDir, 'config', 'user.email', 'sessions-api@example.com')
-  git(workDir, 'config', 'user.name', 'Sessions API')
-  git(workDir, 'checkout', '-b', 'main')
-  await fs.writeFile(path.join(workDir, 'README.md'), 'main\n')
-  git(workDir, 'add', 'README.md')
-  git(workDir, 'commit', '-m', 'initial')
-  git(workDir, 'checkout', '-b', 'feature/rail')
-  await fs.writeFile(path.join(workDir, 'feature.txt'), 'feature\n')
-  git(workDir, 'add', 'feature.txt')
-  git(workDir, 'commit', '-m', 'feature')
-  git(workDir, 'checkout', 'main')
 
   return workDir
 }
@@ -2283,8 +2253,8 @@ describe('Sessions API', () => {
         path: activeWorktree,
         plannedPath: activeWorktree,
         sourceWorkDir: repository!.requestedWorkDir,
-        slug: repository!.worktreeSlug,
-        branch: repository!.worktreeBranch,
+        slug: repository!.worktreeSlug ?? null,
+        branch: repository!.worktreeBranch ?? null,
       })
     } finally {
       sessionsMap.delete(sessionId)

@@ -20,11 +20,11 @@ let calls: Call[]
 let warning: ReturnType<typeof spyOn>
 
 function respondWith(respond: (call: Call) => Response | Promise<Response>) {
-  globalThis.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
+  globalThis.fetch = Object.assign(mock(async (url: string | URL | Request, init?: RequestInit) => {
     const call = { url: String(url), init }
     calls.push(call)
     return respond(call)
-  }) as typeof fetch
+  }), { preconnect: fetch.preconnect })
 }
 
 function paths(): string[] {
