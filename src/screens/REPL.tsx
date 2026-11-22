@@ -2452,9 +2452,7 @@ export function REPL({
         // are O(n) per render, so drop everything before the previous
         // boundary to keep n bounded across multi-day sessions.
         if (isFullscreenEnvEnabled()) {
-          setMessages(old => [...getMessagesAfterCompactBoundary(old, {
-            includeSnipped: true
-          }), newMessage]);
+          setMessages(old => [...getMessagesAfterCompactBoundary(old), newMessage]);
         } else {
           setMessages(() => [newMessage]);
         }

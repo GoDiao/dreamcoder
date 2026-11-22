@@ -4388,17 +4388,11 @@ export function findLastCompactBoundaryIndex<
  * Returns messages from the last compact boundary onward (including the boundary).
  * If no boundary exists, returns all messages.
  *
- * Also filters snipped messages by default (when HISTORY_SNIP is enabled) —
- * the REPL keeps full history for UI scrollback, so model-facing paths need
- * both compact-slice AND snip-filter applied. Pass `{ includeSnipped: true }`
- * to opt out (e.g., REPL.tsx fullscreen compact handler which preserves
- * snipped messages in scrollback).
- *
  * Note: The boundary itself is a system message and will be filtered by normalizeMessagesForAPI.
  */
 export function getMessagesAfterCompactBoundary<
   T extends Message | NormalizedMessage,
->(messages: T[], options?: { includeSnipped?: boolean }): T[] {
+>(messages: T[]): T[] {
   const boundaryIndex = findLastCompactBoundaryIndex(messages)
   const sliced = boundaryIndex === -1 ? messages : messages.slice(boundaryIndex)
   return sliced

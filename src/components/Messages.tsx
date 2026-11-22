@@ -488,13 +488,7 @@ const MessagesImpl = ({
     // otherwise scroll to. Main-screen mode keeps the filter — pre-compact
     // rows live above the viewport in native scrollback there, and
     // re-rendering them triggers full resets.
-    // includeSnipped: UI rendering keeps snipped messages for scrollback
-    // (this PR's core goal — full history in UI, filter only for the model).
-    // Also avoids a UUID mismatch: normalizeMessages derives new UUIDs, so
-    // projectSnippedView's check against original removedUuids would fail.
-    const compactAwareMessages = verbose || isFullscreenEnvEnabled() ? normalizedMessages : getMessagesAfterCompactBoundary(normalizedMessages, {
-      includeSnipped: true
-    });
+    const compactAwareMessages = verbose || isFullscreenEnvEnabled() ? normalizedMessages : getMessagesAfterCompactBoundary(normalizedMessages);
     const messagesToShowNotTruncated = reorderMessagesInUI(compactAwareMessages.filter((msg_2): msg_2 is Exclude<NormalizedMessage, ProgressMessageType> => msg_2.type !== 'progress')
     // CC-724: drop attachment messages that AttachmentMessage renders as
     // null (hook_success, hook_additional_context, hook_cancelled, etc.)
