@@ -115,9 +115,9 @@
 - 改法方向：响应侧把推理来源字段记在 thinking 块上（例如写进现在为空的 signature），请求侧按这个记录写回同名字段；思考开关的写法并入 P-REQ-02 的按模型映射，不再与推理回传绑在同一个域名判断上。
 - 确定程度：代码确认（各提供方是否要求回传未核实）
 
-### P-REQ-08 Responses 路径不回传 reasoning item、不请求 `encrypted_content`、不请求推理摘要
+### P-REQ-08 Responses 路径回传 reasoning item 并显示推理摘要
 
-- 状态：已在 #264 修复：写回开着且模型能思考时，Responses 请求带 `include: ["reasoning.encrypted_content"]`，`encrypted_content` 记进签名并在下一轮还原成 reasoning item。思考开着时同时请求推理摘要（`reasoning.summary: "auto"`），摘要文本进入 thinking 块。见 [model-rules.md](../model-rules.md)「推理回传」。
+- 状态：#264 加入 `include: ["reasoning.encrypted_content"]`，并把 `encrypted_content` 记进签名、在下一轮还原成 reasoning item；#297 在请求中加入 `reasoning.summary: "auto"`，响应摘要文本进入 thinking 块。见 [model-rules.md](../model-rules.md)「推理回传」。
 - 类型：问题
 - 严重程度：中
 - 现状：Responses 请求固定 `store:false`（`anthropicToOpenaiResponses.ts:17-22`），没有 `include`、没有 `reasoning.summary`（`types.ts:107-125`）；历史中的 thinking 块在 `convertMessageToInputItems` 里没有分支，被丢弃（`anthropicToOpenaiResponses.ts:82-105`）。

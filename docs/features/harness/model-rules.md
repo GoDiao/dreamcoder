@@ -455,7 +455,7 @@ models.dev 和厂商文档不一致、且会改变行为时，在 models.dev 之
 | `anthropic_budget` | `thinking:{type:'disabled'}` | `thinking:{type:'enabled', budget_tokens}`，不发 effort | 同左 | anthropic 格式默认 |
 | `anthropic_disable_only` | `thinking:{type:'disabled'}` | 不发（上游默认开） | 不发 | anthropic 格式：Kimi Code、智谱，保持现在的行为 |
 | `reasoning_effort` | `control` 为 `toggle` 或 `toggle_effort` 时 `reasoning_effort:'none'`，否则不发 | `reasoning_effort:L` | 不发（上游默认） | openai_chat 默认；OpenAI、Gemini、Kimi K3 |
-| `responses_reasoning` | 同上，写 `reasoning:{effort:'none'}` | `reasoning:{effort:L}` | 不发（上游默认） | openai_responses 默认 |
+| `responses_reasoning` | 同上，写 `reasoning:{effort:'none'}` | `reasoning:{effort:L,summary:'auto'}` | 不发（上游默认） | openai_responses 默认 |
 | `thinking_type` | `thinking:{type:'disabled'}` | `thinking:{type:'enabled'}`，`reasoning_effort:L` 仅当 `levels` 非空 | `thinking:{type:'enabled'}` | DeepSeek、智谱、Kimi K2 的 chat 接口 |
 | `thinking_adaptive` | `thinking:{type:'disabled'}` | `thinking:{type:'adaptive'}` + `reasoning_effort:L` | `thinking:{type:'adaptive'}` | MiniMax 的 chat 接口 |
 | `enable_thinking` | `enable_thinking:false` | `enable_thinking:true`，`reasoning_effort:L` 仅当 `levels` 非空 | `enable_thinking:true` | 百炼 Qwen |
@@ -747,7 +747,7 @@ type CliModelRulesEnv = { models: Record<string, CliModelRules>; fallback: CliMo
 3. **CLI 保存**：`signature` 在内存、transcript 和下一轮请求体里原样保留。请求里非 tool_use 的块原样传递（`src/utils/messages.ts:2250`，`claude.ts:659-679`）。会删掉思考块的只有：末尾思考块的过滤（`messages.ts:4878`）、只有思考的孤立消息的过滤（`messages.ts:5088`）、内部用户的降级路径（`src/query.ts:928-931`）。工具调用前的思考块后面跟着 tool_use，不在末尾，不会被删。
 4. **请求方向**：代理读到带 `dc1:` 前缀的思考块，按来源写回：chat 消息的 `reasoning_content` 或 `reasoning_details`，Responses 的 reasoning item。来源字段要被当前端点接受：`reasoning_details` 只在写法是 `openrouter` 时写回，`encrypted_content` 只在 openai_responses 上写回，`reasoning_content` 和 `reasoning` 在 openai_chat 上写回。来源不被当前端点接受的块（会话中途换了提供方，例如从 OpenRouter 换到 DeepSeek 官方 chat）按没有前缀处理。没有前缀的思考块（升级前的旧会话、会话中途换了提供方）默认不写回；站点条目可以用 `unmarkedReasoningReplay: 'reasoning_content'` 让它们按 `reasoning_content` 写回。`api.deepseek.com` 的站点条目这样设，保持现在对旧会话的行为（`client.ts:271-275` 现在对 DeepSeek 一律写回）。
 5. `reasoningReplay: 'off'` 只管有来源标记的块；没有标记的块仍按 `unmarkedReasoningReplay` 处理。上游自带的 `thinking_blocks[].signature` 会编码进载荷，但目前没有接受它的端点，写回时按没有标记处理。
-6. Responses 请求在写回开着、模型能思考时带 `include: ['reasoning.encrypted_content']`，否则上游不返回 `encrypted_content`（P-REQ-08）。不请求推理摘要。
+6. Responses 请求在写回开着、模型能思考时带 `include: ['reasoning.encrypted_content']`，否则上游不返回 `encrypted_content`（P-REQ-08）。发送 reasoning effort 时同时请求 `summary: 'auto'`，供响应转换为 thinking 文本（#297）。
 7. 写回时不再看 host。DeepSeek 带 tools 时要求之前所有轮次的 `reasoning_content` 都回传，否则返回 400（DeepSeek thinking_mode 文档）；按来源写回正好满足这一点。
 
 **Gemini 的 `thought_signature` 不在本轮。** 它挂在工具调用上（`tool_calls[].extra_content.google.thought_signature`），不在推理字段里；这个位置只在第三方 issue 和论坛里见过，官方文档没写（未核实）。CLI 也带不回 tool_use 块上的额外字段：代理模式下工具搜索一定关闭（`src/utils/toolSearch.ts:299-311`，provider 是 firstParty、base URL 不是官方、server 不设 `ENABLE_TOOL_SEARCH`），此时 `normalizeMessagesForAPI` 把 tool_use 重建为只有 `{type, id, name, input}` 的对象（`messages.ts:2215-2247`），`claude.ts:1336-1349` 还会再剥一次。可行的载体是同一条消息里一个思考块的 `signature`（例如 `dc1:gemini_tool:<toolCallId>:<sig>`），但 Gemini 不返回推理文本时要造一个空思考块，空思考块在 CLI 里的去留没核实。所以本轮不做：Gemini 原生 OpenAI 兼容端点上多轮工具调用可能被拒（推断），作为已知限制。经 OpenRouter 用 Gemini 时，签名如果在 `reasoning_details` 里，会随 `reasoning_details` 一起写回（未核实）。
