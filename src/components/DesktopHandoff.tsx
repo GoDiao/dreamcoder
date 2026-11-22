@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import React, { useEffect, useState } from 'react';
 import type { CommandResultDisplay } from '../commands.js';

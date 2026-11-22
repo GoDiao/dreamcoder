@@ -1,30 +1,37 @@
-// @generated stub from scan-missing-imports
-const __target = function noop() {}
-const __handler: ProxyHandler<any> = {
-  get(_t, prop) {
-    if (prop === '__esModule') return true
-    if (prop === 'default') return new Proxy(__target, __handler)
-    if (prop === Symbol.toPrimitive) return () => undefined
-    if (prop === Symbol.iterator) return function* () {}
-    if (prop === Symbol.asyncIterator) return async function* () {}
-    if (prop === 'then') return undefined
-    return new Proxy(__target, __handler)
-  },
-  apply() {
-    return new Proxy(__target, __handler)
-  },
-  construct() {
-    return new Proxy(__target, __handler)
-  },
+import type { z } from 'zod/v4'
+import type {
+  KEYBINDING_ACTIONS,
+  KEYBINDING_CONTEXTS,
+  KeybindingBlockSchema,
+} from './schema.js'
+
+export type KeybindingContextName =
+  | (typeof KEYBINDING_CONTEXTS)[number]
+  | 'Scroll'
+  | 'MessageActions'
+
+export type KeybindingAction = (typeof KEYBINDING_ACTIONS)[number]
+
+export type KeybindingBlock = Omit<
+  z.infer<ReturnType<typeof KeybindingBlockSchema>>,
+  'context'
+> & {
+  context: KeybindingContextName
 }
-const stub: any = new Proxy(__target, __handler)
-export default stub
-export const __stubMissing = true
-export const createCachedMCState = stub
-export const isCachedMicrocompactEnabled = stub
-export const isModelSupportedForCacheEditing = stub
-export const getCachedMCConfig = stub
-export const markToolsSentToAPI = stub
-export const resetCachedMCState = stub
-export const checkProtectedNamespace = stub
-export const getCoordinatorUserContext = stub
+
+export type ParsedKeystroke = {
+  key: string
+  ctrl: boolean
+  alt: boolean
+  shift: boolean
+  meta: boolean
+  super: boolean
+}
+
+export type Chord = ParsedKeystroke[]
+
+export type ParsedBinding = {
+  chord: Chord
+  action: KeybindingBlock['bindings'][string]
+  context: KeybindingContextName
+}

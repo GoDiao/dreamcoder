@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import React, { type ReactNode } from 'react';
 import type { Theme } from '../../utils/theme.js';

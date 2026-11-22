@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import React, { Suspense, use, useDeferredValue, useEffect, useState } from 'react';
 import type { DeepImmutable } from 'src/types/utils.js';

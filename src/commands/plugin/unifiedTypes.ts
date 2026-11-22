@@ -1,30 +1,52 @@
-// @generated stub from scan-missing-imports
-const __target = function noop() {}
-const __handler: ProxyHandler<any> = {
-  get(_t, prop) {
-    if (prop === '__esModule') return true
-    if (prop === 'default') return new Proxy(__target, __handler)
-    if (prop === Symbol.toPrimitive) return () => undefined
-    if (prop === Symbol.iterator) return function* () {}
-    if (prop === Symbol.asyncIterator) return async function* () {}
-    if (prop === 'then') return undefined
-    return new Proxy(__target, __handler)
-  },
-  apply() {
-    return new Proxy(__target, __handler)
-  },
-  construct() {
-    return new Proxy(__target, __handler)
-  },
-}
-const stub: any = new Proxy(__target, __handler)
-export default stub
-export const __stubMissing = true
-export const createCachedMCState = stub
-export const isCachedMicrocompactEnabled = stub
-export const isModelSupportedForCacheEditing = stub
-export const getCachedMCConfig = stub
-export const markToolsSentToAPI = stub
-export const resetCachedMCState = stub
-export const checkProtectedNamespace = stub
-export const getCoordinatorUserContext = stub
+import type {
+  ConfigScope,
+  MCPServerConnection,
+} from '../../services/mcp/types.js'
+import type { LoadedPlugin, PluginError } from '../../types/plugin.js'
+import type { PluginScope } from '../../utils/plugins/schemas.js'
+
+export type UnifiedInstalledItem =
+  | {
+      type: 'plugin'
+      id: string
+      name: string
+      description: string | undefined
+      marketplace: string
+      scope: PluginScope | 'builtin'
+      isEnabled: boolean
+      errorCount: number
+      errors: PluginError[]
+      plugin: LoadedPlugin
+      pendingEnable?: boolean
+      pendingUpdate?: boolean
+      pendingToggle?: 'will-enable' | 'will-disable'
+    }
+  | {
+      type: 'failed-plugin'
+      id: string
+      name: string
+      marketplace: string
+      scope: PluginScope
+      errorCount: number
+      errors: PluginError[]
+    }
+  | {
+      type: 'mcp'
+      id: string
+      name: string
+      description: undefined
+      scope: ConfigScope
+      status: 'connected' | 'disabled' | 'pending' | 'needs-auth' | 'failed'
+      client: MCPServerConnection
+      indented?: boolean
+    }
+  | {
+      type: 'flagged-plugin'
+      id: string
+      name: string
+      marketplace: string
+      scope: 'flagged'
+      reason: 'delisted'
+      text: string
+      flaggedAt: string
+    }

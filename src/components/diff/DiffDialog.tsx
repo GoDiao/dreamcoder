@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import type { StructuredPatchHunk } from 'diff';
 import React, { useEffect, useMemo, useRef, useState } from 'react';

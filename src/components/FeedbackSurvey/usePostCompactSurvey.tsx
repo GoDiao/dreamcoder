@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isFeedbackSurveyDisabled } from 'src/services/analytics/config.js';

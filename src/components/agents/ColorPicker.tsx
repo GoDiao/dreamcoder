@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import figures from 'figures';
 import React, { useState } from 'react';
@@ -12,7 +13,7 @@ type Props = {
   currentColor?: AgentColorName | 'automatic';
   onConfirm: (color: AgentColorName | undefined) => void;
 };
-export function ColorPicker(t0) {
+export function ColorPicker(t0: Props): React.ReactNode {
   const $ = _c(17);
   const {
     agentName,

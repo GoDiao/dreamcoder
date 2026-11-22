@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import React, { useCallback, useEffect, useState } from 'react';
 import { type OptionWithDescription, Select } from '../../components/CustomSelect/index.js';

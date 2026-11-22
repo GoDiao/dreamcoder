@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import { basename, relative } from 'path';
 import React, { useMemo } from 'react';

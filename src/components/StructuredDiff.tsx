@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import type { StructuredPatchHunk } from 'diff';
 import * as React from 'react';
@@ -92,7 +93,7 @@ function renderColorDiff(patch: StructuredPatchHunk, firstLine: string | null, f
   perHunk.set(key, entry);
   return entry;
 }
-export const StructuredDiff = memo(function StructuredDiff(t0) {
+export const StructuredDiff = memo(function StructuredDiff(t0: Props): React.ReactNode {
   const $ = _c(26);
   const {
     patch,

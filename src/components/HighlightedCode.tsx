@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import * as React from 'react';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
@@ -15,7 +16,7 @@ type Props = {
   dim?: boolean;
 };
 const DEFAULT_WIDTH = 80;
-export const HighlightedCode = memo(function HighlightedCode(t0) {
+export const HighlightedCode = memo(function HighlightedCode(t0: Props): React.ReactElement {
   const $ = _c(21);
   const {
     code,

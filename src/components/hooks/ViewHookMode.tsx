@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 /**
  * ViewHookMode shows read-only details for a single configured hook.

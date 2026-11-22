@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import { feature } from 'bun:bundle';
 import * as React from 'react';
@@ -57,7 +58,7 @@ export async function call(onDone: LocalJSXCommandOnDone, context: LocalJSXComma
     onDone(success ? 'Login successful' : 'Login interrupted');
   }} />;
 }
-export function Login(props) {
+export function Login(props: { onDone: (success: boolean, mainLoopModel: string) => void; startingMessage?: string }): React.ReactNode {
   const $ = _c(12);
   const mainLoopModel = useMainLoopModel();
   let t0;

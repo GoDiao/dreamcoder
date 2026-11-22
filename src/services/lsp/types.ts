@@ -1,30 +1,16 @@
-// @generated stub from scan-missing-imports
-const __target = function noop() {}
-const __handler: ProxyHandler<any> = {
-  get(_t, prop) {
-    if (prop === '__esModule') return true
-    if (prop === 'default') return new Proxy(__target, __handler)
-    if (prop === Symbol.toPrimitive) return () => undefined
-    if (prop === Symbol.iterator) return function* () {}
-    if (prop === Symbol.asyncIterator) return async function* () {}
-    if (prop === 'then') return undefined
-    return new Proxy(__target, __handler)
-  },
-  apply() {
-    return new Proxy(__target, __handler)
-  },
-  construct() {
-    return new Proxy(__target, __handler)
-  },
+import type { z } from 'zod/v4'
+import type { LspServerConfigSchema } from '../../utils/plugins/schemas.js'
+
+export type LspServerConfig = z.infer<ReturnType<typeof LspServerConfigSchema>>
+
+export type ScopedLspServerConfig = LspServerConfig & {
+  scope: 'dynamic'
+  source: string
 }
-const stub: any = new Proxy(__target, __handler)
-export default stub
-export const __stubMissing = true
-export const createCachedMCState = stub
-export const isCachedMicrocompactEnabled = stub
-export const isModelSupportedForCacheEditing = stub
-export const getCachedMCConfig = stub
-export const markToolsSentToAPI = stub
-export const resetCachedMCState = stub
-export const checkProtectedNamespace = stub
-export const getCoordinatorUserContext = stub
+
+export type LspServerState =
+  | 'stopped'
+  | 'starting'
+  | 'running'
+  | 'stopping'
+  | 'error'

@@ -1,2 +1,1 @@
-// Local recovery stub for missing generated SDK settings types.
-export {}
+export type { SettingsJson as Settings } from '../../utils/settings/types.js'

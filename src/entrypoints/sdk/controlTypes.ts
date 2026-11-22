@@ -1,30 +1,34 @@
-// @generated stub from scan-missing-imports
-const __target = function noop() {}
-const __handler: ProxyHandler<any> = {
-  get(_t, prop) {
-    if (prop === '__esModule') return true
-    if (prop === 'default') return new Proxy(__target, __handler)
-    if (prop === Symbol.toPrimitive) return () => undefined
-    if (prop === Symbol.iterator) return function* () {}
-    if (prop === Symbol.asyncIterator) return async function* () {}
-    if (prop === 'then') return undefined
-    return new Proxy(__target, __handler)
-  },
-  apply() {
-    return new Proxy(__target, __handler)
-  },
-  construct() {
-    return new Proxy(__target, __handler)
-  },
-}
-const stub: any = new Proxy(__target, __handler)
-export default stub
-export const __stubMissing = true
-export const createCachedMCState = stub
-export const isCachedMicrocompactEnabled = stub
-export const isModelSupportedForCacheEditing = stub
-export const getCachedMCConfig = stub
-export const markToolsSentToAPI = stub
-export const resetCachedMCState = stub
-export const checkProtectedNamespace = stub
-export const getCoordinatorUserContext = stub
+import type * as schemas from './controlSchemas.js'
+import type { InferSdkSchema } from './sdkUtilityTypes.js'
+
+export type { SDKPartialAssistantMessage } from './coreTypes.generated.js'
+
+export type SDKControlCancelRequest = InferSdkSchema<
+  typeof schemas.SDKControlCancelRequestSchema
+>
+export type SDKControlInitializeRequest = InferSdkSchema<
+  typeof schemas.SDKControlInitializeRequestSchema
+>
+export type SDKControlInitializeResponse = InferSdkSchema<
+  typeof schemas.SDKControlInitializeResponseSchema
+>
+export type SDKControlMcpSetServersResponse = InferSdkSchema<
+  typeof schemas.SDKControlMcpSetServersResponseSchema
+>
+export type SDKControlPermissionRequest = InferSdkSchema<
+  typeof schemas.SDKControlPermissionRequestSchema
+>
+export type SDKControlReloadPluginsResponse = InferSdkSchema<
+  typeof schemas.SDKControlReloadPluginsResponseSchema
+>
+export type SDKControlRequest = InferSdkSchema<
+  typeof schemas.SDKControlRequestSchema
+>
+export type SDKControlRequestInner = InferSdkSchema<
+  typeof schemas.SDKControlRequestInnerSchema
+>
+export type SDKControlResponse = InferSdkSchema<
+  typeof schemas.SDKControlResponseSchema
+>
+export type StdinMessage = InferSdkSchema<typeof schemas.StdinMessageSchema>
+export type StdoutMessage = InferSdkSchema<typeof schemas.StdoutMessageSchema>

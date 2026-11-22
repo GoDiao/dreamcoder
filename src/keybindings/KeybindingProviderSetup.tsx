@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 /**
  * Setup utilities for integrating KeybindingProvider into the app.

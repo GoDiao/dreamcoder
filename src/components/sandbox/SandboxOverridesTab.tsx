@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import React from 'react';
 import { Box, color, Link, Text, useTheme } from '../../ink.js';

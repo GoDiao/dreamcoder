@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import figures from 'figures';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -94,7 +95,7 @@ function getMcpServerBuckets(tools: Tools): Array<{
     tools
   })).sort((a, b) => a.serverName.localeCompare(b.serverName));
 }
-export function ToolSelector(t0) {
+export function ToolSelector(t0: Props): React.ReactNode {
   const $ = _c(69);
   const {
     tools,

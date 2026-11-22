@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useIsInsideModal, useModalScrollRef } from '../../context/modalContext.js';

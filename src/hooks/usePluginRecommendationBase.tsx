@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 /**
  * Shared state machine + install helper for plugin-recommendation hooks

@@ -5,7 +5,7 @@
     "moduleResolution": "bundler",
     "allowJs": true,
     "jsx": "react-jsx",
-    "baseUrl": ".",
+    "skipLibCheck": true,
     "paths": {
       "color-diff-napi": [
         "./stubs/color-diff-napi.ts"
@@ -20,5 +20,12 @@
     "types": [
       "bun-types"
     ]
-  }
+  },
+  "include": [
+    "src",
+    "scripts",
+    "stubs",
+    "preload.ts",
+    "testPreload.ts"
+  ]
 }

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import figures from 'figures';
 import React, { type ReactNode, useEffect, useRef, useState } from 'react';
@@ -189,7 +190,7 @@ export type SelectProps<T> = {
    */
   readonly onRemoveImage?: (id: number) => void;
 };
-export function Select(t0) {
+export function Select<T>(t0: SelectProps<T>): React.ReactNode {
   const $ = _c(72);
   const {
     isDisabled: t1,

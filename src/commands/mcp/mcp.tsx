@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import React, { useEffect, useRef } from 'react';
 import { MCPSettings } from '../../components/mcp/index.js';

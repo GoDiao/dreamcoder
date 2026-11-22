@@ -1,30 +1,41 @@
-// @generated stub from scan-missing-imports
-const __target = function noop() {}
-const __handler: ProxyHandler<any> = {
-  get(_t, prop) {
-    if (prop === '__esModule') return true
-    if (prop === 'default') return new Proxy(__target, __handler)
-    if (prop === Symbol.toPrimitive) return () => undefined
-    if (prop === Symbol.iterator) return function* () {}
-    if (prop === Symbol.asyncIterator) return async function* () {}
-    if (prop === 'then') return undefined
-    return new Proxy(__target, __handler)
-  },
-  apply() {
-    return new Proxy(__target, __handler)
-  },
-  construct() {
-    return new Proxy(__target, __handler)
-  },
+export type Workflow = 'claude' | 'claude-review'
+
+export type Warning = {
+  title: string
+  message: string
+  instructions: string[]
 }
-const stub: any = new Proxy(__target, __handler)
-export default stub
-export const __stubMissing = true
-export const createCachedMCState = stub
-export const isCachedMicrocompactEnabled = stub
-export const isModelSupportedForCacheEditing = stub
-export const getCachedMCConfig = stub
-export const markToolsSentToAPI = stub
-export const resetCachedMCState = stub
-export const checkProtectedNamespace = stub
-export const getCoordinatorUserContext = stub
+
+export type State = {
+  step:
+    | 'check-gh'
+    | 'warnings'
+    | 'choose-repo'
+    | 'install-app'
+    | 'check-existing-workflow'
+    | 'select-workflows'
+    | 'check-existing-secret'
+    | 'api-key'
+    | 'oauth-flow'
+    | 'creating'
+    | 'success'
+    | 'error'
+  selectedRepoName: string
+  currentRepo: string
+  useCurrentRepo: boolean
+  apiKeyOrOAuthToken: string
+  useExistingKey: boolean
+  currentWorkflowInstallStep: number
+  warnings: Warning[]
+  secretExists: boolean
+  secretName: string
+  useExistingSecret: boolean
+  workflowExists: boolean
+  selectedWorkflows: Workflow[]
+  selectedApiKeyOption: 'existing' | 'new' | 'oauth'
+  authType: 'api_key' | 'oauth_token'
+  workflowAction?: 'update' | 'skip'
+  error?: string
+  errorReason?: string
+  errorInstructions?: string[]
+}

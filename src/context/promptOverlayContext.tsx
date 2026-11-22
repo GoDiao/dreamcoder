@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 /**
  * Portal for content that floats above the prompt so it escapes

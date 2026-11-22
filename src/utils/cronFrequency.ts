@@ -1,6 +1,5 @@
 /**
  * Converts between UI-friendly frequency settings and cron expressions.
- * Used by the ScheduledTaskWizard for human-readable schedule configuration.
  */
 
 /** Supported frequency values in the scheduled task UI. */

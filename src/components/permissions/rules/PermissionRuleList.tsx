@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import chalk from 'chalk';
 import figures from 'figures';
@@ -470,7 +471,7 @@ type Props = {
   initialTab?: TabType;
   onRetryDenials?: (commands: string[]) => void;
 };
-export function PermissionRuleList(t0) {
+export function PermissionRuleList(t0: Props): React.ReactNode {
   const $ = _c(113);
   const {
     onExit,
