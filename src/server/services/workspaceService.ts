@@ -1,3 +1,4 @@
+import type { Stats } from 'node:fs'
 import * as fs from 'node:fs/promises'
 import { execFile as execFileCallback } from 'node:child_process'
 import * as path from 'node:path'
@@ -141,7 +142,7 @@ type WorkspacePathResolution = {
 type WorkspaceStatResult =
   | {
       kind: 'ok'
-      stat: Awaited<ReturnType<typeof fs.stat>>
+      stat: Stats
     }
   | {
       kind: 'missing'

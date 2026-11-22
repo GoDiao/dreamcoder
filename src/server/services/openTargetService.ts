@@ -37,7 +37,7 @@ export type OpenTargetLaunchResult = {
 
 export type OpenTargetIconResult = {
   contentType: 'image/png'
-  data: Uint8Array
+  data: Uint8Array<ArrayBuffer>
 }
 
 type Runtime = {
@@ -51,7 +51,7 @@ type Runtime = {
   readDirNames: (targetPath: string) => Promise<string[]>
   readTextFile: (targetPath: string) => Promise<string | null>
   readPlistValue: (plistPath: string, key: string) => Promise<string | null>
-  convertIconToPng: (iconPath: string, size: number) => Promise<Uint8Array>
+  convertIconToPng: (iconPath: string, size: number) => Promise<Uint8Array<ArrayBuffer>>
 }
 
 type LaunchPlan = {
@@ -391,7 +391,7 @@ async function defaultReadPlistValue(plistPath: string, key: string): Promise<st
   }
 }
 
-async function defaultConvertIconToPng(iconPath: string, size: number): Promise<Uint8Array> {
+async function defaultConvertIconToPng(iconPath: string, size: number): Promise<Uint8Array<ArrayBuffer>> {
   const extension = extname(iconPath).toLowerCase()
   if (extension === '.png') {
     return await readFile(iconPath)

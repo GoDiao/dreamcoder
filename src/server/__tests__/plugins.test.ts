@@ -193,6 +193,16 @@ describe('Plugins API', () => {
     ])
   })
 
+  it('POST /api/plugins/enable rejects the managed scope as a bad request', async () => {
+    const { req, url, segments } = makeRequest('POST', '/api/plugins/enable', {
+      id: 'demo@test-market',
+      scope: 'managed',
+    })
+    const res = await handlePluginsApi(req, url, segments)
+
+    expect(res.status).toBe(400)
+  })
+
   it('POST /api/plugins/reload returns numeric counters', async () => {
     const { req, url, segments } = makeRequest('POST', '/api/plugins/reload', {})
     const res = await handlePluginsApi(req, url, segments)

@@ -390,7 +390,7 @@ async function collectPluginSkills(): Promise<SkillMeta[]> {
   return skills
 }
 
-async function collectAllSkills(cwd?: string): Promise<SkillMeta[]> {
+async function collectAllSkills(cwd: string): Promise<SkillMeta[]> {
   const [userSkills, claudeCodeSkills, projectSkills, pluginSkills] = await Promise.all([
     collectSkillsFromRoots([getUserSkillsDir()], 'user'),
     collectSkillsFromRoots(getClaudeCodeSkillsDirs(), 'claudeCode'),

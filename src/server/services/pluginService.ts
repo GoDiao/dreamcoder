@@ -5,8 +5,10 @@ import {
   disablePluginOp,
   enablePluginOp,
   type InstallableScope,
+  isInstallableScope,
   uninstallPluginOp,
   updatePluginOp,
+  VALID_INSTALLABLE_SCOPES,
 } from '../../services/plugins/pluginOperations.js'
 import { getAgentDefinitionsWithOverrides } from '../../tools/AgentTool/loadAgentsDir.js'
 import { getCwd } from '../../utils/cwd.js'
@@ -149,6 +151,15 @@ type HydratedPluginState = {
   errors: PluginError[]
 }
 
+function requireInstallableScope(
+  scope: PluginScope | undefined,
+): InstallableScope | undefined {
+  if (scope === undefined || isInstallableScope(scope)) return scope
+  throw ApiError.badRequest(
+    `Invalid scope "${scope}". Must be one of: ${VALID_INSTALLABLE_SCOPES.join(', ')}`,
+  )
+}
+
 export class PluginService {
   async listPlugins(cwd?: string): Promise<ApiPluginListResponse> {
     const { plugins, marketplaces } = await this.collectPluginState(cwd)
@@ -180,9 +191,9 @@ export class PluginService {
 
   async enablePlugin(
     pluginId: string,
-    scope?: InstallableScope,
+    scope?: PluginScope,
   ): Promise<ApiPluginActionResponse> {
-    const result = await enablePluginOp(pluginId, scope)
+    const result = await enablePluginOp(pluginId, requireInstallableScope(scope))
     if (!result.success) {
       throw ApiError.badRequest(result.message)
     }
@@ -191,9 +202,9 @@ export class PluginService {
 
   async disablePlugin(
     pluginId: string,
-    scope?: InstallableScope,
+    scope?: PluginScope,
   ): Promise<ApiPluginActionResponse> {
-    const result = await disablePluginOp(pluginId, scope)
+    const result = await disablePluginOp(pluginId, requireInstallableScope(scope))
     if (!result.success) {
       throw ApiError.badRequest(result.message)
     }
@@ -202,14 +213,15 @@ export class PluginService {
 
   async uninstallPlugin(
     pluginId: string,
-    scope?: InstallableScope,
+    scope?: PluginScope,
     keepData = false,
   ): Promise<ApiPluginActionResponse> {
-    if (!scope) {
+    const installableScope = requireInstallableScope(scope)
+    if (!installableScope) {
       throw ApiError.badRequest('Plugin uninstall requires a scope')
     }
 
-    const result = await uninstallPluginOp(pluginId, scope, keepData)
+    const result = await uninstallPluginOp(pluginId, installableScope, keepData)
     if (!result.success) {
       throw ApiError.badRequest(result.message)
     }

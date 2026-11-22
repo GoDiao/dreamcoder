@@ -23,7 +23,7 @@ export function asRecord(value: unknown): Record<string, unknown> | undefined {
 }
 
 export function asRecords(value: unknown): Record<string, unknown>[] {
-  return Array.isArray(value) ? value.flatMap((entry) => asRecord(entry) ?? []) : []
+  return Array.isArray(value) ? value.flatMap<Record<string, unknown>>((entry) => asRecord(entry) ?? []) : []
 }
 
 export function metadataById(

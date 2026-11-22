@@ -406,8 +406,7 @@ function hasCompletedTurn(
   return activeMessages.slice(range.start + 1, range.end).some((message) =>
     message.type === 'assistant' ||
     message.type === 'tool_use' ||
-    message.type === 'tool_result' ||
-    message.type === 'error',
+    message.type === 'tool_result',
   )
 }
 
