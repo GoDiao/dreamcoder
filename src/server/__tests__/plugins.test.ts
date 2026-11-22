@@ -179,6 +179,26 @@ describe('Plugins API', () => {
     expect(typeof body.summary.errors).toBe('number')
   })
 
+  it('POST /api/plugins/reload counts user agents without a cwd', async () => {
+    const reload = async () => {
+      const { req, url, segments } = makeRequest('POST', '/api/plugins/reload', {})
+      const res = await handlePluginsApi(req, url, segments)
+      expect(res.status).toBe(200)
+      const body = await res.json() as { summary: { agents: number } }
+      return body.summary.agents
+    }
+
+    const before = await reload()
+    await fs.mkdir(path.join(tmpDir, 'agents'), { recursive: true })
+    await fs.writeFile(
+      path.join(tmpDir, 'agents', 'reload-count-agent.md'),
+      '---\nname: reload-count-agent\ndescription: Counts after a plugin reload.\n---\n\nVerify the reload count.\n',
+      'utf-8',
+    )
+
+    expect(await reload()).toBe(before + 1)
+  })
+
   it('POST /api/plugins/reload hot-reloads an active CLI session and updates slash commands', async () => {
     const controlRequests: Array<{ sessionId: string; request: Record<string, unknown> }> = []
     conversationService.hasSession = ((sessionId: string) => sessionId === 'session-plugins') as typeof conversationService.hasSession

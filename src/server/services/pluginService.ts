@@ -28,6 +28,7 @@ import { getPluginSkills } from '../../utils/plugins/loadPluginCommands.js'
 import { clearPluginCacheExclusions } from '../../utils/plugins/orphanedPluginFilter.js'
 import { parseFrontmatter } from '../../utils/frontmatterParser.js'
 import { extractDescriptionFromMarkdown } from '../../utils/markdownConfigLoader.js'
+import { getCwd } from '../../utils/cwd.js'
 import { resetSettingsCache } from '../../utils/settings/settingsCache.js'
 import type {
   PluginInstallationEntry,
@@ -240,7 +241,7 @@ export class PluginService {
 
     const [skills, agentDefinitions] = await Promise.all([
       getPluginSkills(),
-      getAgentDefinitionsWithOverrides(cwd),
+      getAgentDefinitionsWithOverrides(cwd ?? getCwd()),
     ])
 
     const hookCount = await this.getHookCount(enabled)
