@@ -27,6 +27,10 @@ If you receive a JSON message with \`type: "shutdown_request"\` or \`type: "plan
 
 Approving shutdown terminates your process. Rejecting plan sends the teammate back to revise. Don't originate \`shutdown_request\` unless asked. Don't send structured JSON status messages — use TaskUpdate.`
 
+const SUBAGENT_SECTION = `## Background agents
+
+To continue a background agent started with the Agent tool, set \`to\` to its agent id from the Agent result. You can use its registered name instead if it was started with a name. Send only a plain text message.`
+
 const SESSION_ADDRESS_SECTION = `## Other sessions
 
 \`\`\`json
@@ -46,6 +50,7 @@ export const DESCRIPTION = 'Send a message to another agent'
 export function getPrompt(): string {
   const sections = ['# SendMessage\n\nSend a message to another agent.']
   if (isAgentSwarmsEnabled()) sections.push(TEAMMATE_SECTION.trim())
+  else sections.push(SUBAGENT_SECTION)
   if (isSessionLinksEnabled()) sections.push(SESSION_ADDRESS_SECTION)
   return sections.join('\n\n')
 }

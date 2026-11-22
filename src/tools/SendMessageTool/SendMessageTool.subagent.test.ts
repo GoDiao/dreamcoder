@@ -20,9 +20,13 @@ const localAgent = (status: string) => ({
   pendingMessages: [] as string[],
 })
 
-const validateWith = (to: string, registeredNames: Array<[string, string]> = []) =>
+const validateWith = (
+  to: string,
+  registeredNames: Array<[string, string]> = [],
+  message: string | { type: 'shutdown_request' } = 'hello',
+) =>
   SendMessageTool.validateInput!(
-    { to, summary: 'follow up', message: 'hello' } as never,
+    { to, summary: 'follow up', message } as never,
     {
       getAppState: () => ({ agentNameRegistry: new Map(registeredNames), tasks: {} }),
     } as never,
@@ -58,13 +62,35 @@ describe('SendMessage to a subagent with agent teams off', () => {
 
   test('still rejects a teammate name', async () => {
     teams.disable()
-    expect(await validateWith('researcher')).toMatchObject({ result: false })
+    expect(await validateWith('researcher')).toMatchObject({
+      result: false,
+      message: expect.stringContaining('registered background-agent name'),
+    })
+  })
+
+  test('rejects a structured message to a subagent id', async () => {
+    teams.disable()
+    expect(await validateWith(AGENT_ID, [], { type: 'shutdown_request' })).toMatchObject({
+      result: false,
+    })
   })
 
   test('queues the message on a running subagent by agent id', async () => {
     teams.disable()
     const { output, getState } = await sendWith(AGENT_ID, {
       agentNameRegistry: new Map(),
+      tasks: { [AGENT_ID]: localAgent('running') },
+    })
+    expect(output).toMatchObject({ data: { success: true } })
+    expect(
+      (getState().tasks[AGENT_ID] as { pendingMessages: string[] }).pendingMessages,
+    ).toEqual(['hello'])
+  })
+
+  test('queues the message on a running subagent by registered name', async () => {
+    teams.disable()
+    const { output, getState } = await sendWith('explorer', {
+      agentNameRegistry: new Map([['explorer', AGENT_ID]]),
       tasks: { [AGENT_ID]: localAgent('running') },
     })
     expect(output).toMatchObject({ data: { success: true } })
@@ -82,6 +108,24 @@ describe('SendMessage to a subagent with agent teams off', () => {
       const { output } = await sendWith(AGENT_ID, {
         agentNameRegistry: new Map(),
         tasks: { [AGENT_ID]: localAgent('completed') },
+      })
+      expect(output).toMatchObject({ data: { success: true } })
+      expect(resume).toHaveBeenCalledTimes(1)
+      expect(resume.mock.calls[0]?.[0]).toMatchObject({ agentId: AGENT_ID, prompt: 'hello' })
+    } finally {
+      resume.mockRestore()
+    }
+  })
+
+  test('resumes a subagent from its transcript when its task was evicted', async () => {
+    teams.disable()
+    const resume = spyOn(resumeAgent, 'resumeAgentBackground').mockResolvedValue({
+      outputFile: '/tmp/agent-output',
+    } as never)
+    try {
+      const { output } = await sendWith(AGENT_ID, {
+        agentNameRegistry: new Map(),
+        tasks: {},
       })
       expect(output).toMatchObject({ data: { success: true } })
       expect(resume).toHaveBeenCalledTimes(1)

@@ -115,7 +115,7 @@ describe('SendMessage to a session', () => {
     expect(SendMessageTool.isEnabled()).toBe(true)
   })
 
-  test('accepts only session addresses without agent teams', async () => {
+  test('rejects unregistered recipients without agent teams', async () => {
     teams.disable()
     env.enable()
     const result = await validate({ to: 'researcher', summary: 's', message: 'hello' })

@@ -63,7 +63,7 @@
 
 ### T-TOOL-01 Agent 的描述和每次结果都让模型用 SendMessage 续接子 agent，但 SendMessage 在本场景只接受 `session:<id>`，这类调用必然被拒
 
-- 状态：维护者已定（2026-11-18）：放宽 SendMessage 的参数检查，接受已登记的子 agent 名字和格式合法的 agentId；teammate 名字和 `*` 仍要求打开 agent teams。
+- 状态：已修复（#298）：SendMessage 在 agent teams 关闭时接受格式合法的子 agent id 和已登记的后台 agent 名字；结构化消息、teammate 名字和 `*` 仍要求打开 agent teams。
 - 类型：问题
 - 严重程度：高
 - 体量：Agent 描述里一句约 190 字符（每个请求）；Agent 结果尾注约 70 字符加 agentId（每次非 Explore/Plan 的同步完成和每次后台启动都出现）；被拒后多一轮。
