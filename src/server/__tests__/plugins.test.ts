@@ -163,6 +163,36 @@ describe('Plugins API', () => {
     expect(body.summary.enabled).toBe(1)
   })
 
+  it('GET /api/plugins lists the known marketplaces', async () => {
+    const marketplaceRoot = path.join(tmpDir, 'marketplace-root')
+    await fs.mkdir(path.join(tmpDir, 'plugins'), { recursive: true })
+    await fs.writeFile(
+      path.join(tmpDir, 'plugins', 'known_marketplaces.json'),
+      JSON.stringify({
+        'test-market': {
+          source: { source: 'directory', path: marketplaceRoot },
+          installLocation: marketplaceRoot,
+          lastUpdated: new Date(0).toISOString(),
+        },
+      }),
+      'utf-8',
+    )
+
+    const { req, url, segments } = makeRequest('GET', '/api/plugins')
+    const res = await handlePluginsApi(req, url, segments)
+    const body = await res.json() as { marketplaces: unknown[] }
+
+    expect(body.marketplaces).toEqual([
+      {
+        name: 'test-market',
+        source: marketplaceRoot,
+        lastUpdated: new Date(0).toISOString(),
+        autoUpdate: true,
+        installedCount: 0,
+      },
+    ])
+  })
+
   it('POST /api/plugins/reload returns numeric counters', async () => {
     const { req, url, segments } = makeRequest('POST', '/api/plugins/reload', {})
     const res = await handlePluginsApi(req, url, segments)
@@ -177,6 +207,32 @@ describe('Plugins API', () => {
     expect(typeof body.summary.enabled).toBe('number')
     expect(typeof body.summary.skills).toBe('number')
     expect(typeof body.summary.errors).toBe('number')
+  })
+
+  it('POST /api/plugins/reload without a cwd counts user-defined agents', async () => {
+    const reloadAgentCount = async () => {
+      const { req, url, segments } = makeRequest('POST', '/api/plugins/reload')
+      const res = await handlePluginsApi(req, url, segments)
+      const body = await res.json() as { summary: { agents: number } }
+      return body.summary.agents
+    }
+
+    const before = await reloadAgentCount()
+    await fs.mkdir(path.join(tmpDir, 'agents'), { recursive: true })
+    await fs.writeFile(
+      path.join(tmpDir, 'agents', 'reload-count-agent.md'),
+      [
+        '---',
+        'name: reload-count-agent',
+        'description: Counted by the reload summary',
+        '---',
+        'You are a test agent.',
+        '',
+      ].join('\n'),
+      'utf-8',
+    )
+
+    expect(await reloadAgentCount()).toBe(before + 1)
   })
 
   it('POST /api/plugins/reload hot-reloads an active CLI session and updates slash commands', async () => {

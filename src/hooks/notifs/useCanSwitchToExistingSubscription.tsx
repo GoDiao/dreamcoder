@@ -1,9 +1,10 @@
 import * as React from 'react';
 import { getOauthProfileFromApiKey } from 'src/services/oauth/getOauthProfile.js';
 import { isClaudeAISubscriber } from 'src/utils/auth.js';
+import type { Notification } from '../../context/notifications.js';
 import { Text } from '../../ink.js';
 import { logEvent } from '../../services/analytics/index.js';
-import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js';
+import { type GlobalConfig, getGlobalConfig, saveGlobalConfig } from '../../utils/config.js';
 import { useStartupNotification } from './useStartupNotification.js';
 const MAX_SHOW_COUNT = 3;
 
@@ -18,7 +19,7 @@ export function useCanSwitchToExistingSubscription() {
  * Checks if the user has a subscription but is not currently logged into it.
  * This helps inform users they should run /login to access their subscription.
  */
-async function _temp2() {
+async function _temp2(): Promise<Notification | null> {
   if ((getGlobalConfig().subscriptionNoticeCount ?? 0) >= MAX_SHOW_COUNT) {
     return null;
   }
@@ -34,7 +35,7 @@ async function _temp2() {
     priority: "low"
   };
 }
-function _temp(current) {
+function _temp(current: GlobalConfig): GlobalConfig {
   return {
     ...current,
     subscriptionNoticeCount: (current.subscriptionNoticeCount ?? 0) + 1

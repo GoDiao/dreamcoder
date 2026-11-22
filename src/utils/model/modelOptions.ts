@@ -32,6 +32,7 @@ import {
   renderDefaultModelSetting,
   type ModelSetting,
 } from './model.js'
+import { getAntModels } from './antModels.js'
 import { has1mContext } from '../context.js'
 import { getGlobalConfig } from '../config.js'
 import { OPENAI_CODEX_MODEL_CATALOG } from '../../services/openaiAuth/models.js'
@@ -376,7 +377,7 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
   }
 
   if (hasOpenAIAuthLogin()) {
-    return getOpenAIModelOptions(fastMode)
+    return getOpenAIModelOptions()
   }
 
   if (isClaudeAISubscriber()) {

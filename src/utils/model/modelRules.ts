@@ -1,5 +1,4 @@
 import { z } from 'zod/v4'
-import type { EffortLevel } from 'src/entrypoints/sdk/runtimeTypes.js'
 import { logError } from '../log.js'
 
 export const MODEL_RULES_ENV_KEY = 'DREAMCODER_MODEL_RULES'
@@ -11,7 +10,9 @@ export const EFFORT_LEVELS = [
   'medium',
   'high',
   'max',
-] as const satisfies readonly EffortLevel[]
+] as const
+
+export type EffortLevel = (typeof EFFORT_LEVELS)[number]
 
 export const ModelContextWindowSchema = z
   .number()

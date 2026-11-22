@@ -1,7 +1,6 @@
 import type { UUID } from 'crypto'
 import { randomUUID } from 'crypto'
 import { getIsNonInteractiveSession, getSessionId } from '../bootstrap/state.js'
-import type { SdkWorkflowProgress } from '../types/tools.js'
 
 type TaskStartedEvent = {
   type: 'system'
@@ -27,10 +26,6 @@ type TaskProgressEvent = {
   }
   last_tool_name?: string
   summary?: string
-  // Delta batch of workflow state changes. Clients upsert by
-  // `${type}:${index}` then group by phaseIndex to rebuild the phase tree,
-  // same fold as collectFromEvents + groupByPhase in PhaseProgress.tsx.
-  workflow_progress?: SdkWorkflowProgress[]
 }
 
 // Emitted when a foreground agent completes without being backgrounded.

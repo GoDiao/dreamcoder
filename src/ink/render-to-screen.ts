@@ -82,9 +82,7 @@ export function renderToScreen(
   }
 
   const t0 = performance.now()
-  // @ts-expect-error updateContainerSync exists but not in @types
   reconciler.updateContainerSync(el, container, null, noop)
-  // @ts-expect-error flushSyncWork exists but not in @types
   reconciler.flushSyncWork()
   const t1 = performance.now()
 
@@ -117,9 +115,7 @@ export function renderToScreen(
   const t3 = performance.now()
 
   // Unmount so next call gets a fresh tree. Leaves root/container/pools.
-  // @ts-expect-error updateContainerSync exists but not in @types
   reconciler.updateContainerSync(null, container, null, noop)
-  // @ts-expect-error flushSyncWork exists but not in @types
   reconciler.flushSyncWork()
 
   timing.reconcile += t1 - t0

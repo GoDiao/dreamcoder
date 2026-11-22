@@ -1820,6 +1820,18 @@ export const SDKSessionStateChangedMessageSchema = lazySchema(() =>
 )
 
 
+export const SDKArtifactWrittenMessageSchema = lazySchema(() =>
+  z.object({
+    type: z.literal('system'),
+    subtype: z.literal('artifact_written'),
+    path: z.string(),
+    tool_name: z.string(),
+    agent_id: z.string().optional(),
+    uuid: UUIDPlaceholder(),
+    session_id: z.string(),
+  }),
+)
+
 export const SDKTaskProgressMessageSchema = lazySchema(() =>
   z.object({
     type: z.literal('system'),
@@ -1945,6 +1957,7 @@ export const SDKMessageSchema = lazySchema(() =>
     SDKTaskNotificationMessageSchema(),
     SDKTaskStartedMessageSchema(),
     SDKTaskProgressMessageSchema(),
+    SDKArtifactWrittenMessageSchema(),
     SDKSessionStateChangedMessageSchema(),
     SDKFilesPersistedEventSchema(),
     SDKToolUseSummaryMessageSchema(),

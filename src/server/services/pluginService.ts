@@ -9,6 +9,7 @@ import {
   updatePluginOp,
 } from '../../services/plugins/pluginOperations.js'
 import { getAgentDefinitionsWithOverrides } from '../../tools/AgentTool/loadAgentsDir.js'
+import { getCwd } from '../../utils/cwd.js'
 import type { LoadedPlugin, PluginError } from '../../types/plugin.js'
 import { getPluginErrorMessage } from '../../types/plugin.js'
 import { clearAllCaches } from '../../utils/plugins/cacheUtils.js'
@@ -240,7 +241,7 @@ export class PluginService {
 
     const [skills, agentDefinitions] = await Promise.all([
       getPluginSkills(),
-      getAgentDefinitionsWithOverrides(cwd),
+      getAgentDefinitionsWithOverrides(cwd ?? getCwd()),
     ])
 
     const hookCount = await this.getHookCount(enabled)
@@ -318,7 +319,7 @@ export class PluginService {
       this.toSummary(detail),
     )
 
-    const marketplaces = Object.entries(marketplaceConfig.marketplaces ?? {})
+    const marketplaces = Object.entries(marketplaceConfig)
       .map(([name, entry]) => ({
         name,
         source: getMarketplaceSourceDisplay(entry.source),
@@ -687,8 +688,10 @@ export class PluginService {
         return hook.prompt
       case 'http':
         return hook.url
-      default:
-        return hook.type
+      default: {
+        const unknownHook: { type: string } = hook
+        return unknownHook.type
+      }
     }
   }
 

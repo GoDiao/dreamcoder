@@ -3,15 +3,19 @@ import { isUltrathinkEnabled } from './thinking.js'
 import { getInitialSettings } from './settings/settings.js'
 import { isProSubscriber, isMaxSubscriber, isTeamSubscriber } from './auth.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from 'src/services/analytics/growthbook.js'
+import {
+  getAntModelOverrideConfig,
+  resolveAntModel,
+} from './model/antModels.js'
 import { getAPIProvider } from './model/providers.js'
 import {
   EFFORT_LEVELS,
+  type EffortLevel,
   getCliModelRules,
   getCliModelRulesEnv,
   resolveEffortForLevels,
 } from './model/modelRules.js'
 import { isEnvTruthy } from './envUtils.js'
-import type { EffortLevel } from 'src/entrypoints/sdk/runtimeTypes.js'
 
 export type { EffortLevel }
 export { EFFORT_LEVELS }

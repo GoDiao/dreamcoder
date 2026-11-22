@@ -445,18 +445,21 @@ function sameOrigin(
   if (a === undefined || b === undefined) return a === b
   if (a.kind === 'kanban' || b.kind === 'kanban') {
     return (
-      a.kind === b.kind &&
+      a.kind === 'kanban' &&
+      b.kind === 'kanban' &&
       a.project === b.project &&
-      a.card?.id === b.card?.id &&
+      a.card.id === b.card.id &&
       a.purpose === b.purpose
     )
   }
-  return (
-    a.kind === b.kind &&
-    a.sessionId === b.sessionId &&
-    a.purpose === b.purpose &&
-    a.summary === b.summary
-  )
+  if (a.kind === 'session' && b.kind === 'session') {
+    return (
+      a.sessionId === b.sessionId &&
+      a.purpose === b.purpose &&
+      a.summary === b.summary
+    )
+  }
+  return a.kind === b.kind
 }
 
 /**
