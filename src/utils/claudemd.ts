@@ -45,7 +45,7 @@ import {
   getAdditionalDirectoriesForClaudeMd,
   getOriginalCwd,
 } from '../bootstrap/state.js'
-import { truncateEntrypointContent } from '../memdir/memdir.js'
+import { EMPTY_ENTRYPOINT_NOTICE, truncateEntrypointContent } from '../memdir/memdir.js'
 import { getAutoMemEntrypoint, isAutoMemoryEnabled } from '../memdir/paths.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growthbook.js'
 import {
@@ -1195,6 +1195,30 @@ function describeMemoryFile(file: MemoryFileInfo): string {
     return `Contents of ${file.path}${description}:\n\n<team-memory-content source="shared">\n${content}\n</team-memory-content>`
   }
   return `Contents of ${file.path}${description}:\n\n${content}`
+}
+
+export async function getEmptyAutoMemoryNotice(
+  memoryFiles: MemoryFileInfo[],
+): Promise<MemoryFileInfo | null> {
+  if (!isAutoMemoryEnabled()) return null
+
+  const entry = memoryFiles.find(file => file.type === 'AutoMem')
+  if (entry?.content.trim()) return null
+
+  if (!entry) {
+    try {
+      await getFsImplementation().stat(getAutoMemEntrypoint())
+      return null
+    } catch (error) {
+      if (getErrnoCode(error) !== 'ENOENT') return null
+    }
+  }
+
+  return {
+    path: entry?.path ?? getAutoMemEntrypoint(),
+    type: 'AutoMem',
+    content: EMPTY_ENTRYPOINT_NOTICE,
+  }
 }
 
 export const getClaudeMds = (

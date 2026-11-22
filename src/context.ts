@@ -9,6 +9,7 @@ import {
   filterInjectedMemoryFiles,
   getClaudeMds,
   getClaudeMdsForSubagent,
+  getEmptyAutoMemoryNotice,
   getMemoryFiles,
 } from './utils/claudemd.js'
 import { logForDiagnosticsNoPII } from './utils/diagLogs.js'
@@ -180,9 +181,16 @@ export const getUserContext = memoize(
     const shouldDisableClaudeMd = isClaudeMdDisabled()
     // Await the async I/O (readFile/readdir directory walk) so the event
     // loop yields naturally at the first fs.readFile.
+    const memoryFiles = shouldDisableClaudeMd ? [] : await getMemoryFiles()
+    const emptyAutoMemory = shouldDisableClaudeMd
+      ? null
+      : await getEmptyAutoMemoryNotice(memoryFiles)
+    const contextFiles = emptyAutoMemory
+      ? [...memoryFiles.filter(file => file.type !== 'AutoMem'), emptyAutoMemory]
+      : memoryFiles
     const claudeMd = shouldDisableClaudeMd
       ? null
-      : getClaudeMds(filterInjectedMemoryFiles(await getMemoryFiles()))
+      : getClaudeMds(filterInjectedMemoryFiles(contextFiles))
     // Cache for the auto-mode classifier (yoloClassifier.ts reads this
     // instead of importing claudemd.ts directly, which would create a
     // cycle through permissions/filesystem → permissions → yoloClassifier).

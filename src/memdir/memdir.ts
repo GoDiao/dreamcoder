@@ -32,6 +32,7 @@ import {
 } from './memoryTypes.js'
 
 export const ENTRYPOINT_NAME = 'MEMORY.md'
+export const EMPTY_ENTRYPOINT_NOTICE = `Your ${ENTRYPOINT_NAME} is currently empty. When you save new memories, they will appear here.`
 export const MAX_ENTRYPOINT_LINES = 200
 // ~125 chars/line at 200 lines. At p97 today; catches long-line indexes that
 // slip past the line cap (p100 observed: 197KB under 200 lines).
@@ -308,7 +309,7 @@ export function buildMemoryPrompt(params: {
     lines.push(
       `## ${ENTRYPOINT_NAME}`,
       '',
-      `Your ${ENTRYPOINT_NAME} is currently empty. When you save new memories, they will appear here.`,
+      EMPTY_ENTRYPOINT_NOTICE,
     )
   }
 
