@@ -12,6 +12,8 @@ const TITLE_LOG_EXCERPT_LEN = 200
 
 const TITLE_SYSTEM_PROMPT = `Generate a concise, sentence-case title (3-7 words) that captures the main topic or goal of this coding session. The title should be clear enough that the user recognizes the session in a list. Use sentence case: capitalize only the first word and proper nouns.
 
+This is a title-generation task, not a conversation. Never answer the user's question or fulfill their request. Write the title in the language the user writes in, even when the message contains English code, commands or product names: a Chinese message gets a Chinese title.
+
 Return JSON with a single "title" field.
 
 Good examples:
@@ -19,6 +21,7 @@ Good examples:
 {"title": "Add OAuth authentication"}
 {"title": "Debug failing CI tests"}
 {"title": "Refactor API client error handling"}
+{"title": "排查 CI 上的测试失败"}
 
 Bad (too vague): {"title": "Code changes"}
 Bad (too long): {"title": "Investigate and fix the issue where the login button does not respond on mobile devices"}
