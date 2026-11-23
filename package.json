@@ -107,7 +107,8 @@
     "zod": "^4.4.3"
   },
   "overrides": {
-    "follow-redirects": "^1.16.0"
+    "follow-redirects": "^1.16.0",
+    "vscode-jsonrpc": "8.2.1"
   },
   "devDependencies": {
     "@types/asciichart": "^1.5.8",
@@ -123,6 +124,7 @@
     "@types/stack-utils": "^2.0.3",
     "@types/turndown": "^5.0.6",
     "@types/ws": "^8.18.2",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vscode-languageserver-protocol": "^3.17.5"
   }
 }
