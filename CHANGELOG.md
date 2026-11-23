@@ -54,7 +54,7 @@ All notable changes to DreamCoder will be documented in this file.
 - When the output limit cuts off a tool call in the middle of its arguments, the agent no longer runs the tool with missing arguments; the model is told the call was cut off and retries with smaller pieces (#263).
 - **A reply that breaks off in the middle is retried as a stream.** When a provider's stream fails partway, the agent removes the half-finished reply from the conversation, the app and the session history, and asks again with streaming, instead of switching to a slower request without streaming that long answers could not finish within the timeout. Retries before and during a stream share one limit (#263).
 - **Reloading plugins counts your own agents.** Reloading plugins without a project open now includes the agents in your user folder in the count (#301).
-- The plugins page lists the marketplaces you have added; before, the list was always empty (#300).
+- The plugins page lists the marketplaces you have added and shows whether each one updates automatically; before, the list was always empty (#300).
 - Enabling, disabling or uninstalling a plugin in the scope your organization manages now returns an error that lists the scopes you can change, instead of a server error (#300).
 - An installed plugin with no recorded version no longer makes all installed plugins disappear (#300).
 - Installing a plugin from an MCP bundle (`.mcpb`) no longer fails when the manifest is checked (#300).
