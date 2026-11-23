@@ -44,7 +44,8 @@ versions in `package.json` match ShowAI's lockfile at that commit.
 
 Check out the new ShowAI commit, bundle the two entry points with esbuild's metafile to list the
 source files they reach, copy those files over these, along with the files that their type-only
-`import("…")` references point to, apply the changes above again, and update `package.json` from
+`import("…")` references point to, except the three modules covered by the declaration files
+above, apply the changes above again, and update `package.json` from
 ShowAI's lockfile. Compare the types in the three declaration files with their upstream definitions
 and copy any change. Run `bun build-g2-fields.ts` here to refresh the G2 field
 list, then `bun install`, `bun test` at the repository

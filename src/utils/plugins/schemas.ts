@@ -1173,11 +1173,6 @@ export const PluginSourceSchema = lazySchema(() =>
  * PluginMarketplaceEntry (strict gets its .default(true), everything else stays
  * undefined). So this narrowness is settings-surface-only; downstream code sees
  * the same shape it would from any sparse marketplace.json entry.
- *
- * Keeping this narrow prevents PluginManifestSchema().partial() from expanding
- * inline in settingsTypes.generated.ts — that expansion is ~870 lines per
- * occurrence, and MarketplaceSource appears three times in the settings schema
- * (extraKnownMarketplaces, strictKnownMarketplaces, blockedMarketplaces).
  */
 const SettingsMarketplacePluginSchema = lazySchema(() =>
   z

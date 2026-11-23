@@ -38,6 +38,7 @@ jobs:
           restore-keys: bun-${{ runner.os }}-
 
       - name: Install dependencies
+        id: install
         run: |
           bun install --frozen-lockfile
           (cd vendor/showai && bun install --frozen-lockfile)
@@ -47,6 +48,7 @@ jobs:
         run: bun run typecheck
 
       - name: Run tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: bun test
 
   desktop-tests:

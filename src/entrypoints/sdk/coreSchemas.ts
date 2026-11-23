@@ -2,9 +2,7 @@
  * SDK Core Schemas - Zod schemas for serializable SDK data types.
  *
  * These schemas are the single source of truth for SDK data types.
- * TypeScript types are generated from these schemas and committed for IDE support.
- *
- * @see scripts/generate-sdk-types.ts for type generation
+ * TypeScript types are inferred from these schemas in coreTypes.generated.ts.
  */
 
 import { z } from 'zod/v4'
@@ -1887,48 +1885,6 @@ export const SDKPromptSuggestionMessageSchema = lazySchema(() =>
 // ============================================================================
 // Session Listing Types
 // ============================================================================
-
-export const SDKSessionInfoSchema = lazySchema(() =>
-  z
-    .object({
-      sessionId: z.string().describe('Unique session identifier (UUID).'),
-      summary: z
-        .string()
-        .describe(
-          'Display title for the session: custom title, auto-generated summary, or first prompt.',
-        ),
-      lastModified: z
-        .number()
-        .describe('Last modified time in milliseconds since epoch.'),
-      fileSize: z
-        .number()
-        .optional()
-        .describe(
-          'File size in bytes. Only populated for local JSONL storage.',
-        ),
-      customTitle: z
-        .string()
-        .optional()
-        .describe('User-set session title via /rename.'),
-      firstPrompt: z
-        .string()
-        .optional()
-        .describe('First meaningful user prompt in the session.'),
-      gitBranch: z
-        .string()
-        .optional()
-        .describe('Git branch at the end of the session.'),
-      cwd: z.string().optional().describe('Working directory for the session.'),
-      tag: z.string().optional().describe('User-set session tag.'),
-      createdAt: z
-        .number()
-        .optional()
-        .describe(
-          "Creation time in milliseconds since epoch, extracted from the first entry's timestamp.",
-        ),
-    })
-    .describe('Session metadata returned by listSessions and getSessionInfo.'),
-)
 
 export const SDKMessageSchema = lazySchema(() =>
   z.union([

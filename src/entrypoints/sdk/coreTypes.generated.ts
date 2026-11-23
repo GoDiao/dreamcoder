@@ -94,7 +94,6 @@ export type SDKResultMessage = InferSdkSchema<
 export type SDKResultSuccess = InferSdkSchema<
   typeof schemas.SDKResultSuccessSchema
 >
-export type SDKSessionInfo = InferSdkSchema<typeof schemas.SDKSessionInfoSchema>
 export type SDKStatus = InferSdkSchema<typeof schemas.SDKStatusSchema>
 export type SDKStatusMessage = InferSdkSchema<
   typeof schemas.SDKStatusMessageSchema
