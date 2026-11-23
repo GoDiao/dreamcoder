@@ -14,6 +14,10 @@ Only the source files reachable from two entry points, with their paths unchange
 - `src/portable/cdn.tsx`: the reader, `mount(element, { artifact, options })`. `build-reader.ts`
   bundles it into code-split modules that the sidecar serves under `/showai-reader/`.
 
+`src/portable/template-bundle.mjs` and `template-bundle.d.mts` are copied only because
+`src/components/custom/types.ts` refers to their types with `import("…")`; neither entry point
+reaches them at runtime.
+
 `resources/catalog/` holds the component catalogs: names, data formats and examples. Dependency
 versions in `package.json` match ShowAI's lockfile at that commit.
 
@@ -24,6 +28,13 @@ versions in `package.json` match ShowAI's lockfile at that commit.
   anything over the network.
 - `src/portable/component-signature.mjs` is copied as well; the `ShowUI` catalog uses it for the
   one-line data signature of each component.
+- Three declaration files are ours. `src/core/model.ts` refers to types in three upstream modules
+  with `import("…")`, and copying those modules would pull in at least 55 more files (the library
+  storage layer). Each file copies only the referenced types from upstream, unchanged:
+  - `src/sync/conflict-retention.d.ts`: `ConflictSource` and `RetainedConflict` from
+    `src/sync/conflict-retention.ts`.
+  - `src/core/workspace-conflicts.d.ts`: `WorkspaceConflict` from `src/core/workspace-conflicts.ts`.
+  - `src/core/agent-created.d.ts`: `AgentCreatedMark` from `src/core/agent-created.ts`.
 - `build-reader.ts` is ours, adapted from upstream `scripts/build-cdn-reader.mjs`.
 - `build-g2-fields.ts` is ours. It writes `resources/catalog/g2-fields.json`: for each G2 chart, the
   dataset keys of its example and the record fields its drawing code reads. `ShowUI` rejects a G2
@@ -32,7 +43,9 @@ versions in `package.json` match ShowAI's lockfile at that commit.
 ## Updating
 
 Check out the new ShowAI commit, bundle the two entry points with esbuild's metafile to list the
-source files they reach, copy those files over these, apply the changes above again, and update
-`package.json` from ShowAI's lockfile. Run `bun build-g2-fields.ts` here to refresh the G2 field
+source files they reach, copy those files over these, along with the files that their type-only
+`import("…")` references point to, apply the changes above again, and update `package.json` from
+ShowAI's lockfile. Compare the types in the three declaration files with their upstream definitions
+and copy any change. Run `bun build-g2-fields.ts` here to refresh the G2 field
 list, then `bun install`, `bun test` at the repository
 root and `bun run build` in `desktop/`.
