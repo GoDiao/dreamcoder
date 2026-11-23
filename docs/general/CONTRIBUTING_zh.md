@@ -91,12 +91,13 @@ git checkout main && git checkout -b feat/your-feature
 4. **测试**。确保你的改动不会破坏现有功能：
    ```bash
    bun run prepare:ripgrep    # 准备固定版本的搜索程序
+   bun run typecheck         # 服务端/CLI 类型检查
    bun test                  # 服务端/CLI 测试
    cd desktop
    bun run lint              # 类型检查和设计系统 lint
    bun run test -- --run     # 桌面端测试
    ```
-   每个提到 `main` 的 PR,CI 都会跑这三项检查。
+   每个提到 `main` 的 PR,CI 都会跑这四项检查。
 
 5. **提交 PR**。PR 目标分支为 `main`，描述清楚改了什么、为什么改。
 

@@ -91,12 +91,13 @@ git checkout main && git checkout -b feat/your-feature
 4. **Test**. Make sure your changes don't break existing functionality:
    ```bash
    bun run prepare:ripgrep    # prepare the pinned search binary
+   bun run typecheck         # server/CLI type check
    bun test                  # server/CLI tests
    cd desktop
    bun run lint              # type check and design-system lint
    bun run test -- --run     # desktop tests
    ```
-   CI runs the same three checks on every PR to `main`.
+   CI runs the same four checks on every PR to `main`.
 
 5. **Submit a PR**. Target the `main` branch. Describe what you changed and why.
 

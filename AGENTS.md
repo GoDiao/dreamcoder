@@ -13,9 +13,10 @@ Guidance for coding agents (and humans) working on DreamCoder. Setup, build orde
 
 ## Checks
 
-CI runs three checks on every PR to `main`. Run them locally before opening a PR:
+CI runs four checks on every PR to `main`. Run them locally before opening a PR:
 
 ```bash
+bun run typecheck           # TypeScript type check of the server and CLI (tsc --noEmit)
 bun test                    # server and CLI tests; needs ripgrep on PATH
 cd desktop
 bun run lint                # TypeScript type check (tsc --noEmit) and design-system lint (oxlint + @shadcn/lint)
