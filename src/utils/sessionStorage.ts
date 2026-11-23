@@ -44,8 +44,6 @@ import {
 import type { AttributionSnapshotMessage } from '../types/logs.js'
 import {
   type ContentReplacementEntry,
-  type ContextCollapseCommitEntry,
-  type ContextCollapseSnapshotEntry,
   type Entry,
   type FileHistorySnapshotMessage,
   type LogOption,
@@ -1243,14 +1241,6 @@ class Project {
         ? getAgentTranscriptPath(entry.agentId)
         : sessionFile
       void this.enqueueWrite(targetFile, entry)
-    } else if (entry.type === 'marble-origami-commit') {
-      // Always append. Commit order matters for restore (later commits may
-      // reference earlier commits' summary messages), so these must be
-      // written in the order received and read back sequentially.
-      void this.enqueueWrite(sessionFile, entry)
-    } else if (entry.type === 'marble-origami-snapshot') {
-      // Always append. Last-wins on restore — later entries supersede.
-      void this.enqueueWrite(sessionFile, entry)
     } else {
       const messageSet = await getSessionMessages(sessionId)
       if (entry.type === 'queue-operation') {
@@ -1571,53 +1561,6 @@ export function adoptResumedSessionFile(): void {
   const project = getProject()
   project.sessionFile = getTranscriptPath()
   project.reAppendSessionMetadata(true)
-}
-
-/**
- * Append a context-collapse commit entry to the transcript. One entry per
- * commit, in commit order. On resume these are collected into an ordered
- * array and handed to restoreFromEntries() which rebuilds the commit log.
- */
-export async function recordContextCollapseCommit(commit: {
-  collapseId: string
-  summaryUuid: string
-  summaryContent: string
-  summary: string
-  firstArchivedUuid: string
-  lastArchivedUuid: string
-}): Promise<void> {
-  const sessionId = getSessionId() as UUID
-  if (!sessionId) return
-  await getProject().appendEntry({
-    type: 'marble-origami-commit',
-    sessionId,
-    ...commit,
-  })
-}
-
-/**
- * Snapshot the staged queue + spawn state. Written after each ctx-agent
- * spawn resolves (when staged contents may have changed). Last-wins on
- * restore — the loader keeps only the most recent snapshot entry.
- */
-export async function recordContextCollapseSnapshot(snapshot: {
-  staged: Array<{
-    startUuid: string
-    endUuid: string
-    summary: string
-    risk: number
-    stagedAt: number
-  }>
-  armed: boolean
-  lastSpawnTokens: number
-}): Promise<void> {
-  const sessionId = getSessionId() as UUID
-  if (!sessionId) return
-  await getProject().appendEntry({
-    type: 'marble-origami-snapshot',
-    sessionId,
-    ...snapshot,
-  })
 }
 
 export async function flushSessionStorage(): Promise<void> {
@@ -2924,8 +2867,6 @@ export async function loadFullLog(log: LogOption): Promise<LogOption> {
       fileHistorySnapshots,
       attributionSnapshots,
       contentReplacements,
-      contextCollapseCommits,
-      contextCollapseSnapshot,
       leafUuids,
     } = await loadTranscriptFile(sessionFile)
 
@@ -2987,16 +2928,6 @@ export async function loadFullLog(log: LogOption): Promise<LogOption> {
       contentReplacements: sessionId
         ? (contentReplacements.get(sessionId) ?? [])
         : log.contentReplacements,
-      // Filter to the resumed session's entries. loadTranscriptFile reads
-      // the file sequentially so the array is already in commit order;
-      // filter preserves that.
-      contextCollapseCommits: sessionId
-        ? contextCollapseCommits.filter(e => e.sessionId === sessionId)
-        : undefined,
-      contextCollapseSnapshot:
-        sessionId && contextCollapseSnapshot?.sessionId === sessionId
-          ? contextCollapseSnapshot
-          : undefined,
     }
   } catch {
     // If loading fails, return the original log
@@ -3438,8 +3369,6 @@ export async function loadTranscriptFile(
   attributionSnapshots: Map<UUID, AttributionSnapshotMessage>
   contentReplacements: Map<UUID, ContentReplacementRecord[]>
   agentContentReplacements: Map<AgentId, ContentReplacementRecord[]>
-  contextCollapseCommits: ContextCollapseCommitEntry[]
-  contextCollapseSnapshot: ContextCollapseSnapshotEntry | undefined
   leafUuids: Set<UUID>
 }> {
   const messages = new Map<UUID, TranscriptMessage>()
@@ -3461,10 +3390,6 @@ export async function loadTranscriptFile(
     AgentId,
     ContentReplacementRecord[]
   >()
-  // Array, not Map — commit order matters (nested collapses).
-  const contextCollapseCommits: ContextCollapseCommitEntry[] = []
-  // Last-wins — later entries supersede.
-  let contextCollapseSnapshot: ContextCollapseSnapshotEntry | undefined
 
   try {
     // For large transcripts, avoid materializing megabytes of stale content.
@@ -3593,17 +3518,6 @@ export async function loadTranscriptFile(
           entry.parentUuid = progressBridge.get(entry.parentUuid) ?? null
         }
         messages.set(entry.uuid, entry)
-        // Compact boundary: prior marble-origami-commit entries reference
-        // messages that won't be in the post-boundary chain. The >5MB
-        // backward-scan path discards them naturally by never reading the
-        // pre-boundary bytes; the <5MB path reads everything, so discard
-        // here. Without this, getStats().collapsedSpans in /context
-        // overcounts (projectView silently skips the stale commits but
-        // they're still in the log).
-        if (isCompactBoundaryMessage(entry)) {
-          contextCollapseCommits.length = 0
-          contextCollapseSnapshot = undefined
-        }
       } else if (entry.type === 'summary' && entry.leafUuid) {
         summaries.set(entry.leafUuid, entry.summary)
       } else if (entry.type === 'custom-title' && entry.sessionId) {
@@ -3640,10 +3554,6 @@ export async function loadTranscriptFile(
           contentReplacements.set(entry.sessionId, existing)
           existing.push(...entry.replacements)
         }
-      } else if (entry.type === 'marble-origami-commit') {
-        contextCollapseCommits.push(entry)
-      } else if (entry.type === 'marble-origami-snapshot') {
-        contextCollapseSnapshot = entry
       }
     }
   } catch {
@@ -3755,8 +3665,6 @@ export async function loadTranscriptFile(
     attributionSnapshots,
     contentReplacements,
     agentContentReplacements,
-    contextCollapseCommits,
-    contextCollapseSnapshot,
     leafUuids,
   }
 }
@@ -3774,8 +3682,6 @@ async function loadSessionFile(sessionId: UUID): Promise<{
   fileHistorySnapshots: Map<UUID, FileHistorySnapshotMessage>
   attributionSnapshots: Map<UUID, AttributionSnapshotMessage>
   contentReplacements: Map<UUID, ContentReplacementRecord[]>
-  contextCollapseCommits: ContextCollapseCommitEntry[]
-  contextCollapseSnapshot: ContextCollapseSnapshotEntry | undefined
 }> {
   const sessionFile = join(
     getSessionProjectDir() ?? getProjectDir(getOriginalCwd()),
@@ -3829,8 +3735,6 @@ export async function getLastSessionLog(
     fileHistorySnapshots,
     attributionSnapshots,
     contentReplacements,
-    contextCollapseCommits,
-    contextCollapseSnapshot,
   } = await loadSessionFile(sessionId)
   if (messages.size === 0) return null
   // Prime getSessionMessages cache so recordTranscript (called after REPL
@@ -3870,13 +3774,6 @@ export async function getLastSessionLog(
       contentReplacements.get(sessionId) ?? [],
     ),
     worktreeSession: worktreeStates.get(sessionId),
-    contextCollapseCommits: contextCollapseCommits.filter(
-      e => e.sessionId === sessionId,
-    ),
-    contextCollapseSnapshot:
-      contextCollapseSnapshot?.sessionId === sessionId
-        ? contextCollapseSnapshot
-        : undefined,
   }
 }
 

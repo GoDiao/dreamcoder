@@ -4,7 +4,6 @@ export type Terminal =
         | 'blocking_limit'
         | 'image_error'
         | 'aborted_streaming'
-        | 'prompt_too_long'
         | 'completed'
         | 'stop_hook_prevented'
         | 'aborted_tools'

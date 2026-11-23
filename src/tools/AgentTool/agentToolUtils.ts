@@ -442,7 +442,6 @@ export async function classifyHandoffIfNeeded({
       toolName:
         // Use legacy name for analytics continuity across the Task→Agent rename
         LEGACY_AGENT_TOOL_NAME as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-      inProtectedNamespace: false,
       classifierModel:
         classifierResult.model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       agentType:

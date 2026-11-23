@@ -1,4 +1,4 @@
-import { getDirectConnectServerUrl, getSessionId } from '../bootstrap/state.js'
+import { getSessionId } from '../bootstrap/state.js'
 import { stringWidth } from '../ink/stringWidth.js'
 import type { LogOption } from '../types/logs.js'
 import { getSubscriptionName, isClaudeAISubscriber } from './auth.js'
@@ -244,13 +244,9 @@ export function getLogoDisplayData(): {
   agentName: string | undefined
 } {
   const version = process.env.DEMO_VERSION ?? MACRO.VERSION
-  const serverUrl = getDirectConnectServerUrl()
-  const displayPath = process.env.DEMO_VERSION
+  const cwd = process.env.DEMO_VERSION
     ? '/code/claude'
     : getDisplayPath(getCwd())
-  const cwd = serverUrl
-    ? `${displayPath} in ${serverUrl.replace(/^https?:\/\//, '')}`
-    : displayPath
   const billingType = isClaudeAISubscriber()
     ? getSubscriptionName()
     : 'API Usage Billing'

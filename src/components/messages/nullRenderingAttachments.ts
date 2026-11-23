@@ -29,7 +29,6 @@ const NULL_RENDERING_TYPES = [
   'structured_output',
   'team_context',
   'todo_reminder',
-  'context_efficiency',
   'deferred_tools_delta',
   'mcp_instructions_delta',
   'companion_intro',

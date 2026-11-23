@@ -6,8 +6,6 @@ import { addInvokedSkill } from '../bootstrap/state.js'
 import { asSessionId } from '../types/ids.js'
 import type {
   AttributionSnapshotMessage,
-  ContextCollapseCommitEntry,
-  ContextCollapseSnapshotEntry,
   LogOption,
   PersistedWorktreeSession,
   SerializedMessage,
@@ -416,8 +414,6 @@ export async function loadConversationForResume(
   fileHistorySnapshots?: FileHistorySnapshot[]
   attributionSnapshots?: AttributionSnapshotMessage[]
   contentReplacements?: ContentReplacementRecord[]
-  contextCollapseCommits?: ContextCollapseCommitEntry[]
-  contextCollapseSnapshot?: ContextCollapseSnapshotEntry
   sessionId: UUID | undefined
   // Session metadata for restoring agent context
   agentName?: string
@@ -501,8 +497,6 @@ export async function loadConversationForResume(
       fileHistorySnapshots: log?.fileHistorySnapshots,
       attributionSnapshots: log?.attributionSnapshots,
       contentReplacements: log?.contentReplacements,
-      contextCollapseCommits: log?.contextCollapseCommits,
-      contextCollapseSnapshot: log?.contextCollapseSnapshot,
       sessionId,
       // Include session metadata for restoring agent context on resume
       agentName: log?.agentName,

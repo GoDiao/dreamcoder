@@ -52,12 +52,6 @@ type State = {
   totalAPIDuration: number
   totalAPIDurationWithoutRetries: number
   totalToolDuration: number
-  turnHookDurationMs: number
-  turnToolDurationMs: number
-  turnClassifierDurationMs: number
-  turnToolCount: number
-  turnHookCount: number
-  turnClassifierCount: number
   startTime: number
   lastInteractionTime: number
   totalLinesAdded: number
@@ -179,12 +173,6 @@ type State = {
       agentId: string | null
     }
   >
-  // Track slow operations for dev bar display (ant-only)
-  slowOperations: Array<{
-    operation: string
-    durationMs: number
-    timestamp: number
-  }>
   // SDK-provided betas (e.g., context-1m-2025-08-07)
   sdkBetas: string[] | undefined
   // Main thread agent type (from --agent flag or settings)
@@ -195,8 +183,6 @@ type State = {
   // Outbound-only CCR mirror mode keeps the bridge handle but cannot receive
   // peer messages or user-file requests.
   replBridgeActive: boolean
-  // Direct connect server URL (for display in header)
-  directConnectServerUrl: string | undefined
   // System prompt section cache state
   systemPromptSectionCache: Map<string, string | null>
   // Last date emitted to the model (for detecting midnight date changes)
@@ -275,12 +261,6 @@ function getInitialState(): State {
     totalAPIDuration: 0,
     totalAPIDurationWithoutRetries: 0,
     totalToolDuration: 0,
-    turnHookDurationMs: 0,
-    turnToolDurationMs: 0,
-    turnClassifierDurationMs: 0,
-    turnToolCount: 0,
-    turnHookCount: 0,
-    turnClassifierCount: 0,
     startTime: Date.now(),
     lastInteractionTime: Date.now(),
     totalLinesAdded: 0,
@@ -373,7 +353,6 @@ function getInitialState(): State {
     // Track invoked skills for preservation across compaction
     invokedSkills: new Map(),
     // Track slow operations for dev bar display
-    slowOperations: [],
     // SDK-provided betas
     sdkBetas: undefined,
     // Main thread agent type
@@ -382,7 +361,6 @@ function getInitialState(): State {
     isRemoteMode: false,
     replBridgeActive: false,
     // Direct connect server URL
-    directConnectServerUrl: undefined,
     // System prompt section cache state
     systemPromptSectionCache: new Map(),
     // Last date emitted to the model
@@ -519,14 +497,6 @@ export function setCwdState(cwd: string): void {
   STATE.cwd = cwd.normalize('NFC')
 }
 
-export function getDirectConnectServerUrl(): string | undefined {
-  return STATE.directConnectServerUrl
-}
-
-export function setDirectConnectServerUrl(url: string): void {
-  STATE.directConnectServerUrl = url
-}
-
 export function addToTotalDurationState(
   duration: number,
   durationWithoutRetries: number,
@@ -572,33 +542,6 @@ export function getTotalToolDuration(): number {
 
 export function addToToolDuration(duration: number): void {
   STATE.totalToolDuration += duration
-  STATE.turnToolDurationMs += duration
-  STATE.turnToolCount++
-}
-
-export function addToTurnHookDuration(duration: number): void {
-  STATE.turnHookDurationMs += duration
-  STATE.turnHookCount++
-}
-
-export function resetTurnHookDuration(): void {
-  STATE.turnHookDurationMs = 0
-  STATE.turnHookCount = 0
-}
-
-export function resetTurnToolDuration(): void {
-  STATE.turnToolDurationMs = 0
-  STATE.turnToolCount = 0
-}
-
-export function addToTurnClassifierDuration(duration: number): void {
-  STATE.turnClassifierDurationMs += duration
-  STATE.turnClassifierCount++
-}
-
-export function resetTurnClassifierDuration(): void {
-  STATE.turnClassifierDurationMs = 0
-  STATE.turnClassifierCount = 0
 }
 
 export function getStatsStore(): {
@@ -1538,30 +1481,6 @@ export function clearInvokedSkillsForAgent(agentId: string): void {
     if (skill.agentId === agentId) {
       STATE.invokedSkills.delete(key)
     }
-  }
-}
-
-// Slow operations tracking for dev bar
-const MAX_SLOW_OPERATIONS = 10
-const SLOW_OPERATION_TTL_MS = 10000
-
-export function addSlowOperation(operation: string, durationMs: number): void {
-  if (process.env.USER_TYPE !== 'ant') return
-  // Skip tracking for editor sessions (user editing a prompt file in $EDITOR)
-  // These are intentionally slow since the user is drafting text
-  if (operation.includes('exec') && operation.includes('claude-prompt-')) {
-    return
-  }
-  const now = Date.now()
-  // Remove stale operations
-  STATE.slowOperations = STATE.slowOperations.filter(
-    op => now - op.timestamp < SLOW_OPERATION_TTL_MS,
-  )
-  // Add new operation
-  STATE.slowOperations.push({ operation, durationMs, timestamp: now })
-  // Keep only the most recent operations
-  if (STATE.slowOperations.length > MAX_SLOW_OPERATIONS) {
-    STATE.slowOperations = STATE.slowOperations.slice(-MAX_SLOW_OPERATIONS)
   }
 }
 

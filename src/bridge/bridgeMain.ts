@@ -1102,7 +1102,6 @@ export async function runBridgeLoop(
             in_worktree: sessionWorktrees.has(sessionId),
             spawn_duration_ms: spawnDurationMs,
             worktree_create_ms: worktreeCreateMs,
-            inProtectedNamespace: false,
           })
           logForDiagnosticsNoPII('info', 'bridge_session_started', {
             spawn_mode: spawnModeAtDecision,

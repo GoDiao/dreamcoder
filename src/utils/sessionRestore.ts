@@ -23,8 +23,6 @@ import { TODO_WRITE_TOOL_NAME } from '../tools/TodoWriteTool/constants.js'
 import { asSessionId } from '../types/ids.js'
 import type {
   AttributionSnapshotMessage,
-  ContextCollapseCommitEntry,
-  ContextCollapseSnapshotEntry,
   PersistedWorktreeSession,
 } from '../types/logs.js'
 import type { Message } from '../types/message.js'
@@ -65,8 +63,6 @@ type ResumeResult = {
   messages?: Message[]
   fileHistorySnapshots?: FileHistorySnapshot[]
   attributionSnapshots?: AttributionSnapshotMessage[]
-  contextCollapseCommits?: ContextCollapseCommitEntry[]
-  contextCollapseSnapshot?: ContextCollapseSnapshotEntry
 }
 
 /**
@@ -282,8 +278,6 @@ type ResumeLoadResult = {
   fileHistorySnapshots?: FileHistorySnapshot[]
   attributionSnapshots?: AttributionSnapshotMessage[]
   contentReplacements?: ContentReplacementRecord[]
-  contextCollapseCommits?: ContextCollapseCommitEntry[]
-  contextCollapseSnapshot?: ContextCollapseSnapshotEntry
   sessionId: UUID | undefined
   agentName?: string
   agentColor?: string

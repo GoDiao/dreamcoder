@@ -15,7 +15,6 @@ import type { Progress as AgentProgress } from '../../tools/AgentTool/AgentTool.
 import { runAgent } from '../../tools/AgentTool/runAgent.js';
 import { renderToolUseProgressMessage } from '../../tools/AgentTool/UI.js';
 import type { CommandResultDisplay } from '../../types/command.js';
-import { createAbortController } from '../abortController.js';
 import { getAgentContext } from '../agentContext.js';
 import { createAttachmentMessage, getAttachmentMessages } from '../attachments.js';
 import { logForDebugging } from '../debug.js';
@@ -27,7 +26,6 @@ import { isFullscreenEnvEnabled } from '../fullscreen.js';
 import { toArray } from '../generators.js';
 import { registerSkillHooks } from '../hooks/registerSkillHooks.js';
 import { logError } from '../log.js';
-import { enqueuePendingNotification } from '../messageQueueManager.js';
 import { createCommandInputMessage, createSyntheticUserCaveatMessage, createSystemMessage, createUserInterruptionMessage, createUserMessage, formatCommandInputTags, isCompactBoundaryMessage, isSystemLocalCommandMessage, normalizeMessages, prepareUserContent } from '../messages.js';
 import type { ModelAlias } from '../model/aliases.js';
 import { parseToolListFromCLI } from '../permissions/permissionSetup.js';
@@ -35,23 +33,15 @@ import { hasPermissionsToUseTool } from '../permissions/permissions.js';
 import { isOfficialMarketplaceName, parsePluginIdentifier } from '../plugins/pluginIdentifier.js';
 import { isRestrictedToPluginOnly, isSourceAdminTrusted } from '../settings/pluginOnlyPolicy.js';
 import { parseSlashCommand } from '../slashCommandParsing.js';
-import { sleep } from '../sleep.js';
 import { recordSkillUsage } from '../suggestions/skillUsageTracking.js';
 import { logOTelEvent, redactIfDisabled } from '../telemetry/events.js';
 import { buildPluginCommandTelemetryFields } from '../telemetry/pluginTelemetry.js';
 import { getAssistantMessageContentLength } from '../tokens.js';
 import { createAgentId } from '../uuid.js';
-import { getWorkload } from '../workloadContext.js';
 import type { ProcessUserInputBaseResult, ProcessUserInputContext } from './processUserInput.js';
 type SlashCommandResult = ProcessUserInputBaseResult & {
   command: Command;
 };
-
-// Poll interval and deadline for MCP settle before launching a background
-// forked subagent. MCP servers typically connect within 1-3s of startup;
-// 10s headroom covers slow SSE handshakes.
-const MCP_SETTLE_POLL_MS = 200;
-const MCP_SETTLE_TIMEOUT_MS = 10_000;
 
 /**
  * Executes a slash command with context: fork in a sub-agent.
@@ -83,101 +73,6 @@ async function executeForkedSlashCommand(command: CommandBase & PromptCommand, a
     effort: command.effort
   } : baseAgent;
   logForDebugging(`Executing forked slash command /${command.name} with agent ${agentDefinition.agentType}`);
-
-  // Assistant mode: fire-and-forget. Launch subagent in background, return
-  // immediately, re-enqueue the result as an isMeta prompt when done.
-  // Without this, N scheduled tasks on startup = N serial (subagent + main
-  // agent turn) cycles blocking user input. With this, N subagents run in
-  // parallel and results trickle into the queue as they finish.
-  //
-  // Gated on kairosEnabled (not CLAUDE_CODE_BRIEF) because the closed loop
-  // depends on assistant-mode invariants: scheduled_tasks.json exists,
-  // the main agent knows to pipe results through SendUserMessage, and
-  // isMeta prompts are hidden. Outside assistant mode, context:fork commands
-  // are user-invoked skills (/commit etc.) that should run synchronously
-  // with the progress UI.
-  if (feature('KAIROS') && (await context.getAppState()).kairosEnabled) {
-    // Standalone abortController — background subagents survive main-thread
-    // ESC (same policy as AgentTool's async path). They're cron-driven; if
-    // killed mid-run they just re-fire on the next schedule.
-    const bgAbortController = createAbortController();
-    const commandName = getCommandName(command);
-
-    // Workload: handlePromptSubmit wraps the entire turn in runWithWorkload
-    // (AsyncLocalStorage). ALS context is captured when this `void` fires
-    // and survives every await inside — isolated from the parent's
-    // continuation. The detached closure's runAgent calls see the cron tag
-    // automatically. We still capture the value here ONLY for the
-    // re-enqueued result prompt below: that second turn runs in a fresh
-    // handlePromptSubmit → fresh runWithWorkload boundary (which always
-    // establishes a new context, even for `undefined`) → so it needs its
-    // own QueuedCommand.workload tag to preserve attribution.
-    const spawnTimeWorkload = getWorkload();
-
-    // Re-enter the queue as a hidden prompt. isMeta: hides from queue
-    // preview + placeholder + transcript. skipSlashCommands: prevents
-    // re-parsing if the result text happens to start with '/'. When
-    // drained, this triggers a main-agent turn that sees the result and
-    // decides whether to SendUserMessage. Propagate workload so that
-    // second turn is also tagged.
-    const enqueueResult = (value: string): void => enqueuePendingNotification({
-      value,
-      mode: 'prompt',
-      priority: 'later',
-      isMeta: true,
-      skipSlashCommands: true,
-      workload: spawnTimeWorkload
-    });
-    void (async () => {
-      // Wait for MCP servers to settle. Scheduled tasks fire at startup and
-      // all N drain within ~1ms (since we return immediately), capturing
-      // context.options.tools before MCP connects. The sync path
-      // accidentally avoided this — tasks serialized, so task N's drain
-      // happened after task N-1's 30s run, by which time MCP was up.
-      // Poll until no 'pending' clients remain, then refresh.
-      const deadline = Date.now() + MCP_SETTLE_TIMEOUT_MS;
-      while (Date.now() < deadline) {
-        const s = context.getAppState();
-        if (!s.mcp.clients.some(c => c.type === 'pending')) break;
-        await sleep(MCP_SETTLE_POLL_MS);
-      }
-      const freshTools = context.options.refreshTools?.() ?? context.options.tools;
-      const agentMessages: Message[] = [];
-      for await (const message of runAgent({
-        agentDefinition,
-        promptMessages,
-        toolUseContext: {
-          ...context,
-          getAppState: modifiedGetAppState,
-          abortController: bgAbortController
-        },
-        canUseTool,
-        isAsync: true,
-        querySource: 'agent:custom',
-        model: command.model as ModelAlias | undefined,
-        availableTools: freshTools,
-        override: {
-          agentId
-        }
-      })) {
-        agentMessages.push(message);
-      }
-      const resultText = extractResultText(agentMessages, 'Command completed');
-      logForDebugging(`Background forked command /${commandName} completed (agent ${agentId})`);
-      enqueueResult(`<scheduled-task-result command="/${commandName}">\n${resultText}\n</scheduled-task-result>`);
-    })().catch(err => {
-      logError(err);
-      enqueueResult(`<scheduled-task-result command="/${commandName}" status="failed">\n${err instanceof Error ? err.message : String(err)}\n</scheduled-task-result>`);
-    });
-
-    // Nothing to render, nothing to query — the background runner re-enters
-    // the queue on its own schedule.
-    return {
-      messages: [],
-      shouldQuery: false,
-      command
-    };
-  }
 
   // Collect messages from the forked agent
   const agentMessages: Message[] = [];
@@ -853,15 +748,10 @@ async function getMessagesForPromptSlashCommand(command: CommandBase & PromptCom
   const mainMessageContent: ContentBlockParam[] = imageContentBlocks.length > 0 || precedingInputBlocks.length > 0 ? [...imageContentBlocks, ...precedingInputBlocks, ...result] : result;
 
   // Extract attachments from command arguments (@-mentions, MCP resources,
-  // agent mentions in SKILL.md). skipSkillDiscovery prevents the SKILL.md
-  // content itself from triggering discovery — it's meta-content, not user
-  // intent, and a large SKILL.md (e.g. 110KB) would fire chunked AKI queries
-  // adding seconds of latency to every skill invocation.
+  // agent mentions in SKILL.md).
   const attachmentMessages = await toArray(getAttachmentMessages(result.filter((block): block is TextBlockParam => block.type === 'text').map(block => block.text).join(' '), context, null, [],
   // queuedCommands - handled by query.ts for mid-turn attachments
-  context.messages, 'repl_main_thread', {
-    skipSkillDiscovery: true
-  }));
+  context.messages, 'repl_main_thread'));
   const messages = [createUserMessage({
     content: metadata,
     uuid

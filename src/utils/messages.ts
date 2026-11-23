@@ -61,7 +61,6 @@ import type {
   SystemMemorySavedMessage,
   SystemMessage,
   SystemMessageLevel,
-  SystemMicrocompactBoundaryMessage,
   SystemPermissionRetryMessage,
   SystemScheduledTaskFireMessage,
   SystemStopHookSummaryMessage,
@@ -80,7 +79,7 @@ import {
   memoryHeader,
 } from './attachments.js'
 import { quote } from './bash/shellQuote.js'
-import { formatNumber, formatTokens } from './format.js'
+import { formatNumber } from './format.js'
 import { jsonStringify } from './slowOperations.js'
 
 // Hook attachments that have a hookName field (excludes HookPermissionDecisionAttachment)
@@ -3945,9 +3944,6 @@ You have exited auto mode. The user may now want to interact more directly. You 
         }),
       ])
     }
-    case 'context_efficiency': {
-      return []
-    }
     case 'date_change': {
       return wrapMessagesInSystemReminder([
         createUserMessage({
@@ -4060,6 +4056,7 @@ You have exited auto mode. The user may now want to interact more directly. You 
     'todo',
     'task_progress', // removed in PR #19337
     'ultramemory', // removed in PR #23596
+    'context_efficiency',
   ]
   if (LEGACY_ATTACHMENT_TYPES.includes((attachment as { type: string }).type)) {
     return []
@@ -4307,34 +4304,6 @@ export function createCompactBoundaryMessage(
     ...(lastPreCompactMessageUuid && {
       logicalParentUuid: lastPreCompactMessageUuid,
     }),
-  }
-}
-
-export function createMicrocompactBoundaryMessage(
-  trigger: 'auto',
-  preTokens: number,
-  tokensSaved: number,
-  compactedToolIds: string[],
-  clearedAttachmentUUIDs: string[],
-): SystemMicrocompactBoundaryMessage {
-  logForDebugging(
-    `[microcompact] saved ~${formatTokens(tokensSaved)} tokens (cleared ${compactedToolIds.length} tool results)`,
-  )
-  return {
-    type: 'system',
-    subtype: 'microcompact_boundary',
-    content: 'Context microcompacted',
-    isMeta: false,
-    timestamp: new Date().toISOString(),
-    uuid: randomUUID(),
-    level: 'info',
-    microcompactMetadata: {
-      trigger,
-      preTokens,
-      tokensSaved,
-      compactedToolIds,
-      clearedAttachmentUUIDs,
-    },
   }
 }
 

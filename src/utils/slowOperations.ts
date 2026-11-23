@@ -8,7 +8,6 @@ import {
 } from 'fs'
 // biome-ignore lint: This file IS the cloneDeep wrapper - it must import the original
 import lodashCloneDeep from 'lodash-es/cloneDeep.js'
-import { addSlowOperation } from '../bootstrap/state.js'
 import { logForDebugging } from './debug.js'
 
 // Extended WriteFileOptions to include 'flush' which is available in Node.js 20.1.0+
@@ -116,7 +115,6 @@ class AntSlowLogger {
         logForDebugging(
           `[SLOW OPERATION DETECTED] ${description} (${duration.toFixed(1)}ms)`,
         )
-        addSlowOperation(description, duration)
       } finally {
         isLogging = false
       }

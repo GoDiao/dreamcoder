@@ -1,7 +1,6 @@
 import { feature } from 'bun:bundle'
 import type { ToolResultBlockParam } from '@anthropic-ai/sdk/resources/index.mjs'
 import type { QuerySource } from '../../constants/querySource.js'
-import type { ToolUseContext } from '../../Tool.js'
 import { FILE_EDIT_TOOL_NAME } from '../../tools/FileEditTool/constants.js'
 import { FILE_READ_TOOL_NAME } from '../../tools/FileReadTool/prompt.js'
 import { FILE_WRITE_TOOL_NAME } from '../../tools/FileWriteTool/prompt.js'
@@ -117,24 +116,13 @@ export function estimateMessageTokens(messages: Message[]): number {
   return Math.ceil(totalTokens * (4 / 3))
 }
 
-export type PendingCacheEdits = {
-  trigger: 'auto'
-  deletedToolIds: string[]
-  // Baseline cumulative cache_deleted_input_tokens from the previous API response,
-  // used to compute the per-operation delta (the API value is sticky/cumulative)
-  baselineCacheDeletedTokens: number
-}
-
 export type MicrocompactResult = {
   messages: Message[]
-  compactionInfo?: {
-    pendingCacheEdits?: PendingCacheEdits
-  }
 }
 
 /**
  * Walk messages and collect tool_use IDs whose tool name is in
- * COMPACTABLE_TOOLS, in encounter order. Shared by both microcompact paths.
+ * COMPACTABLE_TOOLS, in encounter order.
  */
 function collectCompactableToolIds(messages: Message[]): string[] {
   const ids: string[] = []
@@ -156,16 +144,12 @@ function collectCompactableToolIds(messages: Message[]): string[] {
 // Prefix-match because promptCategory.ts sets the querySource to
 // 'repl_main_thread:outputStyle:<style>' when a non-default output style
 // is active. The bare 'repl_main_thread' is only used for the default style.
-// query.ts:350/1451 use the same startsWith pattern; the pre-existing
-// cached-MC `=== 'repl_main_thread'` check was a latent bug — users with a
-// non-default output style were silently excluded from cached MC.
 function isMainThreadSource(querySource: QuerySource | undefined): boolean {
   return !querySource || querySource.startsWith('repl_main_thread')
 }
 
 export async function microcompactMessages(
   messages: Message[],
-  toolUseContext?: ToolUseContext,
   querySource?: QuerySource,
 ): Promise<MicrocompactResult> {
   // Clear suppression flag at start of new microcompact attempt
@@ -190,9 +174,6 @@ export async function microcompactMessages(
  *
  * Returns null when the trigger doesn't fire (disabled, wrong source, gap
  * under threshold, nothing to clear) — caller falls through to other paths.
- *
- * Unlike cached MC, this mutates message content directly. The cache is cold,
- * so there's no cached prefix to preserve via cache_edits.
  */
 /**
  * Check whether the time-based trigger should fire for this request.

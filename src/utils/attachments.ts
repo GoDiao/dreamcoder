@@ -635,9 +635,6 @@ export type Attachment =
       type: 'compaction_reminder'
     }
   | {
-      type: 'context_efficiency'
-    }
-  | {
       type: 'date_change'
       newDate: string
     }
@@ -710,7 +707,6 @@ export async function getAttachments(
   queuedCommands: QueuedCommand[],
   messages?: Message[],
   querySource?: QuerySource,
-  options?: { skipSkillDiscovery?: boolean },
 ): Promise<Attachment[]> {
   if (
     isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_ATTACHMENTS) ||
@@ -766,7 +762,7 @@ export async function getAttachments(
     // (removed from queue by removeFromQueue but never attached).
     maybe('queued_commands', () => getQueuedCommandAttachments(queuedCommands)),
     maybe('date_change', () =>
-      Promise.resolve(getDateChangeAttachments(messages)),
+      Promise.resolve(getDateChangeAttachments()),
     ),
     maybe('ultrathink_effort', () =>
       Promise.resolve(getUltrathinkEffortAttachment(input)),
@@ -805,11 +801,6 @@ export async function getAttachments(
     // relevant_memories moved to async prefetch (startRelevantMemoryPrefetch)
     maybe('dynamic_skill', () => getDynamicSkillAttachments(context)),
     maybe('skill_listing', () => getSkillListingAttachments(context, messages)),
-    // Inter-turn skill discovery now runs via startSkillDiscoveryPrefetch
-    // (query.ts, concurrent with the main turn). The blocking call that
-    // previously lived here was the assistant_turn signal — 97% of those
-    // Haiku calls found nothing in prod. Prefetch + await-at-collection
-    // replaces it; see src/services/skillSearch/prefetch.ts.
     maybe('plan_mode', () => getPlanModeAttachments(messages, toolUseContext)),
     maybe('plan_mode_exit', () => getPlanModeExitAttachment(toolUseContext)),
     ...(feature('TRANSCRIPT_CLASSIFIER')
@@ -1347,9 +1338,7 @@ async function getAutoModeExitAttachment(
  *
  * Exported for testing — regression guard for the cache-clear removal.
  */
-export function getDateChangeAttachments(
-  messages: Message[] | undefined,
-): Attachment[] {
+export function getDateChangeAttachments(): Attachment[] {
   const currentDate = getLocalISODate()
   const lastDate = getLastEmittedDate()
 
@@ -2772,7 +2761,6 @@ export async function* getAttachmentMessages(
   queuedCommands: QueuedCommand[],
   messages?: Message[],
   querySource?: QuerySource,
-  options?: { skipSkillDiscovery?: boolean },
 ): AsyncGenerator<AttachmentMessage, void> {
   // TODO: Compute this upstream
   const attachments = await getAttachments(
@@ -2782,7 +2770,6 @@ export async function* getAttachmentMessages(
     queuedCommands,
     messages,
     querySource,
-    options,
   )
 
   if (attachments.length === 0) {

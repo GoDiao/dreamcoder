@@ -40,8 +40,6 @@ export type LogOption = {
   tag?: string // Optional tag for the session (searchable in /resume)
   fileHistorySnapshots?: FileHistorySnapshot[] // Optional file history snapshots
   attributionSnapshots?: AttributionSnapshotMessage[] // Optional attribution snapshots
-  contextCollapseCommits?: ContextCollapseCommitEntry[] // Ordered — commit B may reference commit A's summary
-  contextCollapseSnapshot?: ContextCollapseSnapshotEntry // Last-wins — staged queue + spawn state
   gitBranch?: string // Git branch at the end of the session
   projectPath?: string // Original project directory path
   prNumber?: number // GitHub PR number linked to this session
@@ -236,64 +234,6 @@ export type SpeculationAcceptMessage = {
   timeSavedMs: number
 }
 
-/**
- * Persisted context-collapse commit. The archived messages themselves are
- * NOT persisted — they're already in the transcript as ordinary user/
- * assistant messages. We only persist enough to reconstruct the splice
- * instruction (boundary uuids) and the summary placeholder (which is NOT
- * in the transcript because it's never yielded to the REPL).
- *
- * On restore, the store reconstructs CommittedCollapse with archived=[];
- * projectView lazily fills the archive the first time it finds the span.
- *
- * Discriminator is obfuscated to match the gate name. sessionStorage.ts
- * isn't feature-gated (it's the generic transcript plumbing used by every
- * entry type), so a descriptive string here would leak into external builds
- * via the appendEntry dispatch / loadTranscriptFile parser even though
- * nothing in an external build ever writes or reads this entry.
- */
-export type ContextCollapseCommitEntry = {
-  type: 'marble-origami-commit'
-  sessionId: UUID
-  /** 16-digit collapse ID. Max across entries reseeds the ID counter. */
-  collapseId: string
-  /** The summary placeholder's uuid — registerSummary() needs it. */
-  summaryUuid: string
-  /** Full <collapsed id="...">text</collapsed> string for the placeholder. */
-  summaryContent: string
-  /** Plain summary text for ctx_inspect. */
-  summary: string
-  /** Span boundaries — projectView finds these in the resumed Message[]. */
-  firstArchivedUuid: string
-  lastArchivedUuid: string
-}
-
-/**
- * Snapshot of the staged queue and spawn trigger state. Unlike commits
- * (append-only, replay-all), snapshots are last-wins — only the most
- * recent snapshot entry is applied on restore. Written after every
- * ctx-agent spawn resolves (when staged contents may have changed).
- *
- * Staged boundaries are UUIDs (session-stable), not collapse IDs (which
- * reset with the uuidToId bimap). Restoring a staged span issues fresh
- * collapse IDs for those messages on the next decorate/display, but the
- * span itself resolves correctly.
- */
-export type ContextCollapseSnapshotEntry = {
-  type: 'marble-origami-snapshot'
-  sessionId: UUID
-  staged: Array<{
-    startUuid: string
-    endUuid: string
-    summary: string
-    risk: number
-    stagedAt: number
-  }>
-  /** Spawn trigger state — so the +interval clock picks up where it left off. */
-  armed: boolean
-  lastSpawnTokens: number
-}
-
 export type Entry =
   | TranscriptMessage
   | SummaryMessage
@@ -313,8 +253,6 @@ export type Entry =
   | ModeEntry
   | WorktreeStateEntry
   | ContentReplacementEntry
-  | ContextCollapseCommitEntry
-  | ContextCollapseSnapshotEntry
 
 export function sortLogs(logs: LogOption[]): LogOption[] {
   return logs.sort((a, b) => {

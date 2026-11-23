@@ -488,7 +488,6 @@ export async function initBridgeCore(
   logForDiagnosticsNoPII('info', 'bridge_repl_session_created')
   logEvent('tengu_bridge_repl_started', {
     has_initial_messages: !!(initialMessages && initialMessages.length > 0),
-    inProtectedNamespace: false,
   })
 
   // UUIDs of initial messages. Used for dedup in writeMessages to avoid

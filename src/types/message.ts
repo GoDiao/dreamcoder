@@ -237,7 +237,7 @@ export type SystemCompactBoundaryMessage = SystemMessageBase & {
   compactMetadata: CompactMetadata
 }
 
-export type SystemMicrocompactBoundaryMessage = SystemMessageBase & {
+type SystemMicrocompactBoundaryMessage = SystemMessageBase & {
   subtype: 'microcompact_boundary'
   content: string
   isMeta?: boolean

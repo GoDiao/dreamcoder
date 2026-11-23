@@ -754,7 +754,6 @@ export async function initEnvLessBridgeCore(
       has_initial_messages: !!(initialMessages && initialMessages.length > 0),
       v2: true,
       expires_in_s: credentials.expires_in,
-      inProtectedNamespace: false,
     })
   }
 
