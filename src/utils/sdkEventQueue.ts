@@ -9,7 +9,6 @@ type TaskStartedEvent = {
   tool_use_id?: string
   description: string
   task_type?: string
-  workflow_name?: string
   prompt?: string
 }
 

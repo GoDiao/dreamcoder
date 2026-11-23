@@ -1434,7 +1434,6 @@ export const en = {
   'chat.backgroundAgents.count': '{count} active or recent',
   'chat.backgroundAgents.agent': 'agent',
   'chat.backgroundTasks.command': 'Background command',
-  'chat.backgroundTasks.workflow': 'Background workflow',
   'chat.backgroundTasks.task': 'Background task',
   'chat.backgroundAgents.tokens': '{count} tokens',
   'chat.backgroundAgents.status.running': 'running',

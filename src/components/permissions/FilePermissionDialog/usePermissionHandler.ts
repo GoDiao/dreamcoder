@@ -27,11 +27,11 @@ import type {
 function logPermissionEvent(
   event: 'accept' | 'reject',
   completionType: CompletionType,
-  languageName: string | Promise<string>,
+  languageName: string,
   messageId: string,
   hasFeedback?: boolean,
 ): void {
-  void logUnaryEvent({
+  logUnaryEvent({
     completion_type: completionType,
     event,
     metadata: {
@@ -51,7 +51,7 @@ export type PermissionHandlerParams = {
   onDone: () => void
   onReject: () => void
   completionType: CompletionType
-  languageName: string | Promise<string>
+  languageName: string
   operationType: FileOperationType
 }
 

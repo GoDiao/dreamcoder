@@ -80,7 +80,7 @@ export const call: LocalCommandCall = async () => {
   }
 
   // Check for recording tools
-  const { checkVoiceDependencies, requestMicrophonePermission } = await import(
+  const { checkVoiceDependencies } = await import(
     '../../services/voice.js'
   )
   const deps = await checkVoiceDependencies()
@@ -91,23 +91,6 @@ export const call: LocalCommandCall = async () => {
     return {
       type: 'text' as const,
       value: `No audio recording tool found.${hint}`,
-    }
-  }
-
-  // Probe mic access so the OS permission dialog fires now rather than
-  // on the user's first hold-to-talk activation.
-  if (!(await requestMicrophonePermission())) {
-    let guidance: string
-    if (process.platform === 'win32') {
-      guidance = 'Settings \u2192 Privacy \u2192 Microphone'
-    } else if (process.platform === 'linux') {
-      guidance = "your system's audio settings"
-    } else {
-      guidance = 'System Settings \u2192 Privacy & Security \u2192 Microphone'
-    }
-    return {
-      type: 'text' as const,
-      value: `Microphone access is denied. To enable it, go to ${guidance}, then run /voice again.`,
     }
   }
 

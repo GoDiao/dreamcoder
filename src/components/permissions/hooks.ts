@@ -25,7 +25,7 @@ import { type CompletionType, logUnaryEvent } from '../../utils/unaryLogging.js'
 
 export type UnaryEvent = {
   completion_type: CompletionType
-  language_name: string | Promise<string>
+  language_name: string
 }
 
 function permissionResultToLog(permissionResult: PermissionResult): string {
@@ -196,7 +196,7 @@ export function usePermissionRequestLogging(
       }
     }
 
-    void logUnaryEvent({
+    logUnaryEvent({
       completion_type: unaryEvent.completion_type,
       event: 'response',
       metadata: {

@@ -46,7 +46,7 @@ export async function collectContextData(
     },
   } = context
 
-  let apiView = getMessagesAfterCompactBoundary(messages)
+  const apiView = getMessagesAfterCompactBoundary(messages)
 
   const { messages: compactedMessages } = await microcompactMessages(apiView)
   const appState = getAppState()

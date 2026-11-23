@@ -27,7 +27,7 @@ export interface ToolInput {
 export type UseFilePermissionDialogProps<T extends ToolInput> = {
   filePath: string
   completionType: CompletionType
-  languageName: string | Promise<string>
+  languageName: string
   toolUseConfirm: ToolUseConfirm
   onDone: () => void
   onReject: () => void

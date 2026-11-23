@@ -22,7 +22,6 @@ import { asSessionId } from '../types/ids.js';
 import type { LogOption } from '../types/logs.js';
 import type { Message } from '../types/message.js';
 import { agenticSessionSearch } from '../utils/agenticSessionSearch.js';
-import { renameRecordingForSession } from '../utils/asciicast.js';
 import { updateSessionName } from '../utils/concurrentSessions.js';
 import { loadConversationForResume } from '../utils/conversationRecovery.js';
 import { checkCrossProjectResume } from '../utils/crossProjectResume.js';
@@ -220,7 +219,6 @@ export function ResumeConversation({
       }
       if (result_3.sessionId && !forkSession) {
         switchSession(asSessionId(result_3.sessionId), log_0.fullPath ? dirname(log_0.fullPath) : null);
-        await renameRecordingForSession();
         await resetSessionFilePointer();
         restoreCostStateForSession(result_3.sessionId);
       } else if (forkSession && result_3.contentReplacements?.length) {

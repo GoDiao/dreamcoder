@@ -37,12 +37,12 @@ function isCodeEditingTool(toolName: string): boolean {
 
 // Builds OTel counter attributes for code editing tools, enriching with
 // language when the tool's target file path can be extracted from input
-async function buildCodeEditToolAttributes(
+function buildCodeEditToolAttributes(
   tool: ToolType,
   input: unknown,
   decision: 'accept' | 'reject',
   source: string,
-): Promise<Record<string, string>> {
+): Record<string, string> {
   // Derive language from file path if the tool exposes one (e.g., Edit, Write)
   let language: string | undefined
   if (tool.getPath && input) {
@@ -211,8 +211,9 @@ function logPermissionDecision(
 
   // Track code editing tool metrics
   if (isCodeEditingTool(tool.name)) {
-    void buildCodeEditToolAttributes(tool, input, decision, sourceString).then(
-      attributes => getCodeEditToolDecisionCounter()?.add(1, attributes),
+    getCodeEditToolDecisionCounter()?.add(
+      1,
+      buildCodeEditToolAttributes(tool, input, decision, sourceString),
     )
   }
 

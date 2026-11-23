@@ -19,50 +19,19 @@ export type SharpInstance = {
 
 export type SharpFunction = (input: Buffer) => SharpInstance
 
-type SharpCreatorOptions = {
-  create: {
-    width: number
-    height: number
-    channels: 3 | 4
-    background: { r: number; g: number; b: number }
-  }
-}
-
-type SharpCreator = (options: SharpCreatorOptions) => SharpInstance
-
-let imageProcessorModule: { default: SharpFunction } | null = null
-let imageCreatorModule: { default: SharpCreator } | null = null
+let imageProcessor: SharpFunction | null = null
 
 export async function getImageProcessor(): Promise<SharpFunction> {
-  if (imageProcessorModule) {
-    return imageProcessorModule.default
+  if (imageProcessor) {
+    return imageProcessor
   }
 
   // Single structural cast: our SharpFunction is a subset of sharp's actual type surface.
   const imported = (await import(
     'sharp'
   )) as unknown as MaybeDefault<SharpFunction>
-  const sharp = unwrapDefault(imported)
-  imageProcessorModule = { default: sharp }
-  return sharp
-}
-
-/**
- * Get image creator for generating new images from scratch.
- * Note: image-processor-napi doesn't support image creation,
- * so this always uses sharp directly.
- */
-export async function getImageCreator(): Promise<SharpCreator> {
-  if (imageCreatorModule) {
-    return imageCreatorModule.default
-  }
-
-  const imported = (await import(
-    'sharp'
-  )) as unknown as MaybeDefault<SharpCreator>
-  const sharp = unwrapDefault(imported)
-  imageCreatorModule = { default: sharp }
-  return sharp
+  imageProcessor = unwrapDefault(imported)
+  return imageProcessor
 }
 
 // Dynamic import shape varies by module interop mode — ESM yields { default: fn }, CJS yields fn directly.

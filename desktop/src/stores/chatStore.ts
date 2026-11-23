@@ -1756,7 +1756,6 @@ function upsertBackgroundAgentTask(
       status: event.status,
       description: event.description ?? existing?.description,
       taskType: event.taskType ?? existing?.taskType,
-      workflowName: event.workflowName ?? existing?.workflowName,
       prompt: event.prompt ?? existing?.prompt,
       summary: event.summary ?? existing?.summary,
       lastToolName: event.lastToolName ?? existing?.lastToolName,

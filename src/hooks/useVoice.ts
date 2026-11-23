@@ -133,10 +133,6 @@ export function normalizeLanguageForSTT(language: string | undefined): {
   return { code: DEFAULT_STT_LANGUAGE, fellBackFrom: language }
 }
 
-// Lazy-loaded voice module. We defer importing voice.ts (and its native
-// audio-capture-napi dependency) until voice input is actually activated.
-// On macOS, loading the native audio module can trigger a TCC microphone
-// permission prompt — we must avoid that until voice input is actually enabled.
 type VoiceModule = typeof import('../services/voice.js')
 let voiceModule: VoiceModule | null = null
 
@@ -521,12 +517,6 @@ export function useVoice({
       })
   }
 
-  // When voice is enabled, lazy-import voice.ts so checkRecordingAvailability
-  // et al. are ready when the user presses the voice key. Do NOT preload the
-  // native module — require('audio-capture.node') is a synchronous dlopen of
-  // CoreAudio/AudioUnit that blocks the event loop for ~1s (warm) to ~8s
-  // (cold coreaudiod). setImmediate doesn't help: it yields one tick, then the
-  // dlopen still blocks. The first voice keypress pays the dlopen cost instead.
   useEffect(() => {
     if (enabled && !voiceModule) {
       void import('../services/voice.js').then(mod => {

@@ -1677,11 +1677,6 @@ export function REPL({
       // a different project (cross-worktree, /branch); null derives from
       // current originalCwd.
       switchSession(asSessionId(sessionId), log.fullPath ? dirname(log.fullPath) : null);
-      // Rename asciicast recording to match the resumed session ID
-      const {
-        renameRecordingForSession
-      } = await import('../utils/asciicast.js');
-      await renameRecordingForSession();
       await resetSessionFilePointer();
 
       // Clear then restore session metadata so it's re-appended on exit via

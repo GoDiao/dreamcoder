@@ -254,7 +254,6 @@ export const ConfigTool = buildTool({
       const {
         checkRecordingAvailability,
         checkVoiceDependencies,
-        requestMicrophonePermission,
       } = await import('../../services/voice.js')
 
       const recording = await checkRecordingAvailability()
@@ -285,23 +284,6 @@ export const ConfigTool = buildTool({
             error:
               'No audio recording tool found.' +
               (deps.installCommand ? ` Run: ${deps.installCommand}` : ''),
-          },
-        }
-      }
-      if (!(await requestMicrophonePermission())) {
-        let guidance: string
-        if (process.platform === 'win32') {
-          guidance = 'Settings \u2192 Privacy \u2192 Microphone'
-        } else if (process.platform === 'linux') {
-          guidance = "your system's audio settings"
-        } else {
-          guidance =
-            'System Settings \u2192 Privacy & Security \u2192 Microphone'
-        }
-        return {
-          data: {
-            success: false,
-            error: `Microphone access is denied. To enable it, go to ${guidance}, then try again.`,
           },
         }
       }

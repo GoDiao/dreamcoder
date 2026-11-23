@@ -992,12 +992,10 @@ async function checkPermissionsAndCallTool(
 
     // Increment code-edit tool decision counter for headless mode
     if (isCodeEditingTool(tool.name)) {
-      void buildCodeEditToolAttributes(
-        tool,
-        processedInput,
-        decision,
-        source,
-      ).then(attributes => getCodeEditToolDecisionCounter()?.add(1, attributes))
+      getCodeEditToolDecisionCounter()?.add(
+        1,
+        buildCodeEditToolAttributes(tool, processedInput, decision, source),
+      )
     }
   }
 

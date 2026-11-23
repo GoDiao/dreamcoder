@@ -350,7 +350,6 @@ function getBackgroundTaskLabel(
   t: (key: TranslationKey, params?: Record<string, string | number>) => string,
 ): string {
   if (taskType === 'local_bash') return t('chat.backgroundTasks.command')
-  if (taskType === 'local_workflow') return t('chat.backgroundTasks.workflow')
   return t('chat.backgroundTasks.task')
 }
 

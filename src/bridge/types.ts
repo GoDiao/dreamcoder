@@ -68,16 +68,6 @@ export type SessionActivity = {
  */
 export type SpawnMode = 'single-session' | 'worktree' | 'same-dir'
 
-/**
- * Well-known worker_type values THIS codebase produces. Sent as
- * `metadata.worker_type` at environment registration so claude.ai can filter
- * the session picker by origin (e.g. assistant tab only shows assistant
- * workers). The backend treats this as an opaque string — desktop cowork
- * sends `"cowork"`, which isn't in this union. REPL code uses this narrow
- * type for its own exhaustiveness; wire-level fields accept any string.
- */
-export type BridgeWorkerType = 'claude_code' | 'claude_code_assistant'
-
 export type BridgeConfig = {
   dir: string
   machineName: string
@@ -91,7 +81,7 @@ export type BridgeConfig = {
   bridgeId: string
   /**
    * Sent as metadata.worker_type so web clients can filter by origin.
-   * Backend treats this as opaque — any string, not just BridgeWorkerType.
+   * Backend treats this as opaque — any string.
    */
   workerType: string
   /** Client-generated UUID for idempotent environment registration. */

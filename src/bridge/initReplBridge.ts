@@ -68,7 +68,6 @@ import { getPollIntervalConfig } from './pollConfig.js'
 import type { BridgeState, ReplBridgeHandle } from './replBridge.js'
 import { initBridgeCore } from './replBridge.js'
 import { setCseShimGate } from './sessionIdCompat.js'
-import type { BridgeWorkerType } from './types.js'
 
 export type InitBridgeOptions = {
   onInboundMessage?: (msg: SDKMessage) => void | Promise<void>
@@ -94,8 +93,6 @@ export type InitBridgeOptions = {
   // server (duplicate UUIDs across sessions cause the WS to be killed).
   // Mutated in place — newly flushed UUIDs are added after each flush.
   previouslyFlushedUUIDs?: Set<string>
-  /** See BridgeCoreParams.perpetual. */
-  perpetual?: boolean
   /**
    * When true, the bridge only forwards events outbound (no SSE inbound
    * stream). Used by CCR mirror mode — local sessions visible on claude.ai
@@ -120,7 +117,6 @@ export async function initReplBridge(
     getMessages,
     previouslyFlushedUUIDs,
     initialName,
-    perpetual,
     outboundOnly,
     tags,
   } = options ?? {}
@@ -401,11 +397,7 @@ export async function initReplBridge(
   // NAMING: "env-less" is distinct from "CCR v2" (the /worker/* transport).
   // The env-based path below can ALSO use CCR v2 via CLAUDE_CODE_USE_CCR_V2.
   // tengu_bridge_repl_v2 gates env-less (no poll loop), not transport version.
-  //
-  // perpetual (assistant-mode session continuity via bridge-pointer.json) is
-  // env-coupled and not yet implemented here — fall back to env-based when set
-  // so KAIROS users don't silently lose cross-restart continuity.
-  if (isEnvLessBridgeEnabled() && !perpetual) {
+  if (isEnvLessBridgeEnabled()) {
     const versionError = await checkEnvLessBridgeMinVersion()
     if (versionError) {
       logBridgeSkip(
@@ -468,7 +460,7 @@ export async function initReplBridge(
       ? process.env.CLAUDE_BRIDGE_SESSION_INGRESS_URL
       : baseUrl
 
-  const workerType: BridgeWorkerType = 'claude_code'
+  const workerType = 'claude_code'
 
   // 6. Delegate. BridgeCoreHandle is a structural superset of
   // ReplBridgeHandle (adds writeSdkMessages which REPL callers don't use),
@@ -526,7 +518,6 @@ export async function initReplBridge(
     onSetMaxThinkingTokens,
     onSetPermissionMode,
     onStateChange,
-    perpetual,
   })
 }
 

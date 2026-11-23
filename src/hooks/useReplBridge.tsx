@@ -172,8 +172,7 @@ export function useReplBridge(messages: Message[], setMessages: (action: React.S
               const {
                 resolveAndPrepend
               } = await import('../bridge/inboundAttachments.js');
-              let sanitized = fields.content;
-              const content = await resolveAndPrepend(msg, sanitized);
+              const content = await resolveAndPrepend(msg, fields.content);
               const preview = typeof content === 'string' ? content.slice(0, 80) : `[${content.length} content blocks]`;
               logForDebugging(`[bridge:repl] Injecting inbound user message: ${preview}${uuid ? ` uuid=${uuid}` : ''}`);
               enqueue({
@@ -579,10 +578,8 @@ export function useReplBridge(messages: Message[], setMessages: (action: React.S
               };
             });
 
-            // Show bridge status with URL in the transcript. perpetual (KAIROS
-            // assistant mode) falls back to v1 at initReplBridge.ts — skip the
-            // v2-only upgrade nudge for them. Own try/catch so a cosmetic
-            // GrowthBook hiccup doesn't hit the outer init-failure handler.
+            // Show bridge status with URL in the transcript. Own try/catch so a
+            // cosmetic GrowthBook hiccup doesn't hit the outer init-failure handler.
             const upgradeNudge = await shouldShowAppUpgradeMessage().catch(() => false);
             if (cancelled) return;
             setMessages(prev_18 => [...prev_18, createBridgeStatusMessage(url, upgradeNudge ? 'Please upgrade to the latest version of the Claude mobile app to see your Remote Control sessions.' : undefined)]);

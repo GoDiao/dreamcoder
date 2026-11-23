@@ -541,19 +541,19 @@ describe('MessageList nested tool calls', () => {
     expect(card.querySelector('.text-destructive')).toBeNull()
   })
 
-  it('uses user-facing labels for workflow and unknown background tasks', () => {
+  it('uses user-facing labels for command and unknown background tasks', () => {
     useChatStore.setState({
       sessions: {
         [ACTIVE_TAB]: makeSessionState({
           messages: [
             {
-              id: 'background-task-workflow',
+              id: 'background-task-command',
               type: 'background_task',
               timestamp: 2,
               task: {
-                taskId: 'workflow-task',
+                taskId: 'command-task',
                 status: 'running',
-                taskType: 'local_workflow',
+                taskType: 'local_bash',
                 summary: 'Running release checklist',
                 startedAt: 1,
                 updatedAt: 2,
@@ -580,7 +580,7 @@ describe('MessageList nested tool calls', () => {
 
     const cards = screen.getAllByTestId('background-task-event-card')
     expect(cards).toHaveLength(2)
-    expect(cards[0]?.textContent).toContain('Background workflow')
+    expect(cards[0]?.textContent).toContain('Background command')
     expect(cards[1]?.textContent).toContain('Background task')
   })
 

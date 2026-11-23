@@ -177,10 +177,6 @@ export type RecordingAvailability = {
   reason: string | null
 }
 
-export async function requestMicrophonePermission(): Promise<boolean> {
-  return true
-}
-
 export async function checkRecordingAvailability(): Promise<RecordingAvailability> {
   // Remote environments have no local microphone
   if (isRunningOnHomespace() || isEnvTruthy(process.env.CLAUDE_CODE_REMOTE)) {

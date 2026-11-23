@@ -26,7 +26,6 @@ import type {
   PersistedWorktreeSession,
 } from '../types/logs.js'
 import type { Message } from '../types/message.js'
-import { renameRecordingForSession } from './asciicast.js'
 import { clearMemoryFileCaches } from './claudemd.js'
 import {
   type AttributionState,
@@ -420,9 +419,6 @@ export async function processResumedConversation(
         asSessionId(sid),
         opts.transcriptPath ? dirname(opts.transcriptPath) : null,
       )
-      // Rename asciicast recording to match the resumed session ID so
-      // getSessionRecordingPaths() can discover it during /share
-      await renameRecordingForSession()
       await resetSessionFilePointer()
       restoreCostStateForSession(sid)
     }

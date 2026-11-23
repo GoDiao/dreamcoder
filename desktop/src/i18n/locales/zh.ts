@@ -1436,7 +1436,6 @@ export const zh: Record<TranslationKey, string> = {
   'chat.backgroundAgents.count': '{count} 个运行中或最近任务',
   'chat.backgroundAgents.agent': 'agent',
   'chat.backgroundTasks.command': '后台命令',
-  'chat.backgroundTasks.workflow': '后台工作流',
   'chat.backgroundTasks.task': '后台任务',
   'chat.backgroundAgents.tokens': '{count} tokens',
   'chat.backgroundAgents.status.running': '运行中',
