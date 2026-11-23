@@ -78,29 +78,8 @@ function getSearchOrReadInfo(progressMessage: ProgressMessage<Progress>, tools: 
   }
   return null;
 }
-type SummaryMessage = {
-  type: 'summary';
-  searchCount: number;
-  readCount: number;
-  replCount: number;
-  uuid: string;
-  isActive: boolean; // true if still in progress (last message was tool_use, not tool_result)
-};
-type ProcessedMessage = {
-  type: 'original';
-  message: ProgressMessage<AgentToolProgress>;
-} | SummaryMessage;
-
-/**
- * Process progress messages to group consecutive search/read operations into summaries.
- * For ants only - returns original messages for non-ants.
- * @param isAgentRunning - If true, the last group is always marked as active (in progress)
- */
-function processProgressMessages(messages: ProgressMessage<Progress>[], tools: Tools, isAgentRunning: boolean): ProcessedMessage[] {
-  return messages.filter((m): m is ProgressMessage<AgentToolProgress> => hasProgressMessage(m.data) && m.data.message.type !== 'user').map(m => ({
-    type: 'original',
-    message: m
-  }));
+function processProgressMessages(messages: ProgressMessage<Progress>[]): ProgressMessage<AgentToolProgress>[] {
+  return messages.filter((m): m is ProgressMessage<AgentToolProgress> => hasProgressMessage(m.data) && m.data.message.type !== 'user');
 }
 const ESTIMATED_LINES_PER_TOOL = 9;
 const TERMINAL_BUFFER_LINES = 7;
@@ -405,9 +384,7 @@ export function renderToolUseProgressMessage(progressMessages: ProgressMessage<P
       </MessageResponse>;
   }
 
-  // Process messages to group consecutive search/read operations into summaries (ants only)
-  // isAgentRunning=true since this is the progress view while the agent is still running
-  const processedMessages = processProgressMessages(progressMessages, tools, true);
+  const processedMessages = processProgressMessages(progressMessages);
 
   // For display, take the last few processed messages
   const displayedMessages = isTranscriptMode ? processedMessages : processedMessages.slice(-MAX_PROGRESS_MESSAGES_TO_SHOW);
@@ -417,23 +394,10 @@ export function renderToolUseProgressMessage(progressMessages: ProgressMessage<P
   // progress messages (tool_use + tool_result + text), so counting all
   // hidden messages inflates the number shown to the user.
   const hiddenMessages = isTranscriptMode ? [] : processedMessages.slice(0, Math.max(0, processedMessages.length - MAX_PROGRESS_MESSAGES_TO_SHOW));
-  const hiddenToolUseCount = count(hiddenMessages, m => {
-    if (m.type === 'summary') {
-      return m.searchCount + m.readCount + m.replCount > 0;
-    }
-    const data = m.message.data;
-    if (!hasProgressMessage(data)) {
-      return false;
-    }
-    return data.message.message.content.some(content => content.type === 'tool_use');
-  });
+  const hiddenToolUseCount = count(hiddenMessages, m => m.data.message.message.content.some(content => content.type === 'tool_use'));
   const firstData = progressMessages[0]?.data;
   const prompt = firstData && hasProgressMessage(firstData) ? firstData.prompt : undefined;
 
-  // After grouping, displayedMessages can be empty when the only progress so
-  // far is an assistant tool_use for a search/read op (grouped but not yet
-  // counted, since counts increment on tool_result). Fall back to the
-  // initializing text so MessageResponse doesn't render a bare ⎿.
   if (displayedMessages.length === 0 && !(isTranscriptMode && prompt)) {
     return <MessageResponse height={1}>
         <Text dimColor>{INITIALIZING_TEXT}</Text>
@@ -450,18 +414,11 @@ export function renderToolUseProgressMessage(progressMessages: ProgressMessage<P
               <AgentPromptDisplay prompt={prompt} />
             </Box>}
           {displayedMessages.map(processed => {
-          if (processed.type === 'summary') {
-            // Render summary for grouped search/read/REPL operations using shared formatting
-            const summaryText = getSearchReadSummaryText(processed.searchCount, processed.readCount, processed.isActive, processed.replCount);
-            return <Box key={processed.uuid} height={1} overflow="hidden">
-                  <Text dimColor>{summaryText}</Text>
-                </Box>;
-          }
           // Render original message without height=1 wrapper so null
           // content (tool not found, renderToolUseMessage returns null)
           // doesn't leave a blank line. Tool call headers are single-line
           // anyway so truncation isn't needed.
-          return <MessageComponent key={processed.message.uuid} message={processed.message.data.message} lookups={subagentLookups} addMargin={false} tools={tools} commands={[]} verbose={verbose} inProgressToolUseIDs={collapsedInProgressIDs} progressMessagesForMessage={[]} shouldAnimate={false} shouldShowDot={false} style="condensed" isTranscriptMode={false} isStatic={true} />;
+          return <MessageComponent key={processed.uuid} message={processed.data.message} lookups={subagentLookups} addMargin={false} tools={tools} commands={[]} verbose={verbose} inProgressToolUseIDs={collapsedInProgressIDs} progressMessagesForMessage={[]} shouldAnimate={false} shouldShowDot={false} style="condensed" isTranscriptMode={false} isStatic={true} />;
         })}
         </SubAgentProvider>
         {hiddenToolUseCount > 0 && <Text dimColor>

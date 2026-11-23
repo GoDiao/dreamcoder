@@ -137,7 +137,7 @@ import {
 } from './toolHooks.js'
 
 /** Minimum total hook duration (ms) to show inline timing summary */
-export const HOOK_TIMING_DISPLAY_THRESHOLD_MS = 500
+const HOOK_TIMING_DISPLAY_THRESHOLD_MS = 500
 /** Log a debug warning when hooks/permission-decision block for this long. Matches
  * BashTool's PROGRESS_THRESHOLD_MS — the collapsed view feels stuck past this. */
 const SLOW_PHASE_LOG_THRESHOLD_MS = 2000

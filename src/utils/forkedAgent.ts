@@ -424,9 +424,6 @@ export function createSubagentContext(
     setResponseLength: overrides?.shareSetResponseLength
       ? parentContext.setResponseLength
       : () => {},
-    pushApiMetricsEntry: overrides?.shareSetResponseLength
-      ? parentContext.pushApiMetricsEntry
-      : undefined,
     updateFileHistoryState: () => {},
     // Attribution is scoped and functional (prev => next) — safe to share even
     // when setAppState is stubbed. Concurrent calls compose via React's state queue.

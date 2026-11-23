@@ -29,9 +29,9 @@ import { count } from '../utils/array.js';
 import { formatRelativeTimeAgo, truncate } from '../utils/format.js';
 import type { Theme } from '../utils/theme.js';
 import { Divider } from './design-system/Divider.js';
-type RestoreOption = 'both' | 'conversation' | 'code' | 'summarize' | 'summarize_up_to' | 'nevermind';
-function isSummarizeOption(option: RestoreOption | null): option is 'summarize' | 'summarize_up_to' {
-  return option === 'summarize' || option === 'summarize_up_to';
+type RestoreOption = 'both' | 'conversation' | 'code' | 'summarize' | 'nevermind';
+function isSummarizeOption(option: RestoreOption | null): option is 'summarize' {
+  return option === 'summarize';
 }
 type Props = {
   messages: Message[];
@@ -88,7 +88,6 @@ export function MessageSelector({
   // Per-option feedback state; Select's internal inputValues Map persists
   // per-option text independently, so sharing one variable would desync.
   const [summarizeFromFeedback, setSummarizeFromFeedback] = useState('');
-  const [summarizeUpToFeedback] = useState('');
 
   // Generate options with summarize as input type for inline context
   function getRestoreOptions(canRestoreCode: boolean): OptionWithDescription<RestoreOption>[] {
@@ -185,9 +184,8 @@ export function MessageSelector({
       setRestoringOption(option);
       setError(undefined);
       try {
-        const direction = option === 'summarize_up_to' ? 'up_to' : 'from';
-        const feedback = (direction === 'up_to' ? summarizeUpToFeedback : summarizeFromFeedback).trim() || undefined;
-        await onSummarize(messageToRestore, feedback, direction);
+        const feedback = summarizeFromFeedback.trim() || undefined;
+        await onSummarize(messageToRestore, feedback, 'from');
         setIsRestoring(false);
         setRestoringOption(null);
         setMessageToRestore(undefined);
@@ -396,8 +394,6 @@ function getRestoreOptionConversationText(option: RestoreOption): string {
   switch (option) {
     case 'summarize':
       return 'Messages after this point will be summarized.';
-    case 'summarize_up_to':
-      return 'Preceding messages will be summarized. This and subsequent messages will remain unchanged — you will stay at the end of the conversation.';
     case 'both':
     case 'conversation':
       return 'The conversation will be forked.';

@@ -2572,7 +2572,6 @@ async function run(): Promise<CommanderCommand> {
       expandedView: getGlobalConfig().showSpinnerTree ? 'teammates' : getGlobalConfig().showExpandedTodos ? 'tasks' : 'none',
       showTeammateMessagePreview: isAgentSwarmsEnabled() ? false : undefined,
       selectedIPAgentIndex: -1,
-      coordinatorTaskIndex: -1,
       viewSelectionMode: 'none',
       footerSelection: null,
       toolPermissionContext: effectiveToolPermissionContext,
@@ -2643,9 +2642,6 @@ async function run(): Promise<CommanderCommand> {
       },
       speculation: IDLE_SPECULATION_STATE,
       speculationSessionTimeSavedMs: 0,
-      skillImprovement: {
-        suggestion: null
-      },
       workerSandboxPermissions: {
         queue: [],
         selectedIndex: 0

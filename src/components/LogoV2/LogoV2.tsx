@@ -220,8 +220,8 @@ export function LogoV2() {
     if ($[25] === Symbol.for("react.memo_cache_sentinel")) {
       t19 = false && !process.env.DEMO_VERSION && <Box paddingLeft={2} flexDirection="column"><Text dimColor={true}>Use /issue to report model behavior issues</Text></Box>;
       t20 = false && !process.env.DEMO_VERSION && <Box paddingLeft={2} flexDirection="column"><Text color="warning">[ANT-ONLY] Logs:</Text><Text dimColor={true}>API calls: {getDisplayPath(getDumpPromptsPath())}</Text><Text dimColor={true}>Debug logs: {getDisplayPath(getDebugLogPath())}</Text>{isDetailedProfilingEnabled() && <Text dimColor={true}>Startup Perf: {getDisplayPath(getStartupPerfLogPath())}</Text>}</Box>;
-      t21 = false && <GateOverridesWarning />;
-      t22 = false && <ExperimentEnrollmentNotice />;
+      t21 = false;
+      t22 = false;
       $[25] = t19;
       $[26] = t20;
       $[27] = t21;
@@ -314,8 +314,8 @@ export function LogoV2() {
     let t18;
     let t19;
     if ($[42] === Symbol.for("react.memo_cache_sentinel")) {
-      t18 = false && <GateOverridesWarning />;
-      t19 = false && <ExperimentEnrollmentNotice />;
+      t18 = false;
+      t19 = false;
       $[42] = t18;
       $[43] = t19;
     } else {
@@ -497,8 +497,8 @@ export function LogoV2() {
   if ($[86] === Symbol.for("react.memo_cache_sentinel")) {
     t37 = false && !process.env.DEMO_VERSION && <Box paddingLeft={2} flexDirection="column"><Text dimColor={true}>Use /issue to report model behavior issues</Text></Box>;
     t38 = false && !process.env.DEMO_VERSION && <Box paddingLeft={2} flexDirection="column"><Text color="warning">[ANT-ONLY] Logs:</Text><Text dimColor={true}>API calls: {getDisplayPath(getDumpPromptsPath())}</Text><Text dimColor={true}>Debug logs: {getDisplayPath(getDebugLogPath())}</Text>{isDetailedProfilingEnabled() && <Text dimColor={true}>Startup Perf: {getDisplayPath(getStartupPerfLogPath())}</Text>}</Box>;
-    t39 = false && <GateOverridesWarning />;
-    t40 = false && <ExperimentEnrollmentNotice />;
+    t39 = false;
+    t40 = false;
     $[86] = t37;
     $[87] = t38;
     $[88] = t39;

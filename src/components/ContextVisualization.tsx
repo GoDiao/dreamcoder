@@ -139,18 +139,15 @@ export function ContextVisualization(t0) {
     } else {
       t15 = $[34];
     }
-    let t16;
     let t17;
     let t18;
     if ($[35] === Symbol.for("react.memo_cache_sentinel")) {
-      t16 = null;
       t17 = <Text> </Text>;
       t18 = <Text dimColor={true} italic={true}>Estimated usage by category</Text>;
-      $[35] = t16;
+      $[35] = true;
       $[36] = t17;
       $[37] = t18;
     } else {
-      t16 = $[35];
       t17 = $[36];
       t18 = $[37];
     }
@@ -182,7 +179,7 @@ export function ContextVisualization(t0) {
     const t22 = autocompactCategory && autocompactCategory.tokens > 0 && <Box><Text color={autocompactCategory.color}>⛝</Text><Text dimColor={true}> {autocompactCategory.name}: </Text><Text dimColor={true}>{formatTokens(autocompactCategory.tokens)} tokens ({(autocompactCategory.tokens / rawMaxTokens * 100).toFixed(1)}%)</Text></Box>;
     let t23;
     if ($[43] !== t15 || $[44] !== t20 || $[45] !== t21 || $[46] !== t22) {
-      t23 = <Box flexDirection="column" gap={0} flexShrink={0}>{t15}{t16}{t17}{t18}{t20}{t21}{t22}</Box>;
+      t23 = <Box flexDirection="column" gap={0} flexShrink={0}>{t15}{t17}{t18}{t20}{t21}{t22}</Box>;
       $[43] = t15;
       $[44] = t20;
       $[45] = t21;

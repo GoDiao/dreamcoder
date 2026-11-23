@@ -5,7 +5,6 @@ import { Ansi, Text } from '../../ink.js';
 import { convertLeadingTabsToSpaces } from '../../utils/file.js';
 type Props = {
   code: string;
-  filePath: string;
   dim?: boolean;
   skipColoring?: boolean;
 };

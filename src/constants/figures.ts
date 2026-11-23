@@ -13,7 +13,6 @@ export const EFFORT_HIGH = '●' // \u25cf - effort level: high
 export const EFFORT_MAX = '◉' // \u25c9 - effort level: max (Opus 4.7 only)
 
 // Media/trigger status indicators
-export const PLAY_ICON = '\u25b6' // ▶
 export const PAUSE_ICON = '\u23f8' // ⏸
 
 // MCP subscription indicators

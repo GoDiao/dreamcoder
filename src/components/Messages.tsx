@@ -499,12 +499,8 @@ const MessagesImpl = ({
     // Brief-only: SendUserMessage + user input only. Default: drop redundant
     // assistant text in turns where SendUserMessage was called (the model's
     // text is working-notes that duplicate the SendUserMessage content).
-    const briefToolNames = [BRIEF_TOOL_NAME].filter((n): n is string => n !== null);
-    // dropTextInBriefTurns should only trigger on SendUserMessage turns —
-    // SendUserFile delivers a file without replacement text, so dropping
-    // assistant text for file-only turns would leave the user with no context.
-    const dropTextToolNames = [BRIEF_TOOL_NAME].filter((n_0): n_0 is string => n_0 !== null);
-    const briefFiltered = briefToolNames.length > 0 && !isTranscriptMode ? isBriefOnly ? filterForBriefTool(messagesToShowNotTruncated, briefToolNames) : dropTextToolNames.length > 0 ? dropTextInBriefTurns(messagesToShowNotTruncated, dropTextToolNames) : messagesToShowNotTruncated : messagesToShowNotTruncated;
+    const briefToolNames = [BRIEF_TOOL_NAME];
+    const briefFiltered = !isTranscriptMode ? isBriefOnly ? filterForBriefTool(messagesToShowNotTruncated, briefToolNames) : dropTextInBriefTurns(messagesToShowNotTruncated, briefToolNames) : messagesToShowNotTruncated;
     const messagesToShow = shouldTruncate ? briefFiltered.slice(-MAX_MESSAGES_TO_SHOW_IN_TRANSCRIPT_MODE) : briefFiltered;
     const hasTruncatedMessages = shouldTruncate && briefFiltered.length > MAX_MESSAGES_TO_SHOW_IN_TRANSCRIPT_MODE;
     const {

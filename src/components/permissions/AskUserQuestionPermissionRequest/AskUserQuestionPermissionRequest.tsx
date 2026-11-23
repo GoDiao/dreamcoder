@@ -2,7 +2,6 @@
 import { c as _c } from "react/compiler-runtime";
 import type { Base64ImageSource, ImageBlockParam } from '@anthropic-ai/sdk/resources/messages.mjs';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { useSettings } from '../../../hooks/useSettings.js';
 import { useTerminalSize } from '../../../hooks/useTerminalSize.js';
 import { stringWidth } from '../../../ink/stringWidth.js';
 import { useTheme } from '../../../ink.js';
@@ -28,18 +27,6 @@ const MIN_CONTENT_WIDTH = 40;
 const CONTENT_CHROME_OVERHEAD = 15;
 export function AskUserQuestionPermissionRequest(props) {
   const $ = _c(4);
-  const settings = useSettings();
-  if (settings.syntaxHighlightingDisabled) {
-    let t0;
-    if ($[0] !== props) {
-      t0 = <AskUserQuestionPermissionRequestBody {...props} />;
-      $[0] = props;
-      $[1] = t0;
-    } else {
-      t0 = $[1];
-    }
-    return t0;
-  }
   let t0;
   if ($[2] !== props) {
     t0 = <AskUserQuestionPermissionRequestBody {...props} />;

@@ -8,14 +8,12 @@ import { useKeybinding } from '../../../keybindings/useKeybinding.js';
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../../services/analytics/growthbook.js';
 import { type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS, logEvent } from '../../../services/analytics/index.js';
 import { sanitizeToolNameForAnalytics } from '../../../services/analytics/metadata.js';
-import { useAppState } from '../../../state/AppState.js';
 import { BashTool } from '../../../tools/BashTool/BashTool.js';
 import { getFirstWordPrefix, getSimpleCommandPrefix } from '../../../tools/BashTool/bashPermissions.js';
 import { getDestructiveCommandWarning } from '../../../tools/BashTool/destructiveCommandWarning.js';
 import { parseSedEditCommand } from '../../../tools/BashTool/sedEditParser.js';
 import { shouldUseSandbox } from '../../../tools/BashTool/shouldUseSandbox.js';
 import { getCompoundCommandPrefixesStatic } from '../../../utils/bash/prefix.js';
-import { createPromptRuleContent, generateGenericDescription, getBashPromptAllowDescriptions, isClassifierPermissionsEnabled } from '../../../utils/permissions/bashClassifier.js';
 import { extractRules } from '../../../utils/permissions/PermissionUpdate.js';
 import type { PermissionUpdate } from '../../../utils/permissions/PermissionUpdateSchema.js';
 import { SandboxManager } from '../../../utils/sandbox/sandbox-adapter.js';
@@ -148,7 +146,6 @@ function BashPermissionRequestInner({
   description?: string;
 }): React.ReactNode {
   const [theme] = useTheme();
-  const toolPermissionContext = useAppState(s => s.toolPermissionContext);
   const explainerState = usePermissionExplainerUI({
     toolName: toolUseConfirm.tool.name,
     toolInput: toolUseConfirm.input,
@@ -175,24 +172,6 @@ function BashPermissionRequestInner({
     explainerVisible: explainerState.visible
   });
   const [showPermissionDebug, setShowPermissionDebug] = useState(false);
-  const [classifierDescription, setClassifierDescription] = useState(description || '');
-  // Track whether the initial description (from prop or async generation) was empty.
-  // Once we receive a non-empty description, this stays false.
-  const [initialClassifierDescriptionEmpty, setInitialClassifierDescriptionEmpty] = useState(!description?.trim());
-
-  // Asynchronously generate a generic description for the classifier
-  useEffect(() => {
-    if (!isClassifierPermissionsEnabled()) return;
-    const abortController = new AbortController();
-    generateGenericDescription(command, description, abortController.signal).then(generic => {
-      if (generic && !abortController.signal.aborted) {
-        setClassifierDescription(generic);
-        setInitialClassifierDescriptionEmpty(false);
-      }
-    }).catch(() => {}); // Keep original on error
-    return () => abortController.abort();
-  }, [command, description]);
-
   // GH#11380: For compound commands (cd src && git status && npm test), the
   // backend already computed correct per-subcommand suggestions via tree-sitter
   // split + per-subcommand permission checks. decisionReason.type ===
@@ -286,21 +265,15 @@ function BashPermissionRequestInner({
     language_name: 'none'
   }), []);
   usePermissionRequestLogging(toolUseConfirm, unaryEvent);
-  const existingAllowDescriptions = useMemo(() => getBashPromptAllowDescriptions(toolPermissionContext), [toolPermissionContext]);
   const options = useMemo(() => bashToolUseOptions({
     suggestions: toolUseConfirm.permissionResult.behavior === 'ask' ? toolUseConfirm.permissionResult.suggestions : undefined,
-    decisionReason: toolUseConfirm.permissionResult.decisionReason,
     onRejectFeedbackChange: setRejectFeedback,
     onAcceptFeedbackChange: setAcceptFeedback,
-    onClassifierDescriptionChange: setClassifierDescription,
-    classifierDescription,
-    initialClassifierDescriptionEmpty,
-    existingAllowDescriptions,
     yesInputMode,
     noInputMode,
     editablePrefix,
     onEditablePrefixChange
-  }), [toolUseConfirm, classifierDescription, initialClassifierDescriptionEmpty, existingAllowDescriptions, yesInputMode, noInputMode, editablePrefix, onEditablePrefixChange]);
+  }), [toolUseConfirm, yesInputMode, noInputMode, editablePrefix, onEditablePrefixChange]);
 
   // Toggle permission debug info with keybinding
   const handleToggleDebug = useCallback(() => {
@@ -320,21 +293,12 @@ function BashPermissionRequestInner({
   });
   function onSelect(value_0: string) {
     // Map options to numeric values for analytics (strings not allowed in logEvent)
-    let optionIndex: Record<string, number> = {
+    const optionIndex: Record<string, number> = {
       yes: 1,
       'yes-apply-suggestions': 2,
       'yes-prefix-edited': 2,
       no: 3
     };
-    if (feature('BASH_CLASSIFIER')) {
-      optionIndex = {
-        yes: 1,
-        'yes-apply-suggestions': 2,
-        'yes-prefix-edited': 2,
-        'yes-classifier-reviewed': 3,
-        no: 4
-      };
-    }
     logEvent('tengu_permission_request_option_selected', {
       option_index: optionIndex[value_0],
       explainer_visible: explainerState.visible
@@ -356,26 +320,6 @@ function BashPermissionRequestInner({
           destination: 'localSettings'
         }];
         toolUseConfirm.onAllow(toolUseConfirm.input, prefixUpdates);
-      }
-      onDone();
-      return;
-    }
-    if (feature('BASH_CLASSIFIER') && value_0 === 'yes-classifier-reviewed') {
-      const trimmedDescription = classifierDescription.trim();
-      logUnaryPermissionEvent('tool_use_single', toolUseConfirm, 'accept');
-      if (!trimmedDescription) {
-        toolUseConfirm.onAllow(toolUseConfirm.input, []);
-      } else {
-        const permissionUpdates: PermissionUpdate[] = [{
-          type: 'addRules',
-          rules: [{
-            toolName: BashTool.name,
-            ruleContent: createPromptRuleContent(trimmedDescription)
-          }],
-          behavior: 'allow',
-          destination: 'session'
-        }];
-        toolUseConfirm.onAllow(toolUseConfirm.input, permissionUpdates);
       }
       onDone();
       return;

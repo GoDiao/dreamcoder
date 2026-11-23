@@ -30,7 +30,6 @@ export function Settings(t0) {
   const [selectedTab, setSelectedTab] = useState(defaultTab);
   const [tabsHidden, setTabsHidden] = useState(false);
   const [configOwnsEsc, setConfigOwnsEsc] = useState(false);
-  const [gatesOwnsEsc, setGatesOwnsEsc] = useState(false);
   const insideModal = useIsInsideModal();
   const {
     rows
@@ -55,7 +54,7 @@ export function Settings(t0) {
     t1 = $[2];
   }
   const handleEscape = t1;
-  const t2 = !tabsHidden && !(selectedTab === "Config" && configOwnsEsc) && !(selectedTab === "Gates" && gatesOwnsEsc);
+  const t2 = !tabsHidden && !(selectedTab === "Config" && configOwnsEsc);
   let t3;
   if ($[3] !== t2) {
     t3 = {
@@ -96,7 +95,7 @@ export function Settings(t0) {
   }
   let t7;
   if ($[13] !== contentHeight) {
-    t7 = false ? [<Tab key="gates" title="Gates"><Gates onOwnsEscChange={setGatesOwnsEsc} contentHeight={contentHeight} /></Tab>] : [];
+    t7 = [];
     $[13] = contentHeight;
     $[14] = t7;
   } else {

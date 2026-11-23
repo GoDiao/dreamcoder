@@ -139,18 +139,6 @@ export function onChangeAppState({
     }))
   }
 
-  // tungstenPanelVisible (ant-only tmux panel sticky toggle)
-  if (process.env.USER_TYPE === 'ant') {
-    if (
-      newState.tungstenPanelVisible !== oldState.tungstenPanelVisible &&
-      newState.tungstenPanelVisible !== undefined &&
-      getGlobalConfig().tungstenPanelVisible !== newState.tungstenPanelVisible
-    ) {
-      const tungstenPanelVisible = newState.tungstenPanelVisible
-      saveGlobalConfig(current => ({ ...current, tungstenPanelVisible }))
-    }
-  }
-
   // settings: clear auth-related caches when settings change
   // This ensures apiKeyHelper and AWS/GCP credential changes take effect immediately
   if (newState.settings !== oldState.settings) {

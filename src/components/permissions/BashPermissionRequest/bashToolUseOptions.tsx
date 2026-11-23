@@ -1,11 +1,10 @@
 import { BASH_TOOL_NAME } from '../../../tools/BashTool/toolName.js';
 import { extractOutputRedirections } from '../../../utils/bash/commands.js';
-import type { PermissionDecisionReason } from '../../../utils/permissions/PermissionResult.js';
 import type { PermissionUpdate } from '../../../utils/permissions/PermissionUpdateSchema.js';
 import { shouldShowAlwaysAllowOptions } from '../../../utils/permissions/permissionsLoader.js';
 import type { OptionWithDescription } from '../../CustomSelect/select.js';
 import { generateShellSuggestionsLabel } from '../shellPermissionHelpers.js';
-export type BashToolUseOption = 'yes' | 'yes-apply-suggestions' | 'yes-prefix-edited' | 'yes-classifier-reviewed' | 'no';
+export type BashToolUseOption = 'yes' | 'yes-apply-suggestions' | 'yes-prefix-edited' | 'no';
 
 /**
  * Strip output redirections so filenames don't show as commands in the label.
@@ -20,27 +19,16 @@ function stripBashRedirections(command: string): string {
 }
 export function bashToolUseOptions({
   suggestions = [],
-  decisionReason,
   onRejectFeedbackChange,
   onAcceptFeedbackChange,
-  onClassifierDescriptionChange,
-  classifierDescription,
-  initialClassifierDescriptionEmpty = false,
-  existingAllowDescriptions = [],
   yesInputMode = false,
   noInputMode = false,
   editablePrefix,
   onEditablePrefixChange
 }: {
   suggestions?: PermissionUpdate[];
-  decisionReason?: PermissionDecisionReason;
   onRejectFeedbackChange: (value: string) => void;
   onAcceptFeedbackChange: (value: string) => void;
-  onClassifierDescriptionChange?: (value: string) => void;
-  classifierDescription?: string;
-  /** Whether the initial classifier description was empty. When true, hides the option. */
-  initialClassifierDescriptionEmpty?: boolean;
-  existingAllowDescriptions?: string[];
   yesInputMode?: boolean;
   noInputMode?: boolean;
   /** Editable prefix rule content (e.g., "npm run:*"). When set, replaces Haiku-based suggestions. */

@@ -1,7 +1,6 @@
 // @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import useStdin from '../../ink/hooks/use-stdin.js';
+import React, { createContext, useContext, useMemo, useState } from 'react';
 import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js';
 import { getSystemThemeName, type SystemTheme } from '../../utils/systemTheme.js';
 import type { ThemeName, ThemeSetting } from '../../utils/theme.js';
@@ -49,20 +48,11 @@ export function ThemeProvider({
   const [previewTheme, setPreviewTheme] = useState<ThemeSetting | null>(null);
 
   // Track terminal theme for 'auto' resolution. Seeds from $COLORFGBG (or
-  // 'dark' if unset); the OSC 11 watcher corrects it on first poll.
+  // 'dark' if unset).
   const [systemTheme, setSystemTheme] = useState<SystemTheme>(() => (initialState ?? themeSetting) === 'auto' ? getSystemThemeName() : 'dark');
 
   // The setting currently in effect (preview wins while picker is open)
   const activeSetting = previewTheme ?? themeSetting;
-  const {
-    internal_querier
-  } = useStdin();
-
-  // Watch for live terminal theme changes while 'auto' is active.
-  // Positive feature() pattern so the watcher import is dead-code-eliminated
-  // in external builds.
-  useEffect(() => {
-  }, [activeSetting, internal_querier]);
   const currentTheme: ThemeName = activeSetting === 'auto' ? systemTheme : activeSetting;
   const value = useMemo<ThemeContextValue>(() => ({
     themeSetting,

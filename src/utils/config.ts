@@ -518,9 +518,6 @@ export type GlobalConfig = {
   // PR status footer configuration (feature-flagged via GrowthBook)
   prStatusFooterEnabled?: boolean // Show PR review status in footer (default: true)
 
-  // Tmux live panel visibility (ant-only, toggled via Enter on tmux pill)
-  tungstenPanelVisible?: boolean
-
   // Cached org-level fast mode status from the API.
   // Used to detect cross-session changes and notify users.
   penguinModeOrgEnabled?: boolean

@@ -2922,7 +2922,6 @@ export function handleMessageFromStream(
   onStreamingThinking?: (
     f: (current: StreamingThinking | null) => StreamingThinking | null,
   ) => void,
-  onApiMetrics?: (metrics: { ttftMs: number }) => void,
   onStreamingText?: (f: (current: string | null) => string | null) => void,
 ): void {
   if (
@@ -2962,12 +2961,6 @@ export function handleMessageFromStream(
   if (message.type === 'stream_request_start') {
     onSetStreamMode('requesting')
     return
-  }
-
-  if (message.event.type === 'message_start') {
-    if (message.ttftMs != null) {
-      onApiMetrics?.({ ttftMs: message.ttftMs })
-    }
   }
 
   if (message.event.type === 'message_stop') {

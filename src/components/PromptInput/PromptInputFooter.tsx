@@ -16,7 +16,6 @@ import type { Message } from '../../types/message.js';
 import type { PromptInputMode, VimMode } from '../../types/textInputTypes.js';
 import type { AutoUpdaterResult } from '../../utils/autoUpdater.js';
 import { isFullscreenEnvEnabled } from '../../utils/fullscreen.js';
-import { useCoordinatorTaskCount } from '../CoordinatorAgentStatus.js';
 import { getLastAssistantMessageId, StatusLine, statusLineShouldDisplay } from '../StatusLine.js';
 import { Notifications } from './Notifications.js';
 import { PromptInputFooterLeftSide } from './PromptInputFooterLeftSide.js';
@@ -46,7 +45,6 @@ type Props = {
   tasksSelected: boolean;
   teamsSelected: boolean;
   bridgeSelected: boolean;
-  tmuxSelected: boolean;
   teammateFooterIndex?: number;
   ideSelection: IDESelection | undefined;
   mcpClients?: MCPServerConnection[];
@@ -80,7 +78,6 @@ function PromptInputFooter({
   tasksSelected,
   teamsSelected,
   bridgeSelected,
-  tmuxSelected,
   teammateFooterIndex,
   ideSelection,
   mcpClients,
@@ -108,15 +105,6 @@ function PromptInputFooter({
   const isFullscreen = isFullscreenEnvEnabled();
   const isShort = isFullscreen && rows < 24;
 
-  // Pill highlights when tasks is the active footer item AND no specific
-  // agent row is selected. When coordinatorTaskIndex >= 0 the pointer has
-  // moved into CoordinatorTaskPanel, so the pill should un-highlight.
-  // coordinatorTaskCount === 0 covers the bash-only case (no agent rows
-  // exist, pill is the only selectable item).
-  const coordinatorTaskCount = useCoordinatorTaskCount();
-  const coordinatorTaskIndex = useAppState(s => s.coordinatorTaskIndex);
-  const pillSelected = tasksSelected && (coordinatorTaskCount === 0 || coordinatorTaskIndex < 0);
-
   // Hide `? for shortcuts` if the user has a custom status line, or during ctrl-r
   const suppressHint = suppressHintFromProps || statusLineShouldDisplay(settings) || isSearching;
   // Fullscreen: portal data to FullscreenLayout — see promptOverlayContext.tsx
@@ -138,7 +126,7 @@ function PromptInputFooter({
       <Box flexDirection={isNarrow ? 'column' : 'row'} justifyContent={isNarrow ? 'flex-start' : 'space-between'} paddingX={2} gap={isNarrow ? 0 : 1}>
         <Box flexDirection="column" flexShrink={isNarrow ? 0 : 1}>
           {mode === 'prompt' && !isShort && !exitMessage.show && !isPasting && statusLineShouldDisplay(settings) && <StatusLine messagesRef={messagesRef} lastAssistantMessageId={lastAssistantMessageId} vimMode={vimMode} />}
-          <PromptInputFooterLeftSide exitMessage={exitMessage} vimMode={vimMode} mode={mode} toolPermissionContext={toolPermissionContext} suppressHint={suppressHint} isLoading={isLoading} tasksSelected={pillSelected} teamsSelected={teamsSelected} teammateFooterIndex={teammateFooterIndex} tmuxSelected={tmuxSelected} isPasting={isPasting} isSearching={isSearching} historyQuery={historyQuery} setHistoryQuery={setHistoryQuery} historyFailedMatch={historyFailedMatch} onOpenTasksDialog={onOpenTasksDialog} />
+          <PromptInputFooterLeftSide exitMessage={exitMessage} vimMode={vimMode} mode={mode} toolPermissionContext={toolPermissionContext} suppressHint={suppressHint} isLoading={isLoading} tasksSelected={tasksSelected} teamsSelected={teamsSelected} teammateFooterIndex={teammateFooterIndex} isPasting={isPasting} isSearching={isSearching} historyQuery={historyQuery} setHistoryQuery={setHistoryQuery} historyFailedMatch={historyFailedMatch} onOpenTasksDialog={onOpenTasksDialog} />
         </Box>
         <Box flexShrink={1} gap={1}>
           {isFullscreen ? null : <Notifications apiKeyStatus={apiKeyStatus} autoUpdaterResult={autoUpdaterResult} debug={debug} isAutoUpdating={isAutoUpdating} verbose={verbose} messages={messages} onAutoUpdaterResult={onAutoUpdaterResult} onChangeIsUpdating={onChangeIsUpdating} ideSelection={ideSelection} mcpClients={mcpClients} isInputWrapped={isInputWrapped} isNarrow={isNarrow} />}

@@ -778,17 +778,6 @@ export async function* runAgent({
       maxTurns: maxTurns ?? agentDefinition.maxTurns,
     })) {
       onQueryProgress?.()
-      // Forward subagent API request starts to parent's metrics display
-      // so TTFT/OTPS update during subagent execution.
-      if (
-        message.type === 'stream_event' &&
-        message.event.type === 'message_start' &&
-        message.ttftMs != null
-      ) {
-        toolUseContext.pushApiMetricsEntry?.(message.ttftMs)
-        continue
-      }
-
       // Yield attachment messages (e.g., structured_output) without recording them
       if (message.type === 'attachment') {
         // Handle max turns reached signal from query.ts

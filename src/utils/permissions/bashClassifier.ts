@@ -52,10 +52,3 @@ export async function classifyBashCommand(
   }
 }
 
-export async function generateGenericDescription(
-  _command: string,
-  specificDescription: string | undefined,
-  _signal: AbortSignal,
-): Promise<string | null> {
-  return specificDescription || null
-}
