@@ -4,10 +4,8 @@ import { chmod, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
 import type { McpServerConfig } from '../../services/mcp/types.js'
 import { logForDebugging } from '../debug.js'
-import {
-  type McpbManifest,
-  parseAndValidateManifestFromBytes,
-} from '../dxt/helpers.js'
+import type { McpbManifestAny } from '@anthropic-ai/mcpb'
+import { parseAndValidateManifestFromBytes } from '../dxt/helpers.js'
 import { parseZipModes, unzipFile } from '../dxt/zip.js'
 import { errorMessage, getErrnoCode, isENOENT, toError } from '../errors.js'
 import { getFsImplementation } from '../fsOperations.js'
@@ -29,7 +27,7 @@ export type UserConfigValues = Record<
 >
 
 type McpbUserConfigurationOption = NonNullable<
-  McpbManifest['user_config']
+  McpbManifestAny['user_config']
 >[string]
 
 /**
@@ -41,7 +39,7 @@ export type UserConfigSchema = Record<string, McpbUserConfigurationOption>
  * Result of loading an MCPB file (success case)
  */
 export type McpbLoadResult = {
-  manifest: McpbManifest
+  manifest: McpbManifestAny
   mcpConfig: McpServerConfig
   extractedPath: string
   contentHash: string
@@ -52,7 +50,7 @@ export type McpbLoadResult = {
  */
 export type McpbNeedsConfigResult = {
   status: 'needs-config'
-  manifest: McpbManifest
+  manifest: McpbManifestAny
   extractedPath: string
   contentHash: string
   configSchema: UserConfigSchema
@@ -414,7 +412,7 @@ export function validateUserConfig(
  * Generate MCP server configuration from DXT manifest
  */
 async function generateMcpConfig(
-  manifest: McpbManifest,
+  manifest: McpbManifestAny,
   extractedPath: string,
   userConfig: UserConfigValues = {},
 ): Promise<McpServerConfig> {

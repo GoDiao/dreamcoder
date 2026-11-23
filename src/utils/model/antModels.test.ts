@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { getContextWindowForModel } from '../context.js'
+import { getModelOptions } from './modelOptions.js'
 import { modelSupportsThinking } from '../thinking.js'
 
 describe('model helpers with USER_TYPE=ant', () => {
@@ -21,5 +22,9 @@ describe('model helpers with USER_TYPE=ant', () => {
   test('resolve a model that has no internal override', () => {
     expect(getContextWindowForModel('some-custom-model')).toBe(200_000)
     expect(() => modelSupportsThinking('some-custom-model')).not.toThrow()
+  })
+
+  test('list the model options', () => {
+    expect(() => getModelOptions()).not.toThrow()
   })
 })

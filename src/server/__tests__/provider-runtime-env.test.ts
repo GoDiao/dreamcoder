@@ -154,6 +154,6 @@ describe('providerRuntimeEnv', () => {
       models: [{ id: 'model-main' }],
     })
 
-    expect(Object.hasOwn(env, 'DREAMCODER_PROVIDER_PROXIED') ? env.DREAMCODER_PROVIDER_PROXIED : undefined).toBe(expected)
+    expect<string | undefined>(env.DREAMCODER_PROVIDER_PROXIED).toBe(expected)
   })
 })

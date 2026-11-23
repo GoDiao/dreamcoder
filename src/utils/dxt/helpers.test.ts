@@ -24,7 +24,7 @@ describe('validateManifest', () => {
   test('reports the invalid fields of a bundle manifest', async () => {
     const { name: _name, ...withoutName } = manifest
     await expect(validateManifest(withoutName)).rejects.toThrow(
-      /^Invalid manifest: /,
+      /^Invalid manifest: .*name: Required/,
     )
   })
 })

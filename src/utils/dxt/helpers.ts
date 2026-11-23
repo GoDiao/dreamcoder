@@ -2,8 +2,6 @@ import type { McpbManifestAny } from '@anthropic-ai/mcpb'
 import { errorMessage } from '../errors.js'
 import { jsonParse } from '../slowOperations.js'
 
-export type McpbManifest = McpbManifestAny
-
 /**
  * Parses and validates a DXT manifest from a JSON object.
  *
@@ -14,9 +12,14 @@ export type McpbManifest = McpbManifestAny
  */
 export async function validateManifest(
   manifestJson: unknown,
-): Promise<McpbManifest> {
-  const { vAny } = await import('@anthropic-ai/mcpb')
-  const parseResult = vAny.McpbManifestSchema.safeParse(manifestJson)
+): Promise<McpbManifestAny> {
+  const { MANIFEST_SCHEMAS, vAny } = await import('@anthropic-ai/mcpb')
+  const versionedSchemas = Object.entries(MANIFEST_SCHEMAS)
+  const schema =
+    readDeclaredVersions(manifestJson)
+      .map(version => versionedSchemas.find(([key]) => key === version)?.[1])
+      .find(candidate => candidate !== undefined) ?? vAny.McpbManifestSchema
+  const parseResult = schema.safeParse(manifestJson)
 
   if (!parseResult.success) {
     const errors = parseResult.error.flatten()
@@ -35,12 +38,24 @@ export async function validateManifest(
   return parseResult.data
 }
 
+function readDeclaredVersions(manifestJson: unknown): unknown[] {
+  if (typeof manifestJson !== 'object' || manifestJson === null) {
+    return []
+  }
+  return [
+    'manifest_version' in manifestJson
+      ? manifestJson.manifest_version
+      : undefined,
+    'dxt_version' in manifestJson ? manifestJson.dxt_version : undefined,
+  ]
+}
+
 /**
  * Parses and validates a DXT manifest from raw text data.
  */
 export async function parseAndValidateManifestFromText(
   manifestText: string,
-): Promise<McpbManifest> {
+): Promise<McpbManifestAny> {
   let manifestJson: unknown
 
   try {
@@ -57,7 +72,7 @@ export async function parseAndValidateManifestFromText(
  */
 export async function parseAndValidateManifestFromBytes(
   manifestData: Uint8Array,
-): Promise<McpbManifest> {
+): Promise<McpbManifestAny> {
   const manifestText = new TextDecoder().decode(manifestData)
   return parseAndValidateManifestFromText(manifestText)
 }
@@ -67,7 +82,7 @@ export async function parseAndValidateManifestFromBytes(
  * Uses the same algorithm as the directory backend for consistency.
  */
 export function generateExtensionId(
-  manifest: McpbManifest,
+  manifest: McpbManifestAny,
   prefix?: 'local.unpacked' | 'local.dxt',
 ): string {
   const sanitize = (str: string) =>
