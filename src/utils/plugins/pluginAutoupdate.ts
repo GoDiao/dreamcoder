@@ -81,19 +81,22 @@ export function getAutoUpdatedPluginNames(): string[] {
  * Get the set of marketplaces that have autoUpdate enabled.
  * Returns the marketplace names that should be auto-updated.
  */
+export function resolveMarketplaceAutoUpdate(
+  name: string,
+  entry: { autoUpdate?: boolean },
+): boolean {
+  return (
+    getDeclaredMarketplaces()[name]?.autoUpdate ??
+    isMarketplaceAutoUpdate(name, entry)
+  )
+}
+
 async function getAutoUpdateEnabledMarketplaces(): Promise<Set<string>> {
   const config = await loadKnownMarketplacesConfig()
-  const declared = getDeclaredMarketplaces()
   const enabled = new Set<string>()
 
   for (const [name, entry] of Object.entries(config)) {
-    // Settings-declared autoUpdate takes precedence over JSON state
-    const declaredAutoUpdate = declared[name]?.autoUpdate
-    const autoUpdate =
-      declaredAutoUpdate !== undefined
-        ? declaredAutoUpdate
-        : isMarketplaceAutoUpdate(name, entry)
-    if (autoUpdate) {
+    if (resolveMarketplaceAutoUpdate(name, entry)) {
       enabled.add(name.toLowerCase())
     }
   }

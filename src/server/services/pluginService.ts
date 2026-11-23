@@ -24,6 +24,7 @@ import {
 } from '../../utils/plugins/marketplaceManager.js'
 import { loadPluginLspServers } from '../../utils/plugins/lspPluginIntegration.js'
 import { loadPluginMcpServers } from '../../utils/plugins/mcpPluginIntegration.js'
+import { resolveMarketplaceAutoUpdate } from '../../utils/plugins/pluginAutoupdate.js'
 import { parsePluginIdentifier } from '../../utils/plugins/pluginIdentifier.js'
 import { loadAllPlugins } from '../../utils/plugins/pluginLoader.js'
 import { loadPluginHooks } from '../../utils/plugins/loadPluginHooks.js'
@@ -336,7 +337,7 @@ export class PluginService {
         name,
         source: getMarketplaceSourceDisplay(entry.source),
         lastUpdated: entry.lastUpdated,
-        autoUpdate: entry.autoUpdate !== false,
+        autoUpdate: resolveMarketplaceAutoUpdate(name, entry),
         installedCount: plugins.filter((plugin) => plugin.marketplace === name).length,
       }))
       .sort((a, b) => a.name.localeCompare(b.name))

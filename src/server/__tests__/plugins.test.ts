@@ -163,13 +163,13 @@ describe('Plugins API', () => {
     expect(body.summary.enabled).toBe(1)
   })
 
-  it('GET /api/plugins lists the known marketplaces', async () => {
+  async function listMarketplaces(name: string) {
     const marketplaceRoot = path.join(tmpDir, 'marketplace-root')
     await fs.mkdir(path.join(tmpDir, 'plugins'), { recursive: true })
     await fs.writeFile(
       path.join(tmpDir, 'plugins', 'known_marketplaces.json'),
       JSON.stringify({
-        'test-market': {
+        [name]: {
           source: { source: 'directory', path: marketplaceRoot },
           installLocation: marketplaceRoot,
           lastUpdated: new Date(0).toISOString(),
@@ -181,16 +181,27 @@ describe('Plugins API', () => {
     const { req, url, segments } = makeRequest('GET', '/api/plugins')
     const res = await handlePluginsApi(req, url, segments)
     const body = await res.json() as { marketplaces: unknown[] }
+    return { marketplaceRoot, marketplaces: body.marketplaces }
+  }
 
-    expect(body.marketplaces).toEqual([
+  it('GET /api/plugins lists the known marketplaces', async () => {
+    const { marketplaceRoot, marketplaces } = await listMarketplaces('test-market')
+
+    expect(marketplaces).toEqual([
       {
         name: 'test-market',
         source: marketplaceRoot,
         lastUpdated: new Date(0).toISOString(),
-        autoUpdate: true,
+        autoUpdate: false,
         installedCount: 0,
       },
     ])
+  })
+
+  it('GET /api/plugins marks an official marketplace as auto-updating', async () => {
+    const { marketplaces } = await listMarketplaces('claude-plugins-official')
+
+    expect(marketplaces).toMatchObject([{ name: 'claude-plugins-official', autoUpdate: true }])
   })
 
   it('POST /api/plugins/enable rejects the managed scope as a bad request', async () => {
