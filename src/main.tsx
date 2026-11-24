@@ -3187,11 +3187,9 @@ async function run(): Promise<CommanderCommand> {
   // default action. The subcommand registration path was measured at ~65ms
   // on baseline — mostly the isBridgeEnabled() call (25ms settings Zod parse
   // + 40ms sync keychain subprocess), both hidden by the try/catch that
-  // always returns false before enableConfigs(). cc:// URLs are rewritten to
-  // `open` at main() line ~851 BEFORE this runs, so argv check is safe here.
+  // always returns false before enableConfigs().
   const isPrintMode = process.argv.includes('-p') || process.argv.includes('--print');
-  const isCcUrl = process.argv.some(a => a.startsWith('cc://') || a.startsWith('cc+unix://'));
-  if (isPrintMode && !isCcUrl) {
+  if (isPrintMode) {
     profileCheckpoint('run_before_parse');
     await program.parseAsync(process.argv);
     profileCheckpoint('run_after_parse');

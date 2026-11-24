@@ -244,9 +244,6 @@ function MessageImpl(t0) {
           }
           return t2;
         }
-        if (message.subtype === "microcompact_boundary") {
-          return null;
-        }
         if (message.subtype === "local_command") {
           let t2;
           if ($[68] !== message.content) {

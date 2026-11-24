@@ -237,20 +237,6 @@ export type SystemCompactBoundaryMessage = SystemMessageBase & {
   compactMetadata: CompactMetadata
 }
 
-type SystemMicrocompactBoundaryMessage = SystemMessageBase & {
-  subtype: 'microcompact_boundary'
-  content: string
-  isMeta?: boolean
-  level: SystemMessageLevel
-  microcompactMetadata: {
-    trigger: 'auto'
-    preTokens: number
-    tokensSaved: number
-    compactedToolIds: string[]
-    clearedAttachmentUUIDs: string[]
-  }
-}
-
 export type SystemAPIErrorMessage = SystemMessageBase & {
   subtype: 'api_error'
   level: SystemMessageLevel
@@ -292,7 +278,6 @@ export type SystemMessage =
   | SystemApiMetricsMessage
   | SystemLocalCommandMessage
   | SystemCompactBoundaryMessage
-  | SystemMicrocompactBoundaryMessage
   | SystemAPIErrorMessage
   | SystemFileSnapshotMessage
   | SystemThinkingMessage
