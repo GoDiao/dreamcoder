@@ -3,7 +3,7 @@ import { getGlobalConfig, saveGlobalConfig } from '../config.js'
 const SKILL_USAGE_DEBOUNCE_MS = 60_000
 
 // Process-lifetime debounce cache — avoids lock + read + parse on debounced
-// calls. Same pattern as lastConfigStatTime / globalConfigWriteCount in config.ts.
+// calls.
 const lastWriteBySkill = new Map<string, number>()
 
 /**

@@ -221,8 +221,6 @@ export type GlobalConfig = {
   }
   primaryApiKey?: string // Primary API key for the user when no environment variable is set, set via oauth (TODO: rename)
   hasAcknowledgedCostThreshold?: boolean
-  hasSeenUndercoverAutoNotice?: boolean // ant-only: whether the one-time auto-undercover explainer has been shown
-  hasSeenUltraplanTerms?: boolean // ant-only: whether the one-time CCR terms notice has been shown in the ultraplan launch dialog
   hasResetAutoModeOptInForDefaultOffer?: boolean // ant-only: one-shot migration guard, re-prompts churned auto-mode users
   oauthAccount?: AccountInfo
   iterm2KeyBindingInstalled?: boolean // Legacy - keeping for backward compatibility
@@ -517,9 +515,6 @@ export type GlobalConfig = {
 
   // PR status footer configuration (feature-flagged via GrowthBook)
   prStatusFooterEnabled?: boolean // Show PR review status in footer (default: true)
-
-  // Tmux live panel visibility (ant-only, toggled via Enter on tmux pill)
-  tungstenPanelVisible?: boolean
 
   // Cached org-level fast mode status from the API.
   // Used to detect cross-session changes and notify users.
@@ -860,17 +855,6 @@ let globalConfigCache: { config: GlobalConfig | null; mtime: number } = {
 let lastReadFileStats: { mtime: number; size: number } | null = null
 let configCacheHits = 0
 let configCacheMisses = 0
-// Session-total count of actual disk writes to the global config file.
-// Exposed for ant-only dev diagnostics (see inc-4552) so anomalous write
-// rates surface in the UI before they corrupt ~/.claude.json.
-let globalConfigWriteCount = 0
-
-export function getGlobalConfigWriteCount(): number {
-  return globalConfigWriteCount
-}
-
-export const CONFIG_WRITE_DISPLAY_THRESHOLD = 20
-
 function reportConfigCacheStats(): void {
   const total = configCacheHits + configCacheMisses
   if (total > 0) {
@@ -1124,9 +1108,6 @@ function saveConfig<A extends object>(
       mode: 0o600,
     },
   )
-  if (file === getGlobalClaudeFile()) {
-    globalConfigWriteCount++
-  }
 }
 
 /**
@@ -1302,9 +1283,6 @@ function saveConfigWithLock<A extends object>(
         mode: 0o600,
       },
     )
-    if (file === getGlobalClaudeFile()) {
-      globalConfigWriteCount++
-    }
     return true
   } finally {
     if (release) {

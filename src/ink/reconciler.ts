@@ -27,34 +27,6 @@ import { getFocusManager, getRootNode } from './focus.js'
 import { LayoutDisplay } from './layout/node.js'
 import applyStyles, { type Styles, type TextStyles } from './styles.js'
 
-// We need to conditionally perform devtools connection to avoid
-// accidentally breaking other third-party code.
-// See https://github.com/vadimdemedes/ink/issues/384
-if (process.env.NODE_ENV === 'development') {
-  try {
-    // eslint-disable-next-line custom-rules/no-top-level-dynamic-import -- dev-only; NODE_ENV check is DCE'd in production
-    void import('./devtools.js')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (error: any) {
-    if (error.code === 'ERR_MODULE_NOT_FOUND') {
-      // biome-ignore lint/suspicious/noConsole: intentional warning
-      console.warn(
-        `
-The environment variable DEV is set to true, so Ink tried to import \`react-devtools-core\`,
-but this failed as it was not installed. Debugging with React Devtools requires it.
-
-To install use this command:
-
-$ npm install --save-dev react-devtools-core
-				`.trim() + '\n',
-      )
-    } else {
-      // eslint-disable-next-line @typescript-eslint/only-throw-error
-      throw error
-    }
-  }
-}
-
 // --
 
 type AnyObject = Record<string, unknown>
@@ -227,6 +199,7 @@ const reconciler = createReconciler<
   DOMElement,
   DOMElement,
   TextNode,
+  unknown,
   DOMElement,
   unknown,
   unknown,
@@ -235,7 +208,12 @@ const reconciler = createReconciler<
   null, // UpdatePayload - not used in React 19
   NodeJS.Timeout,
   -1,
-  null
+  null,
+  unknown,
+  unknown,
+  unknown,
+  unknown,
+  unknown
 >({
   getRootHostContext: () => ({ isInsideText: false }),
   prepareForCommit: () => {
@@ -479,6 +457,25 @@ const reconciler = createReconciler<
   suspendInstance(): void {},
   waitForCommitToBeReady(): null {
     return null
+  },
+  maySuspendCommitOnUpdate(): boolean {
+    return false
+  },
+  maySuspendCommitInSyncRender(): boolean {
+    return false
+  },
+  suspendOnActiveViewTransition(): void {},
+  getSuspendedCommitReason(): null {
+    return null
+  },
+  rendererVersion: MACRO.VERSION,
+  rendererPackageName: 'ink',
+  extraDevToolsConfig: null,
+  bindToConsole(methodName: string, args: unknown[]) {
+    return () => {
+      const method: unknown = Reflect.get(console, methodName)
+      if (typeof method === 'function') Reflect.apply(method, console, args)
+    }
   },
   NotPendingTransition: null,
   HostTransitionContext: {

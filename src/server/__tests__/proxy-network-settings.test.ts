@@ -55,7 +55,7 @@ describe('proxy network settings', () => {
     const originalFetch = globalThis.fetch
     const originalTimeout = AbortSignal.timeout
     const timeoutCalls: number[] = []
-    globalThis.fetch = mock(async (_url: string | URL | Request, _init?: RequestInit) => {
+    globalThis.fetch = Object.assign(mock(async (_url: string | URL | Request, _init?: RequestInit) => {
       return new Response(JSON.stringify({
         id: 'chatcmpl-network-timeout',
         object: 'chat.completion',
@@ -71,7 +71,7 @@ describe('proxy network settings', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
-    }) as typeof fetch
+    }), { preconnect: originalFetch.preconnect })
     AbortSignal.timeout = ((ms: number) => {
       timeoutCalls.push(ms)
       return originalTimeout(ms)
@@ -126,7 +126,7 @@ describe('proxy network settings', () => {
     const originalFetch = globalThis.fetch
     const originalTimeout = AbortSignal.timeout
     const timeoutCalls: number[] = []
-    globalThis.fetch = mock(async (_url: string | URL | Request, _init?: RequestInit) => {
+    globalThis.fetch = Object.assign(mock(async (_url: string | URL | Request, _init?: RequestInit) => {
       return new Response(JSON.stringify({
         id: 'resp-network-timeout',
         status: 'completed',
@@ -140,7 +140,7 @@ describe('proxy network settings', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
-    }) as typeof fetch
+    }), { preconnect: originalFetch.preconnect })
     AbortSignal.timeout = ((ms: number) => {
       timeoutCalls.push(ms)
       return originalTimeout(ms)
@@ -198,7 +198,7 @@ describe('proxy network settings', () => {
     const originalClearTimeout = globalThis.clearTimeout
     const timeoutCalls: number[] = []
     const timers: Array<{ ms: number | undefined; cleared: boolean }> = []
-    globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
+    globalThis.fetch = Object.assign(mock(async (_url: string | URL | Request, init?: RequestInit) => {
       expect(init?.signal).toBeInstanceOf(AbortSignal)
       return new Response(
         new ReadableStream({
@@ -212,18 +212,18 @@ describe('proxy network settings', () => {
           headers: { 'Content-Type': 'text/event-stream' },
         },
       )
-    }) as typeof fetch
+    }), { preconnect: originalFetch.preconnect })
     AbortSignal.timeout = ((ms: number) => {
       timeoutCalls.push(ms)
       return originalTimeout(ms)
     }) as typeof AbortSignal.timeout
-    globalThis.setTimeout = ((handler: TimerHandler, ms?: number, ...args: unknown[]) => {
+    globalThis.setTimeout = ((_handler: TimerHandler, ms?: number) => {
       const timer = { ms, cleared: false }
       timers.push(timer)
-      return timer as unknown as ReturnType<typeof setTimeout>
-    }) as typeof setTimeout
+      return timer
+    }) as unknown as typeof setTimeout
     globalThis.clearTimeout = ((timer?: ReturnType<typeof setTimeout>) => {
-      const found = timers.find((entry) => entry === timer)
+      const found = timers.find((entry) => Object.is(entry, timer))
       if (found) found.cleared = true
     }) as typeof clearTimeout
 

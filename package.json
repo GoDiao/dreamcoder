@@ -15,6 +15,7 @@
     "build:desktop": "cd desktop && bun run build",
     "build:sidecar": "cd desktop && bun run build:sidecars",
     "test": "bun test",
+    "typecheck": "tsc --noEmit",
     "test:desktop": "cd desktop && bun run test",
     "lint:desktop": "cd desktop && bun run lint"
   },
@@ -106,11 +107,24 @@
     "zod": "^4.4.3"
   },
   "overrides": {
-    "follow-redirects": "^1.16.0"
+    "follow-redirects": "^1.16.0",
+    "vscode-jsonrpc": "8.2.1"
   },
   "devDependencies": {
+    "@types/asciichart": "^1.5.8",
     "@types/bun": "^1.3.14",
     "@types/lodash-es": "^4.17.12",
-    "typescript": "^6.0.3"
+    "@types/picomatch": "^4.0.3",
+    "@types/proper-lockfile": "^4.1.4",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "19.2.18",
+    "@types/react-reconciler": "^0.33.1",
+    "@types/semver": "^7.8.0",
+    "@types/shell-quote": "^1.7.5",
+    "@types/stack-utils": "^2.0.3",
+    "@types/turndown": "^5.0.6",
+    "@types/ws": "^8.18.2",
+    "typescript": "^6.0.3",
+    "vscode-languageserver-protocol": "^3.17.5"
   }
 }

@@ -5,17 +5,9 @@
 import figures from 'figures';
 import type { TaskStatus } from 'src/Task.js';
 import type { InProcessTeammateTaskState } from 'src/tasks/InProcessTeammateTask/types.js';
-import { isPanelAgentTask } from 'src/tasks/LocalAgentTask/LocalAgentTask.js';
 import { isBackgroundTask, type TaskState } from 'src/tasks/types.js';
 import type { DeepImmutable } from 'src/types/utils.js';
 import { summarizeRecentActivities } from 'src/utils/collapseReadSearch.js';
-
-/**
- * Returns true if the given task status represents a terminal (finished) state.
- */
-export function isTerminalStatus(status: TaskStatus): boolean {
-  return status === 'completed' || status === 'failed' || status === 'killed';
-}
 
 /**
  * Returns the appropriate icon for a task based on status and state flags.
@@ -86,9 +78,7 @@ export function describeTeammateActivity(t: DeepImmutable<InProcessTeammateTaskS
  * spinner tree is active and every visible background task is an in-process
  * teammate (teammates are shown in the spinner tree instead).
  *
- * Uses the same task filtering as BackgroundTaskStatus: `isBackgroundTask()`
- * plus exclusion of panel-managed agent tasks for ants (those are shown
- * by CoordinatorTaskPanel).
+ * Uses the same task filtering as BackgroundTaskStatus: `isBackgroundTask()`.
  */
 export function shouldHideTasksFooter(tasks: {
   [taskId: string]: TaskState;
@@ -96,7 +86,7 @@ export function shouldHideTasksFooter(tasks: {
   if (!showSpinnerTree) return false;
   let hasVisibleTask = false;
   for (const t of Object.values(tasks) as TaskState[]) {
-    if (!isBackgroundTask(t) || "external" === 'ant' && isPanelAgentTask(t)) {
+    if (!isBackgroundTask(t)) {
       continue;
     }
     hasVisibleTask = true;

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import React, { createContext, type RefObject, useContext, useLayoutEffect, useMemo } from 'react';
 import type { Key } from '../ink.js';

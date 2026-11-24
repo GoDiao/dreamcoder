@@ -34,7 +34,7 @@ describe('text that arrives after a tool result', () => {
   test('stays a separate text block for other models', () => {
     const last = normalizeMessagesForAPI(toolTurnWithReminder(), [], { foldIntoToolResults: false }).at(-1)!
 
-    const content = last.message.content as Array<{ type: string; text?: string }>
+    const content = last.message.content as Array<{ type: string; tool_use_id?: string; content?: unknown; text?: string }>
     expect(content[0]).toEqual({ type: 'tool_result', tool_use_id: 'toolu_1', content: '12 pass' })
     expect(content.slice(1).map(block => block.type)).toEqual(['text'])
     expect(content[1]!.text).toContain(midTurnMessage)

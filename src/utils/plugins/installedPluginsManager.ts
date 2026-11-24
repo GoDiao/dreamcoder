@@ -313,6 +313,9 @@ function normalizePortableInstallPaths(
 
   for (const [pluginId, entries] of Object.entries(data.plugins)) {
     plugins[pluginId] = entries.map(entry => {
+      if (entry.version === undefined) {
+        return entry
+      }
       const expectedPath = getVersionedCachePath(pluginId, entry.version)
       if (resolve(entry.installPath) === resolve(expectedPath)) {
         return entry

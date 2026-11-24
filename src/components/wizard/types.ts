@@ -1,30 +1,29 @@
-// @generated stub from scan-missing-imports
-const __target = function noop() {}
-const __handler: ProxyHandler<any> = {
-  get(_t, prop) {
-    if (prop === '__esModule') return true
-    if (prop === 'default') return new Proxy(__target, __handler)
-    if (prop === Symbol.toPrimitive) return () => undefined
-    if (prop === Symbol.iterator) return function* () {}
-    if (prop === Symbol.asyncIterator) return async function* () {}
-    if (prop === 'then') return undefined
-    return new Proxy(__target, __handler)
-  },
-  apply() {
-    return new Proxy(__target, __handler)
-  },
-  construct() {
-    return new Proxy(__target, __handler)
-  },
+import type { Dispatch, ReactNode, SetStateAction } from 'react'
+
+export type WizardStepComponent<
+  _T extends Record<string, unknown> = Record<string, unknown>,
+> = () => ReactNode
+
+export type WizardContextValue<T extends Record<string, unknown>> = {
+  currentStepIndex: number
+  totalSteps: number
+  wizardData: T
+  setWizardData: Dispatch<SetStateAction<T>>
+  updateWizardData: (updates: Partial<T>) => void
+  goNext: () => void
+  goBack: () => void
+  goToStep: (index: number) => void
+  cancel: () => void
+  title: string | undefined
+  showStepCounter: boolean
 }
-const stub: any = new Proxy(__target, __handler)
-export default stub
-export const __stubMissing = true
-export const createCachedMCState = stub
-export const isCachedMicrocompactEnabled = stub
-export const isModelSupportedForCacheEditing = stub
-export const getCachedMCConfig = stub
-export const markToolsSentToAPI = stub
-export const resetCachedMCState = stub
-export const checkProtectedNamespace = stub
-export const getCoordinatorUserContext = stub
+
+export type WizardProviderProps<T extends Record<string, unknown>> = {
+  steps: WizardStepComponent<T>[]
+  initialData?: T
+  onComplete: (data: T) => void | Promise<void>
+  onCancel?: () => void
+  children?: ReactNode
+  title?: string
+  showStepCounter?: boolean
+}

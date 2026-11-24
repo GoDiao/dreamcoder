@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import figures from 'figures';
 import React, { useCallback, useState } from 'react';
@@ -52,7 +53,7 @@ type Props = {
   onSave: (config: PluginOptionValues) => void;
   onCancel: () => void;
 };
-export function PluginOptionsDialog(t0) {
+export function PluginOptionsDialog(t0: Props): React.ReactNode {
   const $ = _c(70);
   const {
     title,

@@ -190,7 +190,7 @@ function serializeActiveAgent(
     model: agent.model,
     modelDisplay: resolveAgentModelDisplay(agent),
     tools: agent.tools,
-    systemPrompt: agent.getSystemPrompt.length === 0 ? agent.getSystemPrompt() : undefined,
+    systemPrompt: agent.getSystemPrompt(),
     color: agent.color,
     source: agent.source,
     baseDir: agent.baseDir,

@@ -67,7 +67,6 @@ const autoModeStateModule = feature('TRANSCRIPT_CLASSIFIER')
   : null
 
 import {
-  addToTurnClassifierDuration,
   getTotalCacheCreationInputTokens,
   getTotalCacheReadInputTokens,
   getTotalInputTokens,
@@ -83,7 +82,6 @@ import {
   clearClassifierChecking,
   setClassifierChecking,
 } from '../classifierApprovals.js'
-import { isInProtectedNamespace } from '../envUtils.js'
 import { executePermissionRequestHooks } from '../hooks.js'
 import {
   AUTO_REJECT_MESSAGE,
@@ -630,7 +628,6 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
               decision:
                 'allowed' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
               toolName: sanitizeToolNameForAnalytics(tool.name),
-              inProtectedNamespace: isInProtectedNamespace(),
               // msg_id of the agent completion that produced this tool_use —
               // the action at the bottom of the classifier transcript. Joins
               // the decision back to the main agent's API response.
@@ -670,7 +667,6 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
           decision:
             'allowed' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           toolName: sanitizeToolNameForAnalytics(tool.name),
-          inProtectedNamespace: isInProtectedNamespace(),
           agentMsgId: assistantMessage.message
             .id as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           confidence:
@@ -737,7 +733,6 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
         decision:
           yoloDecision as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         toolName: sanitizeToolNameForAnalytics(tool.name),
-        inProtectedNamespace: isInProtectedNamespace(),
         // msg_id of the agent completion that produced this tool_use —
         // the action at the bottom of the classifier transcript.
         agentMsgId: assistantMessage.message
@@ -813,10 +808,6 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
               )
             : undefined,
       })
-
-      if (classifierResult.durationMs !== undefined) {
-        addToTurnClassifierDuration(classifierResult.durationMs)
-      }
 
       if (classifierResult.shouldBlock) {
         // Transcript exceeded the classifier's context window — deterministic

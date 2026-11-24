@@ -59,7 +59,6 @@ export type BackgroundAgentTask = {
   status: 'running' | 'completed' | 'failed' | 'stopped'
   description?: string
   taskType?: string
-  workflowName?: string
   prompt?: string
   summary?: string
   lastToolName?: string

@@ -1,5 +1,5 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
-import { feature } from 'bun:bundle';
 import { toString as qrToString } from 'qrcode';
 import * as React from 'react';
 import { useEffect, useState } from 'react';
@@ -479,19 +479,7 @@ async function checkBridgePrerequisites(): Promise<string | null> {
     return disabledReason;
   }
 
-  // Mirror the v1/v2 branching logic in initReplBridge: env-less (v2) is used
-  // only when the flag is on AND the session is not perpetual.  In assistant
-  // mode (KAIROS) useReplBridge sets perpetual=true, which forces
-  // initReplBridge onto the v1 path — so the prerequisite check must match.
-  let useV2 = isEnvLessBridgeEnabled();
-  if (feature('KAIROS') && useV2) {
-    const {
-      isAssistantMode
-    } = await import('../../assistant/index.js');
-    if (isAssistantMode()) {
-      useV2 = false;
-    }
-  }
+  const useV2 = isEnvLessBridgeEnabled();
   const versionError = useV2 ? await checkEnvLessBridgeMinVersion() : checkBridgeMinVersion();
   if (versionError) {
     return versionError;

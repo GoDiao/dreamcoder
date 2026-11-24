@@ -22,7 +22,6 @@
  */
 
 import { getRepoClassCached } from './commitAttribution.js'
-import { getGlobalConfig } from './config.js'
 import { isEnvTruthy } from './envUtils.js'
 
 export function isUndercover(): boolean {
@@ -69,21 +68,4 @@ BAD (never write these):
 `
   }
   return ''
-}
-
-/**
- * Check whether to show the one-time explainer dialog for auto-undercover.
- * True when: undercover is active via auto-detection (not forced via env),
- * and the user hasn't seen the notice before. Pure — the component marks the
- * flag on mount.
- */
-export function shouldShowUndercoverAutoNotice(): boolean {
-  if (process.env.USER_TYPE === 'ant') {
-    // If forced via env, user already knows; don't nag.
-    if (isEnvTruthy(process.env.CLAUDE_CODE_UNDERCOVER)) return false
-    if (!isUndercover()) return false
-    if (getGlobalConfig().hasSeenUndercoverAutoNotice) return false
-    return true
-  }
-  return false
 }

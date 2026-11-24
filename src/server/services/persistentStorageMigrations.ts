@@ -228,7 +228,7 @@ function migrateProvidersIndex(value: unknown): JsonObject {
   }
 
   const { activeProviderId: _legacyActiveProviderId, ...rest } = value
-  const providers = value.providers.filter(isSavedProvider).map(migrateModelContextWindows).map((provider) => {
+  const providers = value.providers.filter(isSavedProvider).map(migrateModelContextWindows).map((provider): JsonObject => {
     if (isProviderModels(provider.models)) {
       return {
         ...provider,

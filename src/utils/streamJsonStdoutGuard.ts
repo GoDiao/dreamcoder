@@ -33,8 +33,7 @@ function isJsonLine(line: string): boolean {
  * past review, a library banner — breaks the client's parser mid-stream with
  * no recovery path.
  *
- * This guard wraps process.stdout.write at the same layer the asciicast
- * recorder does (see asciicast.ts). Writes are buffered until a newline
+ * This guard wraps process.stdout.write. Writes are buffered until a newline
  * arrives, then each complete line is JSON-parsed. Lines that parse are
  * forwarded to the real stdout; lines that don't are diverted to stderr
  * tagged with STDOUT_GUARD_MARKER so they remain visible without corrupting

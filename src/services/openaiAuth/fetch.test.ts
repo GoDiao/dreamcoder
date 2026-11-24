@@ -1,3 +1,4 @@
+import type { ClientOptions } from '@anthropic-ai/sdk'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import * as fs from 'fs/promises'
 import * as os from 'os'
@@ -44,7 +45,7 @@ describe('buildOpenAICodexFetch', () => {
       headers: Record<string, string>
       body: Record<string, unknown>
     }> = []
-    const fetchOverride: typeof fetch = async (input, init) => {
+    const fetchOverride: NonNullable<ClientOptions['fetch']> = async (input, init) => {
       const headers = new Headers(init?.headers)
       upstreamCalls.push({
         url: String(input),
@@ -91,7 +92,7 @@ describe('buildOpenAICodexFetch', () => {
 
   test('writes the requested reasoning level with the built-in rules for the Codex model', async () => {
     const bodies: Array<Record<string, unknown>> = []
-    const fetchOverride: typeof fetch = async (_input, init) => {
+    const fetchOverride: NonNullable<ClientOptions['fetch']> = async (_input, init) => {
       bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>)
       return Response.json({
         id: 'resp_effort',
@@ -125,7 +126,7 @@ describe('buildOpenAICodexFetch', () => {
       url: string
       body: Record<string, unknown>
     }> = []
-    const fetchOverride: typeof fetch = async (input, init) => {
+    const fetchOverride: NonNullable<ClientOptions['fetch']> = async (input, init) => {
       const body = JSON.parse(String(init?.body)) as Record<string, unknown>
       upstreamCalls.push({
         url: String(input),
@@ -163,7 +164,7 @@ describe('buildOpenAICodexFetch', () => {
   })
 
   test('returns an error when a streamed Codex response fails for a non-streaming caller', async () => {
-    const fetchOverride: typeof fetch = async () =>
+    const fetchOverride: NonNullable<ClientOptions['fetch']> = async () =>
       new Response([
         'event: response.failed',
         'data: {"type":"response.failed","response":{"id":"resp_789","status":"failed","error":{"message":"model overloaded"}}}',

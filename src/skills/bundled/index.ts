@@ -25,14 +25,6 @@ export function initBundledSkills(): void {
   require('./artifacts.js').registerArtifactsSkill()
   require('./design.js').registerDesignSkill()
   require('./slides.js').registerSlidesSkill()
-  if (feature('KAIROS') || feature('KAIROS_DREAM')) {
-    const { registerDreamSkill } = require('./dream.js')
-    registerDreamSkill()
-  }
-  if (feature('REVIEW_ARTIFACT')) {
-    const { registerHunterSkill } = require('./hunter.js')
-    registerHunterSkill()
-  }
   if (feature('AGENT_TRIGGERS')) {
     const { registerLoopSkill } = require('./loop.js')
     // /loop's isEnabled delegates to isKairosCronEnabled() — same lazy
@@ -45,14 +37,6 @@ export function initBundledSkills(): void {
       registerScheduleRemoteAgentsSkill,
     } = require('./scheduleRemoteAgents.js')
     registerScheduleRemoteAgentsSkill()
-  }
-  if (feature('BUILDING_CLAUDE_APPS')) {
-    const { registerClaudeApiSkill } = require('./claudeApi.js')
-    registerClaudeApiSkill()
-  }
-  if (feature('RUN_SKILL_GENERATOR')) {
-    const { registerRunSkillGeneratorSkill } = require('./runSkillGenerator.js')
-    registerRunSkillGeneratorSkill()
   }
   /* eslint-enable @typescript-eslint/no-require-imports */
 }

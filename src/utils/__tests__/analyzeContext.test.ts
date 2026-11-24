@@ -194,7 +194,7 @@ describe('processAssistantMessage', () => {
           },
         ],
       },
-    } as AssistantMessage
+    } as unknown as AssistantMessage
 
     processAssistantMessage(message, breakdown)
 

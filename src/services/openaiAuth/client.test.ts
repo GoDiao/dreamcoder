@@ -124,12 +124,12 @@ describe('OpenAI Codex OAuth client', () => {
   test('includes sanitized token error response details for diagnostics', async () => {
     const originalFetch = globalThis.fetch
 
-    globalThis.fetch = (async () => {
+    globalThis.fetch = Object.assign(async () => {
       return new Response(
         '{"error":"forbidden","code":"sensitive-code","refresh_token":"secret"}',
         { status: 403, headers: { 'Content-Type': 'application/json' } },
       )
-    }) as typeof fetch
+    }, { preconnect: fetch.preconnect })
 
     try {
       await expect(

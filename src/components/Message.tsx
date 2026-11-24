@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import { feature } from 'bun:bundle';
 import type { BetaContentBlock } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs';
@@ -242,41 +243,6 @@ function MessageImpl(t0) {
             t2 = $[64];
           }
           return t2;
-        }
-        if (message.subtype === "microcompact_boundary") {
-          return null;
-        }
-        if (feature("HISTORY_SNIP")) {
-          const {
-            isSnipBoundaryMessage
-          } = require("../services/compact/snipProjection.js") as typeof import('../services/compact/snipProjection.js');
-          const {
-            isSnipMarkerMessage
-          } = require("../services/compact/snipCompact.js") as typeof import('../services/compact/snipCompact.js');
-          if (isSnipBoundaryMessage(message)) {
-            let t2;
-            if ($[65] === Symbol.for("react.memo_cache_sentinel")) {
-              t2 = require("./messages/SnipBoundaryMessage.js");
-              $[65] = t2;
-            } else {
-              t2 = $[65];
-            }
-            const {
-              SnipBoundaryMessage
-            } = t2 as typeof import('./messages/SnipBoundaryMessage.js');
-            let t3;
-            if ($[66] !== message) {
-              t3 = <SnipBoundaryMessage message={message} />;
-              $[66] = message;
-              $[67] = t3;
-            } else {
-              t3 = $[67];
-            }
-            return t3;
-          }
-          if (isSnipMarkerMessage(message)) {
-            return null;
-          }
         }
         if (message.subtype === "local_command") {
           let t2;

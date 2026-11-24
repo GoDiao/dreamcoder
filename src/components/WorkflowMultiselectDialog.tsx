@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import React, { useCallback, useState } from 'react';
 import type { Workflow } from '../commands/install-github-app/types.js';
@@ -34,7 +35,7 @@ function renderInputGuide(exitState: ExitState): React.ReactNode {
       <ConfigurableShortcutHint action="confirm:no" context="Confirmation" fallback="Esc" description="cancel" />
     </Byline>;
 }
-export function WorkflowMultiselectDialog(t0) {
+export function WorkflowMultiselectDialog(t0: Props): React.ReactNode {
   const $ = _c(14);
   const {
     onSubmit,

@@ -19,12 +19,12 @@ afterEach(() => {
 
 const parse = (input: Record<string, unknown>) => StartSessionTool.inputSchema.parse(input)
 const run = (input: Record<string, unknown>) =>
-  StartSessionTool.call(parse(input), {} as never, undefined as never, undefined as never)
+  StartSessionTool.call(parse(input))
 
 describe('StartSession permission', () => {
   test('asks with a safety check the classifier cannot approve', async () => {
     const input = parse({ prompt: 'go', title: 'T', context: 'fresh' })
-    const result = await StartSessionTool.checkPermissions(input, {} as never)
+    const result = await StartSessionTool.checkPermissions(input)
     expect(result.behavior).toBe('ask')
     expect(result.decisionReason).toMatchObject({ type: 'safetyCheck', classifierApprovable: false })
   })
@@ -43,12 +43,12 @@ describe('StartSession permission', () => {
 
 describe('StartSession input', () => {
   test('refuses a role without a card', async () => {
-    const result = await StartSessionTool.validateInput!(parse({ prompt: 'review', title: 'T', context: 'fresh', role: 'reviewer' }), {} as never)
+    const result = await StartSessionTool.validateInput!(parse({ prompt: 'review', title: 'T', context: 'fresh', role: 'reviewer' }))
     expect(result).toMatchObject({ result: false })
   })
 
   test('accepts a role with its card', async () => {
-    const result = await StartSessionTool.validateInput!(parse({ prompt: 'review', title: 'T', context: 'fresh', card: 3, role: 'reviewer' }), {} as never)
+    const result = await StartSessionTool.validateInput!(parse({ prompt: 'review', title: 'T', context: 'fresh', card: 3, role: 'reviewer' }))
     expect(result).toEqual({ result: true })
   })
 })
@@ -71,11 +71,11 @@ describe('StartSession call', () => {
       { subtype: 'session_start', prompt: 'p', title: 'Tokens', context: 'fresh', worktree: false, card: 3, role: 'owner' },
       { subtype: 'session_start', prompt: 'check it', title: 'Check', context: 'fresh', worktree: false, card: 3, role: 'reviewer' },
     ])
-    expect(await StartSessionTool.checkPermissions(parse({ prompt: 'p', title: 'Tokens', context: 'fresh', card: 3 }), {} as never)).toMatchObject({
+    expect(await StartSessionTool.checkPermissions(parse({ prompt: 'p', title: 'Tokens', context: 'fresh', card: 3 }))).toMatchObject({
       behavior: 'ask',
       message: 'Start a new session "Tokens" as the owner of card #3?',
     })
-    expect(await StartSessionTool.checkPermissions(parse({ prompt: 'p', title: 'Check', context: 'fresh', card: 3, role: 'reviewer' }), {} as never)).toMatchObject({
+    expect(await StartSessionTool.checkPermissions(parse({ prompt: 'p', title: 'Check', context: 'fresh', card: 3, role: 'reviewer' }))).toMatchObject({
       message: 'Start a new session "Check" as the reviewer of card #3?',
     })
   })

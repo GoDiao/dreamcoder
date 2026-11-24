@@ -123,7 +123,6 @@ import {
 import { feature } from "bun:bundle";
 import {
   getAfkModeHeaderLatched,
-  getCacheEditingHeaderLatched,
   getFastModeHeaderLatched,
   getLastApiCompletionTimestamp,
   getPromptCache1hAllowlist,
@@ -131,7 +130,6 @@ import {
   getSessionId,
   getThinkingClearLatched,
   setAfkModeHeaderLatched,
-  setCacheEditingHeaderLatched,
   setFastModeHeaderLatched,
   setLastMainRequestId,
   setPromptCache1hAllowlist,
@@ -202,7 +200,6 @@ import {
   TOOL_SEARCH_TOOL_NAME,
 } from "../../tools/ToolSearchTool/prompt.js";
 import { count } from "../../utils/array.js";
-import { insertBlockAfterToolResults } from "../../utils/contentArray.js";
 import { validateBoundedIntEnvVar } from "../../utils/envValidation.js";
 import { safeParseJSON } from "../../utils/json.js";
 import { isClaudeModelName } from "../../utils/model/claudeModelName.js";
@@ -226,12 +223,6 @@ import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   logEvent,
 } from "../analytics/index.js";
-import {
-  consumePendingCacheEdits,
-  getPinnedCacheEdits,
-  markToolsSentToAPIState,
-  pinCacheEdits,
-} from "../compact/microCompact.js";
 import { getInitializationStatus } from "../lsp/manager.js";
 import { withStreamingVCR, withVCR } from "../vcr.js";
 import { requestAzureOpenAI } from "./azureOpenAI.js";
@@ -951,7 +942,7 @@ function getPreviousRequestIdFromMessages(
 }
 
 function isMedia(
-  block: BetaContentBlockParam,
+  block: { type: string },
 ): block is BetaImageBlockParam | BetaRequestDocumentBlock {
   return block.type === "image" || block.type === "document";
 }
@@ -1066,10 +1057,16 @@ async function* queryModel(
       const assistantMessage: AssistantMessage = {
         message: {
           id: result.responseId ?? randomUUID(),
+          container: null,
+          context_management: null,
+          diagnostics: null,
           model: options.model,
           role: "assistant",
           content: result.content,
+          stop_details: null,
           stop_reason: result.stopReason,
+          stop_sequence: null,
+          type: "message",
           usage: result.usage,
         },
         requestId: result.responseId ?? undefined,
@@ -1239,29 +1236,6 @@ async function* queryModel(
     if (!betas.includes(toolSearchHeader)) {
       betas.push(toolSearchHeader);
     }
-  }
-
-  // Determine if cached microcompact is enabled for this model.
-  // Computed once here (in async context) and captured by paramsFromContext.
-  // The beta header is also captured here to avoid a top-level import of the
-  // ant-only CACHE_EDITING_BETA_HEADER constant.
-  let cachedMCEnabled = false;
-  let cacheEditingBetaHeader = "";
-  if (feature("CACHED_MICROCOMPACT")) {
-    const {
-      isCachedMicrocompactEnabled,
-      isModelSupportedForCacheEditing,
-      getCachedMCConfig,
-    } = await import("../compact/cachedMicrocompact.js");
-    const betas = await import("src/constants/betas.js");
-    cacheEditingBetaHeader = betas.CACHE_EDITING_BETA_HEADER;
-    const featureEnabled = isCachedMicrocompactEnabled();
-    const modelSupported = isModelSupportedForCacheEditing(options.model);
-    cachedMCEnabled = featureEnabled && modelSupported;
-    const config = getCachedMCConfig();
-    logForDebugging(
-      `Cached MC gate: enabled=${featureEnabled} modelSupported=${modelSupported} model=${options.model} supportedModels=${jsonStringify(config.supportedModels)}`,
-    );
   }
 
   const useGlobalCacheFeature = shouldUseGlobalCacheScope();
@@ -1479,19 +1453,6 @@ async function* queryModel(
     setFastModeHeaderLatched(true);
   }
 
-  let cacheEditingHeaderLatched = getCacheEditingHeaderLatched() === true;
-  if (feature("CACHED_MICROCOMPACT")) {
-    if (
-      !cacheEditingHeaderLatched &&
-      cachedMCEnabled &&
-      getAPIProvider() === "firstParty" &&
-      options.querySource === "repl_main_thread"
-    ) {
-      cacheEditingHeaderLatched = true;
-      setCacheEditingHeaderLatched(true);
-    }
-  }
-
   // Only latch from agentic queries so a classifier call doesn't flip the
   // main thread's context_management mid-turn.
   let thinkingClearLatched = getThinkingClearLatched() === true;
@@ -1534,7 +1495,6 @@ async function* queryModel(
       betas,
       autoModeActive: afkHeaderLatched,
       isUsingOverage: currentLimits.isUsingOverage ?? false,
-      cachedMCEnabled: cacheEditingHeaderLatched,
       effortValue: effort,
       extraBodyParams: getExtraBodyParams(),
     });
@@ -1579,14 +1539,6 @@ async function* queryModel(
       streamResponse = undefined;
     }
   }
-
-  // Consume pending cache edits ONCE before paramsFromContext is defined.
-  // paramsFromContext is called multiple times (logging, retries), so consuming
-  // inside it would cause the first call to steal edits from subsequent calls.
-  const consumedCacheEdits = cachedMCEnabled
-    ? consumePendingCacheEdits()
-    : null;
-  const consumedPinnedEdits = cachedMCEnabled ? getPinnedCacheEdits() : [];
 
   // Capture the betas sent in the last API request, including the ones that
   // were dynamically added, so we can log and send it to telemetry.
@@ -1743,25 +1695,6 @@ async function* queryModel(
       }
     }
 
-    // Cache editing beta: header is latched session-stable; useCachedMC
-    // (controls cache_edits body behavior) stays live so edits stop when
-    // the feature disables but the header doesn't flip.
-    const useCachedMC =
-      cachedMCEnabled &&
-      getAPIProvider() === "firstParty" &&
-      options.querySource === "repl_main_thread";
-    if (
-      cacheEditingHeaderLatched &&
-      getAPIProvider() === "firstParty" &&
-      options.querySource === "repl_main_thread" &&
-      !betasParams.includes(cacheEditingBetaHeader)
-    ) {
-      betasParams.push(cacheEditingBetaHeader);
-      logForDebugging(
-        "Cache editing beta header enabled for cached microcompact",
-      );
-    }
-
     // Only send temperature when thinking is disabled — the API requires
     // temperature: 1 when thinking is enabled, which is already the default.
     const temperature = !hasThinking
@@ -1776,9 +1709,6 @@ async function* queryModel(
         messagesForAPI,
         enablePromptCaching,
         options.querySource,
-        useCachedMC,
-        consumedCacheEdits,
-        consumedPinnedEdits,
         options.skipCacheWrite,
       ),
       system,
@@ -2946,11 +2876,6 @@ async function* queryModel(
     }
   }
 
-  // Mark all registered tools as sent to API so they become eligible for deletion
-  if (feature("CACHED_MICROCOMPACT") && cachedMCEnabled) {
-    markToolsSentToAPIState();
-  }
-
   // Track the last requestId for the main conversation chain so shutdown
   // can send a cache eviction hint to inference. Exclude backgrounded
   // sessions (Ctrl+B) which share the repl_main_thread querySource but
@@ -3153,36 +3078,10 @@ export function accumulateUsage(
   };
 }
 
-function isToolResultBlock(
-  block: unknown,
-): block is { type: "tool_result"; tool_use_id: string } {
-  return (
-    block !== null &&
-    typeof block === "object" &&
-    "type" in block &&
-    (block as { type: string }).type === "tool_result" &&
-    "tool_use_id" in block
-  );
-}
-
-type CachedMCEditsBlock = {
-  type: "cache_edits";
-  edits: { type: "delete"; cache_reference: string }[];
-};
-
-type CachedMCPinnedEdits = {
-  userMessageIndex: number;
-  block: CachedMCEditsBlock;
-};
-
-// Exported for testing cache_reference placement constraints
 export function addCacheBreakpoints(
   messages: (UserMessage | AssistantMessage)[],
   enablePromptCaching: boolean,
   querySource?: QuerySource,
-  useCachedMC = false,
-  newCacheEdits?: CachedMCEditsBlock | null,
-  pinnedEdits?: CachedMCPinnedEdits[],
   skipCacheWrite = false,
 ): MessageParam[] {
   logEvent("tengu_api_cache_breakpoints", {
@@ -3222,108 +3121,6 @@ export function addCacheBreakpoints(
       querySource,
     );
   });
-
-  if (!useCachedMC) {
-    return result;
-  }
-
-  // Track all cache_references being deleted to prevent duplicates across blocks.
-  const seenDeleteRefs = new Set<string>();
-
-  // Helper to deduplicate a cache_edits block against already-seen deletions
-  const deduplicateEdits = (block: CachedMCEditsBlock): CachedMCEditsBlock => {
-    const uniqueEdits = block.edits.filter((edit) => {
-      if (seenDeleteRefs.has(edit.cache_reference)) {
-        return false;
-      }
-      seenDeleteRefs.add(edit.cache_reference);
-      return true;
-    });
-    return { ...block, edits: uniqueEdits };
-  };
-
-  // Re-insert all previously-pinned cache_edits at their original positions
-  for (const pinned of pinnedEdits ?? []) {
-    const msg = result[pinned.userMessageIndex];
-    if (msg && msg.role === "user") {
-      if (!Array.isArray(msg.content)) {
-        msg.content = [{ type: "text", text: msg.content as string }];
-      }
-      const dedupedBlock = deduplicateEdits(pinned.block);
-      if (dedupedBlock.edits.length > 0) {
-        insertBlockAfterToolResults(msg.content, dedupedBlock);
-      }
-    }
-  }
-
-  // Insert new cache_edits into the last user message and pin them
-  if (newCacheEdits && result.length > 0) {
-    const dedupedNewEdits = deduplicateEdits(newCacheEdits);
-    if (dedupedNewEdits.edits.length > 0) {
-      for (let i = result.length - 1; i >= 0; i--) {
-        const msg = result[i];
-        if (msg && msg.role === "user") {
-          if (!Array.isArray(msg.content)) {
-            msg.content = [{ type: "text", text: msg.content as string }];
-          }
-          insertBlockAfterToolResults(msg.content, dedupedNewEdits);
-          // Pin so this block is re-sent at the same position in future calls
-          pinCacheEdits(i, newCacheEdits);
-
-          logForDebugging(
-            `Added cache_edits block with ${dedupedNewEdits.edits.length} deletion(s) to message[${i}]: ${dedupedNewEdits.edits.map((e) => e.cache_reference).join(", ")}`,
-          );
-          break;
-        }
-      }
-    }
-  }
-
-  // Add cache_reference to tool_result blocks that are within the cached prefix.
-  // Must be done AFTER cache_edits insertion since that modifies content arrays.
-  if (enablePromptCaching) {
-    // Find the last message containing a cache_control marker
-    let lastCCMsg = -1;
-    for (let i = 0; i < result.length; i++) {
-      const msg = result[i]!;
-      if (Array.isArray(msg.content)) {
-        for (const block of msg.content) {
-          if (block && typeof block === "object" && "cache_control" in block) {
-            lastCCMsg = i;
-          }
-        }
-      }
-    }
-
-    // Add cache_reference to tool_result blocks that are strictly before
-    // the last cache_control marker. The API requires cache_reference to
-    // appear "before or on" the last cache_control — we use strict "before"
-    // to avoid edge cases where cache_edits splicing shifts block indices.
-    //
-    // Create new objects instead of mutating in-place to avoid contaminating
-    // blocks reused by secondary queries that use models without cache_editing support.
-    if (lastCCMsg >= 0) {
-      for (let i = 0; i < lastCCMsg; i++) {
-        const msg = result[i]!;
-        if (msg.role !== "user" || !Array.isArray(msg.content)) {
-          continue;
-        }
-        let cloned = false;
-        for (let j = 0; j < msg.content.length; j++) {
-          const block = msg.content[j];
-          if (block && isToolResultBlock(block)) {
-            if (!cloned) {
-              msg.content = [...msg.content];
-              cloned = true;
-            }
-            msg.content[j] = Object.assign({}, block, {
-              cache_reference: block.tool_use_id,
-            });
-          }
-        }
-      }
-    }
-  }
 
   return result;
 }

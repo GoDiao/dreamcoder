@@ -53,9 +53,7 @@ export type RepositoryWorktreeInfo = {
 }
 
 export type RepositoryContextResult = {
-  state: 'ok' | 'not_git_repo' | 'missing_workdir' | 'error'
   workDir: string
-  repoRoot: string | null
   repoName: string | null
   currentBranch: string | null
   defaultBranch: string | null
@@ -63,7 +61,10 @@ export type RepositoryContextResult = {
   branches: RepositoryBranchInfo[]
   worktrees: RepositoryWorktreeInfo[]
   error?: string
-}
+} & (
+  | { state: 'ok' | 'error'; repoRoot: string }
+  | { state: 'not_git_repo' | 'missing_workdir'; repoRoot: null }
+)
 
 export type CreateSessionRepositoryOptions = {
   branch?: string | null

@@ -1,4 +1,3 @@
-import type { PluginScope } from '../../utils/plugins/schemas.js'
 import { ApiError, errorResponse } from '../middleware/errorHandler.js'
 import { PluginService } from '../services/pluginService.js'
 import { conversationService } from '../services/conversationService.js'
@@ -70,7 +69,7 @@ export async function handlePluginsApi(
           return Response.json(await pluginService.disablePlugin(pluginId, scope))
         case 'update':
           return Response.json(
-            await pluginService.updatePlugin(pluginId, scope as PluginScope | undefined),
+            await pluginService.updatePlugin(pluginId, scope),
           )
         case 'uninstall':
           return Response.json(

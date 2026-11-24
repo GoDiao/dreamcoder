@@ -393,7 +393,7 @@ export class BrowserHostChannel {
     command: BackgroundBrowserCommand,
     options: Pick<BrowserHostRequestOptions, 'signal' | 'timeoutMs'> = {},
   ): Promise<unknown> {
-    const response = await this.dispatch<{ value: unknown }>(id => ({ type: 'background', id, command }), { tabId: null, ...options })
+    const response = await this.dispatch<{ value: unknown }>(id => ({ type: 'background', id, command }), options)
     return response.value
   }
 

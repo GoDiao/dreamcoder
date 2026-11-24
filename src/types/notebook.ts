@@ -1,30 +1,52 @@
-// @generated stub from scan-missing-imports
-const __target = function noop() {}
-const __handler: ProxyHandler<any> = {
-  get(_t, prop) {
-    if (prop === '__esModule') return true
-    if (prop === 'default') return new Proxy(__target, __handler)
-    if (prop === Symbol.toPrimitive) return () => undefined
-    if (prop === Symbol.iterator) return function* () {}
-    if (prop === Symbol.asyncIterator) return async function* () {}
-    if (prop === 'then') return undefined
-    return new Proxy(__target, __handler)
-  },
-  apply() {
-    return new Proxy(__target, __handler)
-  },
-  construct() {
-    return new Proxy(__target, __handler)
-  },
+export type NotebookCellType = 'code' | 'markdown'
+
+export type NotebookOutputImage = {
+  image_data: string
+  media_type: 'image/png' | 'image/jpeg'
 }
-const stub: any = new Proxy(__target, __handler)
-export default stub
-export const __stubMissing = true
-export const createCachedMCState = stub
-export const isCachedMicrocompactEnabled = stub
-export const isModelSupportedForCacheEditing = stub
-export const getCachedMCConfig = stub
-export const markToolsSentToAPI = stub
-export const resetCachedMCState = stub
-export const checkProtectedNamespace = stub
-export const getCoordinatorUserContext = stub
+
+export type NotebookCellOutput =
+  | { output_type: 'stream'; text?: string | string[] }
+  | {
+      output_type: 'execute_result' | 'display_data'
+      data?: { 'text/plain'?: string | string[]; [mimeType: string]: unknown }
+    }
+  | {
+      output_type: 'error'
+      ename: string
+      evalue: string
+      traceback: string[]
+    }
+
+export type NotebookCell = {
+  cell_type: NotebookCellType
+  id?: string
+  source: string | string[]
+  metadata: Record<string, unknown>
+  execution_count?: number | null
+  outputs?: NotebookCellOutput[]
+}
+
+export type NotebookContent = {
+  cells: NotebookCell[]
+  metadata: {
+    language_info?: { name?: string }
+  }
+  nbformat: number
+  nbformat_minor: number
+}
+
+export type NotebookCellSourceOutput = {
+  output_type: NotebookCellOutput['output_type']
+  text?: string
+  image?: NotebookOutputImage
+}
+
+export type NotebookCellSource = {
+  cellType: NotebookCellType
+  source: string
+  execution_count?: number
+  cell_id: string
+  language?: string
+  outputs?: NotebookCellSourceOutput[]
+}

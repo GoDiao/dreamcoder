@@ -37,7 +37,7 @@ const MAX_WORKTREE_FANOUT = 50
  * concurrent bridges in different repos don't clobber each other.
  */
 
-export const BRIDGE_POINTER_TTL_MS = 4 * 60 * 60 * 1000
+const BRIDGE_POINTER_TTL_MS = 4 * 60 * 60 * 1000
 
 const BridgePointerSchema = lazySchema(() =>
   z.object({
@@ -80,7 +80,7 @@ export async function writeBridgePointer(
  * stale (mtime > 4h ago). Stale/invalid pointers are deleted so they don't
  * keep re-prompting after the backend has already GC'd the env.
  */
-export async function readBridgePointer(
+async function readBridgePointer(
   dir: string,
 ): Promise<(BridgePointer & { ageMs: number }) | null> {
   const path = getBridgePointerPath(dir)

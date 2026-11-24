@@ -62,6 +62,7 @@ describe('writing artifacts', () => {
     ]) {
       const result = write(file)
       expect(result.behavior).toBe('deny')
+      if (result.behavior !== 'deny') throw new Error('expected a denial')
       expect(result.message).toContain('read-only')
       expect(result.message).toContain('ArtifactCopy')
       expect(edit(file).behavior).toBe('deny')

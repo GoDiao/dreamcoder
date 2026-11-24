@@ -45,7 +45,7 @@ export class ArtifactThumbnailService {
     }
   }
 
-  async read(id: string): Promise<Buffer | null> {
+  async read(id: string): Promise<Buffer<ArrayBuffer> | null> {
     if ((await this.mtimeOf(id)) === null) return null
     try {
       return await fs.readFile(`${fileBase(id)}.jpg`)

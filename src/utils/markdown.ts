@@ -5,8 +5,6 @@ import { color } from '../components/design-system/color.js'
 import { BLOCKQUOTE_BAR } from '../constants/figures.js'
 import { stringWidth } from '../ink/stringWidth.js'
 import { supportsHyperlinks } from '../ink/supports-hyperlinks.js'
-import type { CliHighlight } from './cliHighlight.js'
-import { logForDebugging } from './debug.js'
 import { createHyperlink } from './hyperlink.js'
 import { stripPromptXMLTags } from './messages.js'
 import type { ThemeName } from './theme.js'
@@ -36,12 +34,11 @@ export function configureMarked(): void {
 export function applyMarkdown(
   content: string,
   theme: ThemeName,
-  highlight: CliHighlight | null = null,
 ): string {
   configureMarked()
   return marked
     .lexer(stripPromptXMLTags(content))
-    .map(_ => formatToken(_, theme, 0, null, null, highlight))
+    .map(_ => formatToken(_, theme, 0, null, null))
     .join('')
     .trim()
 }
@@ -52,12 +49,11 @@ export function formatToken(
   listDepth = 0,
   orderedListNumber: number | null = null,
   parent: Token | null = null,
-  highlight: CliHighlight | null = null,
 ): string {
   switch (token.type) {
     case 'blockquote': {
       const inner = (token.tokens ?? [])
-        .map(_ => formatToken(_, theme, 0, null, null, highlight))
+        .map(_ => formatToken(_, theme, 0, null, null))
         .join('')
       // Prefix each line with a dim vertical bar. Keep text italic but at
       // normal brightness — chalk.dim is nearly invisible on dark themes.
@@ -70,20 +66,7 @@ export function formatToken(
         .join(EOL)
     }
     case 'code': {
-      if (!highlight) {
-        return token.text + EOL
-      }
-      let language = 'plaintext'
-      if (token.lang) {
-        if (highlight.supportsLanguage(token.lang)) {
-          language = token.lang
-        } else {
-          logForDebugging(
-            `Language not supported while highlighting code, falling back to plaintext: ${token.lang}`,
-          )
-        }
-      }
-      return highlight.highlight(token.text, { language }) + EOL
+      return token.text + EOL
     }
     case 'codespan': {
       // inline code
@@ -92,13 +75,13 @@ export function formatToken(
     case 'em':
       return chalk.italic(
         (token.tokens ?? [])
-          .map(_ => formatToken(_, theme, 0, null, parent, highlight))
+          .map(_ => formatToken(_, theme, 0, null, parent))
           .join(''),
       )
     case 'strong':
       return chalk.bold(
         (token.tokens ?? [])
-          .map(_ => formatToken(_, theme, 0, null, parent, highlight))
+          .map(_ => formatToken(_, theme, 0, null, parent))
           .join(''),
       )
     case 'heading':
@@ -107,7 +90,7 @@ export function formatToken(
           return (
             chalk.bold.italic.underline(
               (token.tokens ?? [])
-                .map(_ => formatToken(_, theme, 0, null, null, highlight))
+                .map(_ => formatToken(_, theme, 0, null, null))
                 .join(''),
             ) +
             EOL +
@@ -117,7 +100,7 @@ export function formatToken(
           return (
             chalk.bold(
               (token.tokens ?? [])
-                .map(_ => formatToken(_, theme, 0, null, null, highlight))
+                .map(_ => formatToken(_, theme, 0, null, null))
                 .join(''),
             ) +
             EOL +
@@ -127,7 +110,7 @@ export function formatToken(
           return (
             chalk.bold(
               (token.tokens ?? [])
-                .map(_ => formatToken(_, theme, 0, null, null, highlight))
+                .map(_ => formatToken(_, theme, 0, null, null))
                 .join(''),
             ) +
             EOL +
@@ -147,7 +130,7 @@ export function formatToken(
       }
       // Extract display text from the link's child tokens
       const linkText = (token.tokens ?? [])
-        .map(_ => formatToken(_, theme, 0, null, token, highlight))
+        .map(_ => formatToken(_, theme, 0, null, token))
         .join('')
       const plainLinkText = stripAnsi(linkText)
       // If the link has meaningful display text (different from the URL),
@@ -168,7 +151,6 @@ export function formatToken(
             listDepth,
             token.ordered ? token.start + index : null,
             token,
-            highlight,
           ),
         )
         .join('')
@@ -177,13 +159,13 @@ export function formatToken(
       return (token.tokens ?? [])
         .map(
           _ =>
-            `${'  '.repeat(listDepth)}${formatToken(_, theme, listDepth + 1, orderedListNumber, token, highlight)}`,
+            `${'  '.repeat(listDepth)}${formatToken(_, theme, listDepth + 1, orderedListNumber, token)}`,
         )
         .join('')
     case 'paragraph':
       return (
         (token.tokens ?? [])
-          .map(_ => formatToken(_, theme, 0, null, null, highlight))
+          .map(_ => formatToken(_, theme, 0, null, null))
           .join('') + EOL
       )
     case 'space':
@@ -199,7 +181,7 @@ export function formatToken(
         return token.text
       }
       if (parent?.type === 'list_item') {
-        return `${orderedListNumber === null ? '-' : getListNumber(listDepth, orderedListNumber) + '.'} ${token.tokens ? token.tokens.map(_ => formatToken(_, theme, listDepth, orderedListNumber, token, highlight)).join('') : linkifyIssueReferences(token.text)}${EOL}`
+        return `${orderedListNumber === null ? '-' : getListNumber(listDepth, orderedListNumber) + '.'} ${token.tokens ? token.tokens.map(_ => formatToken(_, theme, listDepth, orderedListNumber, token)).join('') : linkifyIssueReferences(token.text)}${EOL}`
       }
       return linkifyIssueReferences(token.text)
     case 'table': {
@@ -209,7 +191,7 @@ export function formatToken(
       function getDisplayText(tokens: Token[] | undefined): string {
         return stripAnsi(
           tokens
-            ?.map(_ => formatToken(_, theme, 0, null, null, highlight))
+            ?.map(_ => formatToken(_, theme, 0, null, null))
             .join('') ?? '',
         )
       }
@@ -229,7 +211,7 @@ export function formatToken(
       tableToken.header.forEach((header, index) => {
         const content =
           header.tokens
-            ?.map(_ => formatToken(_, theme, 0, null, null, highlight))
+            ?.map(_ => formatToken(_, theme, 0, null, null))
             .join('') ?? ''
         const displayText = getDisplayText(header.tokens)
         const width = columnWidths[index]!
@@ -254,7 +236,7 @@ export function formatToken(
         row.forEach((cell, index) => {
           const content =
             cell.tokens
-              ?.map(_ => formatToken(_, theme, 0, null, null, highlight))
+              ?.map(_ => formatToken(_, theme, 0, null, null))
               .join('') ?? ''
           const displayText = getDisplayText(cell.tokens)
           const width = columnWidths[index]!

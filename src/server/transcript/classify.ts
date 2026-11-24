@@ -67,7 +67,6 @@ export type BackgroundTaskEvent = {
   status: 'running' | 'completed' | 'failed' | 'stopped'
   description?: string
   taskType?: string
-  workflowName?: string
   prompt?: string
   summary?: string
   lastToolName?: string
@@ -462,7 +461,6 @@ export function parseBackgroundTaskMessage(
     ...optional('toolUseId', toolUseId),
     ...optional('description', readNonEmptyString(record, 'description', 'message', 'title')),
     ...optional('taskType', readNonEmptyString(record, 'task_type', 'taskType')),
-    ...optional('workflowName', readNonEmptyString(record, 'workflow_name', 'workflowName')),
     ...optional('prompt', readNonEmptyString(record, 'prompt')),
     ...optional('summary', readNonEmptyString(record, 'summary')),
     ...optional('lastToolName', readNonEmptyString(record, 'last_tool_name', 'lastToolName')),

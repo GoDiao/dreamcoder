@@ -25,7 +25,7 @@ describe('titleService', () => {
   })
 
   test('sends disabled thinking for opted-in providers when desktop thinking is off', async () => {
-    let requestBody: Record<string, unknown> | null = null
+    let requestBody = null as Record<string, unknown> | null
     const server = Bun.serve({
       hostname: '127.0.0.1',
       port: 0,
@@ -73,7 +73,7 @@ describe('titleService', () => {
   })
 
   test('sends disabled thinking for DeepSeek title generation when desktop thinking is off', async () => {
-    let requestBody: Record<string, unknown> | null = null
+    let requestBody = null as Record<string, unknown> | null
     const server = Bun.serve({
       hostname: '127.0.0.1',
       port: 0,
@@ -161,7 +161,7 @@ describe('titleService', () => {
 
   test('generates titles through the OpenAI Chat format for OpenAI-compatible providers', async () => {
     let requestPath = ''
-    let authorization: string | null = null
+    let authorization = null as string | null
     const server = Bun.serve({
       hostname: '127.0.0.1',
       port: 0,
@@ -223,9 +223,9 @@ describe('titleService', () => {
   })
 
   test('sends cleaned slash-command text to the title model', async () => {
-    let requestBody: {
+    let requestBody = null as {
       messages?: Array<{ content?: string }>
-    } | null = null
+    } | null
     const server = Bun.serve({
       hostname: '127.0.0.1',
       port: 0,
@@ -278,7 +278,7 @@ describe('titleService', () => {
     }
   })
 
-  async function writeLoggedProvider(port: number): Promise<void> {
+  async function writeLoggedProvider(port: number | undefined): Promise<void> {
     await fs.mkdir(path.join(tmpDir, 'dreamcoder'), { recursive: true })
     await fs.writeFile(
       path.join(tmpDir, 'dreamcoder', 'providers.json'),
@@ -300,7 +300,7 @@ describe('titleService', () => {
   }
 
   test('uses the active provider for an effort-only runtime selection', async () => {
-    let requestBody: Record<string, unknown> | null = null
+    let requestBody = null as Record<string, unknown> | null
     const server = Bun.serve({
       hostname: '127.0.0.1',
       port: 0,
@@ -324,7 +324,7 @@ describe('titleService', () => {
   })
 
   test('title prompt names the session instead of answering and uses the user language', async () => {
-    let requestBody: Record<string, unknown> | null = null
+    let requestBody = null as Record<string, unknown> | null
     const server = Bun.serve({
       hostname: '127.0.0.1',
       port: 0,
@@ -442,7 +442,7 @@ describe('titleService', () => {
     model: string,
     options: { userSettings?: Record<string, unknown>; modelOverrides?: Record<string, unknown> } = {},
   ): Promise<Record<string, unknown> | null> {
-    let requestBody: Record<string, unknown> | null = null
+    let requestBody = null as Record<string, unknown> | null
     const server = Bun.serve({
       hostname: '127.0.0.1',
       port: 0,

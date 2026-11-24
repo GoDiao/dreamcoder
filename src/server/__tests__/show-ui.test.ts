@@ -286,7 +286,7 @@ describe('page store', () => {
   })
 
   it('keeps the G2 field list in step with the vendored chart sources', () => {
-    expect(g2Fields).toEqual(buildG2Fields())
+    expect(buildG2Fields()).toEqual(g2Fields)
   })
 
   it('accepts only the supported components', async () => {
@@ -374,7 +374,7 @@ describe('ShowUI tool', () => {
   })
 
   it('tells the agent to build pages from components and change them only through the tool', async () => {
-    const prompt = await ShowUITool.prompt({} as never)
+    const prompt = await ShowUITool.prompt()
     expect(prompt).toContain('an html block holds a self-contained HTML document you write')
     expect(prompt).toContain("Choose in this order: adjust an existing component's data and layout, combine several components, and only then write html")
     expect(prompt).toContain('An html block must say in its reason which components you considered')
@@ -399,8 +399,8 @@ describe('ShowUI tool', () => {
   })
 
   it('tells the agent to use it for any request to chart or visualize data instead of scripts, files or project code', async () => {
-    const description = await ShowUITool.description({} as never, {} as never)
-    const prompt = await ShowUITool.prompt({} as never)
+    const description = await ShowUITool.description()
+    const prompt = await ShowUITool.prompt()
 
     expect(description).toContain('Use it whenever the user asks to chart, plot, graph, draw or visualize data or a table')
     expect(prompt).toContain('"Show it on the page" or "draw it in the page" also means this tool')
@@ -471,13 +471,13 @@ describe('ShowUI tool', () => {
 
   it('enforces the steps when the tool is called', async () => {
     const create = { title: 'Revenue', blocks: [chart([1])] }
-    const call = (input: Record<string, unknown>) => ShowUITool.call(input as never, {} as never, undefined as never, undefined as never)
+    const call = (input: Record<string, unknown>) => ShowUITool.call(input as never)
 
-    expect(await ShowUITool.validateInput!(create, {} as never)).toMatchObject({ result: false, message: expect.stringContaining('catalog') })
+    expect(await ShowUITool.validateInput!(create)).toMatchObject({ result: false, message: expect.stringContaining('catalog') })
     expect((await call({ catalog: true })).data.note).toBe(COMPONENT_DOCS_LANGUAGE_NOTE)
-    expect(await ShowUITool.validateInput!(create, {} as never)).toMatchObject({ result: false, message: expect.stringContaining('["chart"]') })
+    expect(await ShowUITool.validateInput!(create)).toMatchObject({ result: false, message: expect.stringContaining('["chart"]') })
     expect((await call({ describe: ['chart'] })).data.note).toBe(COMPONENT_DOCS_LANGUAGE_NOTE)
-    expect(await ShowUITool.validateInput!(create, {} as never)).toEqual({ result: true })
+    expect(await ShowUITool.validateInput!(create)).toEqual({ result: true })
   })
 
   it('remembers listed and described components for the session that called it', async () => {
@@ -553,6 +553,7 @@ describe('session state', () => {
         title: { text: null, source: null },
         workspace: { workDir: '/repo', projectRoot: null, workDirExists: true },
         uiPages: [{ pageId, title: 'Disk', revision: 3 }, { pageId: 'c'.repeat(24), title: 'Other', revision: 1 }],
+        pendingReports: [],
       },
     }).state
 

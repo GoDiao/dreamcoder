@@ -485,16 +485,8 @@ export function useTypeahead({
   // from the ready chunks; when the build completes, re-fire the last
   // search so partial upgrades to full. Clears the token ref so the same
   // query isn't discarded as stale.
-  //
-  // Skipped under NODE_ENV=test: REPL-mounting tests would spawn git ls-files
-  // against the real CI workspace (270k+ files on Windows runners), and the
-  // background build outlives the test — its setImmediate chain leaks into
-  // subsequent tests in the shard. The subscriber still registers so
-  // fileSuggestions tests that trigger a refresh directly work correctly.
   useEffect(() => {
-    if ("production" !== 'test') {
-      startBackgroundCacheRefresh();
-    }
+    startBackgroundCacheRefresh();
     return onIndexBuildComplete(() => {
       const token = latestSearchTokenRef.current;
       if (token !== null) {

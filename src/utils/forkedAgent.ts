@@ -382,8 +382,6 @@ export function createSubagentContext(
     nestedMemoryAttachmentTriggers: new Set<string>(),
     loadedNestedMemoryPaths: new Set<string>(),
     dynamicSkillDirTriggers: new Set<string>(),
-    // Per-subagent: tracks skills surfaced by discovery for was_discovered telemetry (SkillTool.ts:116)
-    discoveredSkillNames: new Set<string>(),
     toolDecisions: undefined,
     // Budget decisions: override > clone of parent > undefined (feature off).
     //
@@ -426,9 +424,6 @@ export function createSubagentContext(
     setResponseLength: overrides?.shareSetResponseLength
       ? parentContext.setResponseLength
       : () => {},
-    pushApiMetricsEntry: overrides?.shareSetResponseLength
-      ? parentContext.pushApiMetricsEntry
-      : undefined,
     updateFileHistoryState: () => {},
     // Attribution is scoped and functional (prev => next) — safe to share even
     // when setAppState is stubbed. Concurrent calls compose via React's state queue.

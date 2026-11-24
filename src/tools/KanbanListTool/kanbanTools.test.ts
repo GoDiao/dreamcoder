@@ -28,20 +28,20 @@ describe('kanban tools', () => {
   })
 
   test('only list and get are read-only; updates other than assign need no permission prompt', async () => {
-    expect(KanbanListTool.isReadOnly({})).toBe(true)
-    expect(KanbanGetTool.isReadOnly({ card: 1 })).toBe(true)
-    expect(KanbanCreateTool.isReadOnly({ title: 'x' })).toBe(false)
-    expect(KanbanUpdateTool.isReadOnly({ command: { type: 'start', card: 1 } })).toBe(false)
-    expect((await KanbanUpdateTool.checkPermissions({ command: { type: 'start', card: 1 } }, {} as never)).behavior).toBe('allow')
+    expect(KanbanListTool.isReadOnly()).toBe(true)
+    expect(KanbanGetTool.isReadOnly()).toBe(true)
+    expect(KanbanCreateTool.isReadOnly()).toBe(false)
+    expect(KanbanUpdateTool.isReadOnly()).toBe(false)
+    expect((await KanbanUpdateTool.checkPermissions({ command: { type: 'start', card: 1 } })).behavior).toBe('allow')
   })
 
   test('KanbanCreate asks the user as the host says: never under its own card, by permission mode for a suggestion, always for a new board', async () => {
     let hasBoard = true
     const requests = installFakeHost((request) => {
-      const { parent } = (request as { create: { parent?: number } }).create
+      const { parent } = request.create as { parent?: number }
       return { approval: !hasBoard ? 'board' : parent === 2 ? null : 'task' }
     })
-    const check = (input: { title: string; parent?: number }) => KanbanCreateTool.checkPermissions(input, {} as never)
+    const check = (input: { title: string; parent?: number }) => KanbanCreateTool.checkPermissions(input)
 
     expect(await check({ title: 'Split', parent: 2 })).toEqual({ behavior: 'allow', updatedInput: { title: 'Split', parent: 2 } })
     expect(await check({ title: 'Idea', parent: 3 })).toMatchObject({ behavior: 'ask', decisionReason: { type: 'other' } })
@@ -119,7 +119,7 @@ describe('kanban tools', () => {
       options: { tools: [KanbanUpdateTool] },
     }
     const input = KanbanUpdateTool.inputSchema.parse({ command: { type: 'assign', card: 3, role: 'owner', target: 'self' } })
-    expect(await KanbanUpdateTool.checkPermissions(input, {} as never)).toMatchObject({
+    expect(await KanbanUpdateTool.checkPermissions(input)).toMatchObject({
       behavior: 'ask',
       message: 'Make this session the owner of card #3?',
       decisionReason: { type: 'other' },
@@ -137,7 +137,6 @@ describe('kanban tools', () => {
     const check = (sessionId: string) =>
       KanbanUpdateTool.checkPermissions(
         KanbanUpdateTool.inputSchema.parse({ command: { type: 'assign', card: 3, role: 'owner', target: { sessionId } } }),
-        {} as never,
       )
 
     expect(await check('worker')).toMatchObject({ behavior: 'allow' })
@@ -152,7 +151,7 @@ describe('kanban tools', () => {
       options: { tools: [KanbanUpdateTool] },
     }
     const input = KanbanUpdateTool.inputSchema.parse({ command: { type: 'cancel', card: 4, reason: 'not needed' } })
-    expect(await KanbanUpdateTool.checkPermissions(input, {} as never)).toMatchObject({
+    expect(await KanbanUpdateTool.checkPermissions(input)).toMatchObject({
       behavior: 'ask',
       message: 'Cancel card #4?',
       decisionReason: { type: 'safetyCheck', classifierApprovable: false },
@@ -168,7 +167,7 @@ describe('kanban tools', () => {
       options: { tools: [KanbanUpdateTool] },
     }
     const input = KanbanUpdateTool.inputSchema.parse({ command: { type: 'edit_card', card: 4, acceptance: ['Works offline'] } })
-    expect(await KanbanUpdateTool.checkPermissions(input, {} as never)).toMatchObject({
+    expect(await KanbanUpdateTool.checkPermissions(input)).toMatchObject({
       behavior: 'ask',
       message: 'Change the acceptance criteria of card #4?',
       decisionReason: { type: 'safetyCheck', classifierApprovable: false },
@@ -190,18 +189,18 @@ describe('kanban tools', () => {
     const reviewer = (target: unknown) => KanbanUpdateTool.inputSchema.parse({ command: { type: 'assign', card: 3, role: 'reviewer', target } })
     const always = { behavior: 'ask', decisionReason: { type: 'safetyCheck', classifierApprovable: false } }
 
-    expect(await KanbanUpdateTool.checkPermissions(reviewer('self'), {} as never)).toMatchObject({ ...always, message: 'Make this session the reviewer of card #3?' })
+    expect(await KanbanUpdateTool.checkPermissions(reviewer('self'))).toMatchObject({ ...always, message: 'Make this session the reviewer of card #3?' })
     expect((await hasPermissionsToUseTool(KanbanUpdateTool, reviewer('self'), context as never, undefined as never, 'id')).behavior).toBe('ask')
     roles = ['creator', 'owner']
-    expect(await KanbanUpdateTool.checkPermissions(reviewer({ sessionId: 'worker' }), {} as never)).toMatchObject(always)
+    expect(await KanbanUpdateTool.checkPermissions(reviewer({ sessionId: 'worker' }))).toMatchObject(always)
     expect((await hasPermissionsToUseTool(KanbanUpdateTool, reviewer({ sessionId: 'worker' }), context as never, undefined as never, 'id')).behavior).toBe('ask')
     roles = ['creator']
-    expect(await KanbanUpdateTool.checkPermissions(reviewer({ sessionId: 'worker' }), {} as never)).toMatchObject({ behavior: 'allow' })
+    expect(await KanbanUpdateTool.checkPermissions(reviewer({ sessionId: 'worker' }))).toMatchObject({ behavior: 'allow' })
   })
 
   test('KanbanUpdate lets the creator change acceptance criteria and anyone allowed edit the other fields without asking', async () => {
     const requests = installFakeHost(() => ({ card: { id: 4, myRoles: ['creator', 'owner'] } }))
-    const check = (command: Record<string, unknown>) => KanbanUpdateTool.checkPermissions(KanbanUpdateTool.inputSchema.parse({ command }), {} as never)
+    const check = (command: Record<string, unknown>) => KanbanUpdateTool.checkPermissions(KanbanUpdateTool.inputSchema.parse({ command }))
 
     expect(await check({ type: 'edit_card', card: 4, acceptance: ['Works offline'] })).toMatchObject({ behavior: 'allow' })
     expect(await check({ type: 'edit_card', card: 4, description: 'Clearer goal' })).toMatchObject({ behavior: 'allow' })

@@ -1,30 +1,24 @@
-// @generated stub from scan-missing-imports
-const __target = function noop() {}
-const __handler: ProxyHandler<any> = {
-  get(_t, prop) {
-    if (prop === '__esModule') return true
-    if (prop === 'default') return new Proxy(__target, __handler)
-    if (prop === Symbol.toPrimitive) return () => undefined
-    if (prop === Symbol.iterator) return function* () {}
-    if (prop === Symbol.asyncIterator) return async function* () {}
-    if (prop === 'then') return undefined
-    return new Proxy(__target, __handler)
-  },
-  apply() {
-    return new Proxy(__target, __handler)
-  },
-  construct() {
-    return new Proxy(__target, __handler)
-  },
+import type { AgentMemoryScope } from '../../../tools/AgentTool/agentMemory.js'
+import type { CustomAgentDefinition } from '../../../tools/AgentTool/loadAgentsDir.js'
+import type { SettingSource } from '../../../utils/settings/constants.js'
+
+export type AgentWizardData = {
+  location?: SettingSource
+  method?: 'generate' | 'manual'
+  wasGenerated?: boolean
+  generationPrompt?: string
+  isGenerating?: boolean
+  generatedAgent?: {
+    identifier: string
+    whenToUse: string
+    systemPrompt: string
+  }
+  agentType?: string
+  whenToUse?: string
+  systemPrompt?: string
+  selectedTools?: string[]
+  selectedModel?: string
+  selectedColor?: string
+  selectedMemory?: AgentMemoryScope
+  finalAgent?: CustomAgentDefinition
 }
-const stub: any = new Proxy(__target, __handler)
-export default stub
-export const __stubMissing = true
-export const createCachedMCState = stub
-export const isCachedMicrocompactEnabled = stub
-export const isModelSupportedForCacheEditing = stub
-export const getCachedMCConfig = stub
-export const markToolsSentToAPI = stub
-export const resetCachedMCState = stub
-export const checkProtectedNamespace = stub
-export const getCoordinatorUserContext = stub

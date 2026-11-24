@@ -1,4 +1,4 @@
-import { type Options as ExecaOptions, execaSync } from 'execa'
+import { execaSync, type SyncOptions } from 'execa'
 import { getCwd } from '../utils/cwd.js'
 import { slowLogging } from './slowOperations.js'
 
@@ -9,7 +9,7 @@ type ExecSyncOptions = {
   abortSignal?: AbortSignal
   timeout?: number
   input?: string
-  stdio?: ExecaOptions['stdio']
+  stdio?: SyncOptions['stdio']
 }
 
 /**
@@ -79,7 +79,7 @@ export function execSyncWithDefaults_DEPRECATED(
       reject: false, // Don't throw on non-zero exit codes
       input,
     })
-    if (!result.stdout) {
+    if (typeof result.stdout !== 'string' || !result.stdout) {
       return null
     }
     return result.stdout.trim() || null

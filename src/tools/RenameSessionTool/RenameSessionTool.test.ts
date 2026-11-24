@@ -16,7 +16,7 @@ afterEach(() => {
 
 const parse = (input: Record<string, unknown>) => RenameSessionTool.inputSchema.parse(input)
 const run = (input: Record<string, unknown>) =>
-  RenameSessionTool.call(parse(input), {} as never, undefined as never, undefined as never)
+  RenameSessionTool.call(parse(input))
 
 describe('RenameSession', () => {
   test('sends session_rename with the title and returns the stored one', async () => {
@@ -41,7 +41,7 @@ describe('RenameSession', () => {
 
   test('allows the call without a prompt', async () => {
     const input = parse({ title: 'T' })
-    const result = await RenameSessionTool.checkPermissions(input, {} as never)
+    const result = await RenameSessionTool.checkPermissions(input)
     expect(result.behavior).toBe('allow')
   })
 

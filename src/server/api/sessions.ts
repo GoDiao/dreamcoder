@@ -565,11 +565,10 @@ async function getSessionInspection(sessionId: string, url: URL): Promise<Respon
       }
     }
 
-    if (!includeContext) {
-    } else if (contextResult.status === 'fulfilled' && contextResult.value) {
-      response.context = contextResult.value
-    } else {
+    if (contextResult.status === 'rejected') {
       errors.context = contextResult.reason instanceof Error ? contextResult.reason.message : String(contextResult.reason)
+    } else if (contextResult.value) {
+      response.context = contextResult.value
     }
 
     if (mcpResult.status === 'fulfilled' && response.status && typeof response.status === 'object') {
@@ -592,7 +591,7 @@ function usageTokenTotal(usage: unknown): number {
     record.totalOutputTokens,
     record.totalCacheReadInputTokens,
     record.totalCacheCreationInputTokens,
-  ].reduce((sum, value) => sum + (typeof value === 'number' ? value : 0), 0)
+  ].reduce<number>((sum, value) => sum + (typeof value === 'number' ? value : 0), 0)
 }
 
 function chooseRicherUsage(

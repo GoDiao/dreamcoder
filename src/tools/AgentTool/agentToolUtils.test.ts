@@ -31,6 +31,7 @@ describe('runAsyncAgentLifecycle', () => {
     const abortController = new AbortController()
     const task: LocalAgentTaskState = {
       ...createTaskStateBase(taskId, 'local_agent', 'Review code', 'toolu_agent'),
+      type: 'local_agent',
       status: 'running',
       agentId: taskId,
       prompt: 'Review code',
@@ -53,7 +54,7 @@ describe('runAsyncAgentLifecycle', () => {
       appState = updater(appState)
     }
     const message = createAssistantMessage({
-      content: [{ type: 'text', text: 'Review complete.' }],
+      content: [{ type: 'text', text: 'Review complete.', citations: null }],
     }) as Message
     let cleanupStarted = false
 

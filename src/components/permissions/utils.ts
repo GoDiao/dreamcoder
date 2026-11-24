@@ -12,7 +12,7 @@ export function logUnaryPermissionEvent(
   event: 'accept' | 'reject',
   hasFeedback?: boolean,
 ): void {
-  void logUnaryEvent({
+  logUnaryEvent({
     completion_type,
     event,
     metadata: {

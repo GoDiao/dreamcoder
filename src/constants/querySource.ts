@@ -1,30 +1,45 @@
-// @generated stub from scan-missing-imports
-const __target = function noop() {}
-const __handler: ProxyHandler<any> = {
-  get(_t, prop) {
-    if (prop === '__esModule') return true
-    if (prop === 'default') return new Proxy(__target, __handler)
-    if (prop === Symbol.toPrimitive) return () => undefined
-    if (prop === Symbol.iterator) return function* () {}
-    if (prop === Symbol.asyncIterator) return async function* () {}
-    if (prop === 'then') return undefined
-    return new Proxy(__target, __handler)
-  },
-  apply() {
-    return new Proxy(__target, __handler)
-  },
-  construct() {
-    return new Proxy(__target, __handler)
-  },
-}
-const stub: any = new Proxy(__target, __handler)
-export default stub
-export const __stubMissing = true
-export const createCachedMCState = stub
-export const isCachedMicrocompactEnabled = stub
-export const isModelSupportedForCacheEditing = stub
-export const getCachedMCConfig = stub
-export const markToolsSentToAPI = stub
-export const resetCachedMCState = stub
-export const checkProtectedNamespace = stub
-export const getCoordinatorUserContext = stub
+export type QuerySource =
+  | 'agent:builtin'
+  | 'agent:builtin:fork'
+  | 'agent:custom'
+  | 'agent:default'
+  | 'agent_creation'
+  | 'agent_summary'
+  | 'auto_dream'
+  | 'auto_mode'
+  | 'auto_mode_critique'
+  | 'away_summary'
+  | 'bash_classifier'
+  | 'bash_extract_prefix'
+  | 'compact'
+  | 'extract_memories'
+  | 'feedback'
+  | 'generate_session_title'
+  | 'hook_agent'
+  | 'hook_prompt'
+  | 'insights'
+  | 'magic_docs'
+  | 'marble_origami'
+  | 'mcp_datetime_parse'
+  | 'memdir_relevance'
+  | 'model_validation'
+  | 'permission_explainer'
+  | 'prompt_suggestion'
+  | 'rename_generate_name'
+  | 'repl_main_thread'
+  | 'repl_main_thread:outputStyle:Explanatory'
+  | 'repl_main_thread:outputStyle:Learning'
+  | 'repl_main_thread:outputStyle:custom'
+  | 'sdk'
+  | 'session_memory'
+  | 'session_search'
+  | 'side_question'
+  | 'skill_improvement'
+  | 'skill_improvement_apply'
+  | 'speculation'
+  | 'teleport_generate_title'
+  | 'tool_use_summary_generation'
+  | 'verification_agent'
+  | 'web_fetch_apply'
+  | 'web_search_tool'
+  | 'yolo_classifier'

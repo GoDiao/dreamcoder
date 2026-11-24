@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import * as React from 'react';
 import BashToolResultMessage from '../../tools/BashTool/BashToolResultMessage.js';

@@ -54,7 +54,6 @@ import {
 import { logBridgeSkip } from './debugUtils.js'
 import { logForDebugging } from '../utils/debug.js'
 import { logForDiagnosticsNoPII } from '../utils/diagLogs.js'
-import { isInProtectedNamespace } from '../utils/envUtils.js'
 import { errorMessage } from '../utils/errors.js'
 import { sleep } from '../utils/sleep.js'
 import { registerCleanup } from '../utils/cleanupRegistry.js'
@@ -755,7 +754,6 @@ export async function initEnvLessBridgeCore(
       has_initial_messages: !!(initialMessages && initialMessages.length > 0),
       v2: true,
       expires_in_s: credentials.expires_in,
-      inProtectedNamespace: isInProtectedNamespace(),
     })
   }
 

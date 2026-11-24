@@ -1,8 +1,5 @@
 import type Anthropic from '@anthropic-ai/sdk'
-import type {
-  BetaTool,
-  BetaToolUnion,
-} from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
+import type { BetaTool } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
 import { createHash } from 'crypto'
 import { SYSTEM_PROMPT_DYNAMIC_BOUNDARY } from 'src/constants/prompts.js'
 import { getSystemContext, getUserContext } from 'src/context.js'
@@ -129,7 +126,7 @@ export async function toolToAPISchema(
       ttl?: '5m' | '1h'
     }
   },
-): Promise<BetaToolUnion> {
+): Promise<BetaTool> {
   // Session-stable base schema: name, description, input_schema, strict,
   // eager_input_streaming. These are computed once per session and cached to
   // prevent mid-session GrowthBook flips (tengu_tool_pear, tengu_fgts) or

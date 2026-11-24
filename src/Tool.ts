@@ -50,7 +50,6 @@ import type {
   AgentToolProgress,
   BashProgress,
   MCPProgress,
-  REPLToolProgress,
   SkillToolProgress,
   TaskOutputProgress,
   ToolProgressData,
@@ -66,7 +65,6 @@ export type {
   AgentToolProgress,
   BashProgress,
   MCPProgress,
-  REPLToolProgress,
   SkillToolProgress,
   TaskOutputProgress,
   WebSearchProgress,
@@ -221,16 +219,11 @@ export type ToolUseContext = {
    */
   loadedNestedMemoryPaths?: Set<string>
   dynamicSkillDirTriggers?: Set<string>
-  /** Skill names surfaced via skill_discovery this session. Telemetry only (feeds was_discovered). */
-  discoveredSkillNames?: Set<string>
   userModified?: boolean
   setInProgressToolUseIDs: (f: (prev: Set<string>) => Set<string>) => void
   /** Only wired in interactive (REPL) contexts; SDK/QueryEngine don't set this. */
   setHasInterruptibleToolInProgress?: (v: boolean) => void
   setResponseLength: (f: (prev: number) => number) => void
-  /** Ant-only: push a new API metrics entry for OTPS tracking.
-   *  Called by subagent streaming when a new API request starts. */
-  pushApiMetricsEntry?: (ttftMs: number) => void
   setStreamMode?: (mode: SpinnerMode) => void
   onCompactProgress?: (event: CompactProgressEvent) => void
   setSDKStatus?: (status: SDKStatus) => void

@@ -244,7 +244,8 @@ describe('bash sensitive read permissions', () => {
   })
 
   test('does not suggest an ineffective directory allow rule', () => {
-    expect(check('cat .env').suggestions).toEqual([])
+    const result = check('cat .env')
+    expect('suggestions' in result ? result.suggestions : undefined).toEqual([])
   })
 
   test('keeps safe SSH files and ordinary reads on the read-only path', () => {

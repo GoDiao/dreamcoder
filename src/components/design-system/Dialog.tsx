@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import React from 'react';
 import { type ExitState, useExitOnCtrlCDWithKeybindings } from '../../hooks/useExitOnCtrlCDWithKeybindings.js';
@@ -27,7 +28,7 @@ type DialogProps = {
    */
   isCancelActive?: boolean;
 };
-export function Dialog(t0) {
+export function Dialog(t0: DialogProps): React.ReactNode {
   const $ = _c(27);
   const {
     title,

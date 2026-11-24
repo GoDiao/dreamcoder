@@ -5,7 +5,6 @@ import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { stringWidth } from '../ink/stringWidth.js';
 import { wrapAnsi } from '../ink/wrapAnsi.js';
 import { Ansi, useTheme } from '../ink.js';
-import type { CliHighlight } from '../utils/cliHighlight.js';
 import { formatToken, padAligned } from '../utils/markdown.js';
 
 /** Accounts for parent indentation (e.g. message dot prefix) and terminal
@@ -29,7 +28,6 @@ const ANSI_BOLD_START = '\x1b[1m';
 const ANSI_BOLD_END = '\x1b[22m';
 type Props = {
   token: Tokens.Table;
-  highlight: CliHighlight | null;
   /** Override terminal width (useful for testing) */
   forceWidth?: number;
 };
@@ -71,7 +69,6 @@ function wrapText(text: string, width: number, options?: {
  */
 export function MarkdownTable({
   token,
-  highlight,
   forceWidth
 }: Props): React.ReactNode {
   const [theme] = useTheme();
@@ -82,7 +79,7 @@ export function MarkdownTable({
 
   // Format cell content to ANSI string
   function formatCell(tokens: Token[] | undefined): string {
-    return tokens?.map(_ => formatToken(_, theme, 0, null, null, highlight)).join('') ?? '';
+    return tokens?.map(_ => formatToken(_, theme, 0, null, null)).join('') ?? '';
   }
 
   // Get plain text (stripped of ANSI codes)

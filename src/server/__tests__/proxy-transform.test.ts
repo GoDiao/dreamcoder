@@ -552,7 +552,8 @@ describe('anthropicToOpenaiResponses', () => {
       ],
     }
     const result = anthropicToOpenaiResponses(req, RESPONSES_RULES)
-    const msg = result.input.find((i) => i.type === 'message' && i.role === 'assistant')!
+    const msg = result.input.find((i) => i.type === 'message' && i.role === 'assistant')
+    if (msg?.type !== 'message') throw new Error('missing assistant message')
     const content = msg.content as Array<{ type: string; text: string }>
     expect(content).toEqual([
       { type: 'output_text', text: 'Hello.' },

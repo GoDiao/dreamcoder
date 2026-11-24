@@ -46,8 +46,8 @@ async function artifact(artifactsDir: string, name: string) {
 }
 
 const exists = (path: string) => stat(path).then(() => true, () => false)
-const validate = (path: string) => ArtifactCopyTool.validateInput!({ path }, {} as never)
-const permission = (path: string) => ArtifactCopyTool.checkPermissions({ path }, {} as never)
+const validate = (path: string) => ArtifactCopyTool.validateInput!({ path })
+const permission = (path: string) => ArtifactCopyTool.checkPermissions({ path })
 
 describe('ArtifactCopy validation and permission', () => {
   test('rejects a path that is not an artifact folder', async () => {
@@ -77,7 +77,7 @@ describe('ArtifactCopy validation and permission', () => {
 describe('ArtifactCopy call', () => {
   test('copies an artifact of another project and leaves the original', async () => {
     const foreign = await artifact(join(root, 'other', 'dc_artifacts'), 'a')
-    const { data } = await ArtifactCopyTool.call({ path: foreign }, context(), undefined as never, undefined as never)
+    const { data } = await ArtifactCopyTool.call({ path: foreign }, context())
     expect(data).toEqual({ name: 'a', path: join(project, 'dc_artifacts', 'a'), movedFromGlobalStore: false })
     expect(await exists(join(foreign, 'index.html'))).toBe(true)
     expect(await exists(join(project, 'dc_artifacts', 'a', 'index.html'))).toBe(true)
@@ -88,7 +88,7 @@ describe('ArtifactCopy call', () => {
   test('tells the sidecar the copy was written, so the lists refresh at once', async () => {
     const foreign = await artifact(join(root, 'other', 'dc_artifacts'), 'a')
     drainSdkEvents()
-    await ArtifactCopyTool.call({ path: foreign }, context(), undefined as never, undefined as never)
+    await ArtifactCopyTool.call({ path: foreign }, context())
     const events = drainSdkEvents()
     expect(events).toHaveLength(1)
     expect(events[0]).toMatchObject({
@@ -108,7 +108,7 @@ describe('ArtifactCopy call', () => {
         return new Promise<T>((resolve) => { release = () => resolve({ files: ['index.html'] } as T) })
       })
     })
-    const copying = ArtifactCopyTool.call({ path: global }, context(), undefined as never, undefined as never)
+    const copying = ArtifactCopyTool.call({ path: global }, context())
     expect(await asked).toEqual({ subtype: 'artifact_edit_wait', path: global })
     expect(await exists(global)).toBe(true)
     release()
@@ -118,7 +118,7 @@ describe('ArtifactCopy call', () => {
 
   test('moves an artifact out of the global store', async () => {
     const global = await artifact(getGlobalArtifactsDir(), 'g')
-    const { data } = await ArtifactCopyTool.call({ path: global }, context(), undefined as never, undefined as never)
+    const { data } = await ArtifactCopyTool.call({ path: global }, context())
     expect(data.movedFromGlobalStore).toBe(true)
     expect(await exists(global)).toBe(false)
     expect(await exists(join(project, 'dc_artifacts', 'g', 'index.html'))).toBe(true)
@@ -129,7 +129,7 @@ describe('ArtifactCopy call', () => {
     const worktree = join(root, 'worktree')
     await mkdir(worktree, { recursive: true })
     const foreign = await artifact(join(root, 'other', 'dc_artifacts'), 'a')
-    await runWithCwdOverride(worktree, () => ArtifactCopyTool.call({ path: foreign }, context(), undefined as never, undefined as never))
+    await runWithCwdOverride(worktree, () => ArtifactCopyTool.call({ path: foreign }, context()))
     expect(await exists(join(worktree, 'dc_artifacts', 'a', 'index.html'))).toBe(true)
     expect(await exists(join(project, 'dc_artifacts', 'a'))).toBe(false)
   })
@@ -137,7 +137,7 @@ describe('ArtifactCopy call', () => {
   test('adds a number to the name when it is taken', async () => {
     await artifact(join(project, 'dc_artifacts'), 'a')
     const foreign = await artifact(join(root, 'other', 'dc_artifacts'), 'a')
-    const { data } = await ArtifactCopyTool.call({ path: foreign }, context(), undefined as never, undefined as never)
+    const { data } = await ArtifactCopyTool.call({ path: foreign }, context())
     expect(data.name).toBe('a-2')
   })
 })

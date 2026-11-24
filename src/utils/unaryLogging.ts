@@ -13,21 +13,21 @@ type LogEvent = {
   completion_type: CompletionType
   event: 'accept' | 'reject' | 'response'
   metadata: {
-    language_name: string | Promise<string>
+    language_name: string
     message_id: string
     platform: string
     hasFeedback?: boolean
   }
 }
 
-export async function logUnaryEvent(event: LogEvent): Promise<void> {
+export function logUnaryEvent(event: LogEvent): void {
   logEvent('tengu_unary_event', {
     event:
       event.event as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     completion_type:
       event.completion_type as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-    language_name: (await event.metadata
-      .language_name) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    language_name: event.metadata
+      .language_name as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     message_id: event.metadata
       .message_id as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     platform: event.metadata

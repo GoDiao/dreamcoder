@@ -1,11 +1,12 @@
 export type ConnectorTextBlock = {
   type: 'connector_text';
-  text?: string;
+  connector_text: string;
+  signature?: string;
 };
 
 export type ConnectorTextDelta = {
   type: 'connector_text_delta';
-  text?: string;
+  connector_text: string;
 };
 
 export function isConnectorTextBlock(

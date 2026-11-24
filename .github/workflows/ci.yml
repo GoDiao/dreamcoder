@@ -1,7 +1,7 @@
 name: CI
 
-# Runs the server tests, the desktop tests and the desktop typecheck and design lint on every
-# pull request to main and on every push to main.
+# Runs the root typecheck, the server tests, the desktop tests and the desktop typecheck and design
+# lint on every pull request to main and on every push to main.
 on:
   pull_request:
     branches: [main]
@@ -38,12 +38,17 @@ jobs:
           restore-keys: bun-${{ runner.os }}-
 
       - name: Install dependencies
+        id: install
         run: |
           bun install --frozen-lockfile
           (cd vendor/showai && bun install --frozen-lockfile)
           cd desktop && bun install --frozen-lockfile
 
+      - name: Typecheck
+        run: bun run typecheck
+
       - name: Run tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: bun test
 
   desktop-tests:

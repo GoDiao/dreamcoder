@@ -852,7 +852,7 @@ describe('transcript items from session messages', () => {
     it('rewinds from a queued message by its client id', async () => {
       const sessionId = crypto.randomUUID()
       const user = userEntry(sessionId, 'start')
-      const queued = { ...queuedEntry(sessionId, { prompt: 'one more thing', source_uuid: 'client-id-1' }, '2026-01-01T00:01:30.000Z'), parentUuid: user.uuid }
+      const queued: Entry = { ...queuedEntry(sessionId, { prompt: 'one more thing', source_uuid: 'client-id-1' }, '2026-01-01T00:01:30.000Z'), parentUuid: user.uuid }
       await writeTranscript(sessionId, [metaEntry(), user, queued, assistantEntry(sessionId, 'ok', queued.uuid)])
 
       await sessionService.trimSessionMessagesFrom(sessionId, 'client-id-1')
@@ -865,14 +865,14 @@ describe('transcript items from session messages', () => {
     it('forks at a queued message by its client id', async () => {
       const sessionId = crypto.randomUUID()
       const user = userEntry(sessionId, 'start')
-      const queued = { ...queuedEntry(sessionId, { prompt: 'one more thing', source_uuid: 'client-id-1' }, '2026-01-01T00:01:30.000Z'), parentUuid: user.uuid }
+      const queued: Entry = { ...queuedEntry(sessionId, { prompt: 'one more thing', source_uuid: 'client-id-1' }, '2026-01-01T00:01:30.000Z'), parentUuid: user.uuid }
       const assistant = assistantEntry(sessionId, 'ok', queued.uuid)
       const sourcePath = await writeTranscript(sessionId, [metaEntry(), user, queued, assistant])
 
       const branch = await createSessionBranch({ sourceSessionId: sessionId, sourceTranscriptPath: sourcePath, sourceWorkDir: workDir, targetMessageId: 'client-id-1' })
 
       const copied = (await readEntries(branch.sessionId)).filter((entry) => entry.type === 'user' || entry.type === 'attachment' || entry.type === 'assistant')
-      expect(copied.map((entry) => (entry.forkedFrom as { messageUuid: string }).messageUuid)).toEqual([user.uuid, queued.uuid])
+      expect(copied.map((entry) => (entry.forkedFrom as { messageUuid: string }).messageUuid)).toEqual([user.uuid as string, queued.uuid as string])
     })
 
     it('shows a session report with its origin and the report id', async () => {
@@ -1528,7 +1528,7 @@ describe('session links service', () => {
       })
       const pending = sessionStateStore.peek(parentId)?.pendingReports
       expect(pending).toEqual([
-        { id: stored[0]!.id, from: { sessionId: childId, name: 'Worker' }, summary: 'half way there', createdAt: stored[0]!.createdAt },
+        { id: stored[0]!.id as string, from: { sessionId: childId, name: 'Worker' }, summary: 'half way there', createdAt: stored[0]!.createdAt as number },
       ])
     })
 

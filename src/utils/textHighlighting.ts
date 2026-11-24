@@ -126,6 +126,9 @@ class HighlightSegmenter {
         this.codes.push(token)
         this.stringPos += token.code.length
         this.tokenIdx++
+      } else if (token.type === 'control') {
+        this.stringPos += token.code.length
+        this.tokenIdx++
       } else {
         const charsNeeded = targetVisiblePos - this.visiblePos
         const charsAvailable = token.value.length - this.charIdx

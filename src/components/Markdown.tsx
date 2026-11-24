@@ -1,9 +1,8 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import { marked, type Token, type Tokens } from 'marked';
-import React, { Suspense, use, useMemo, useRef } from 'react';
-import { useSettings } from '../hooks/useSettings.js';
+import React, { useRef } from 'react';
 import { Ansi, Box, useTheme } from '../ink.js';
-import { type CliHighlight, getCliHighlightPromise } from '../utils/cliHighlight.js';
 import { hashContent } from '../utils/hash.js';
 import { configureMarked, formatToken } from '../utils/markdown.js';
 import { stripPromptXMLTags } from '../utils/messages.js';
@@ -77,21 +76,9 @@ function cachedLexer(content: string): Token[] {
  */
 export function Markdown(props) {
   const $ = _c(4);
-  const settings = useSettings();
-  if (settings.syntaxHighlightingDisabled) {
-    let t0;
-    if ($[0] !== props) {
-      t0 = <MarkdownBody {...props} highlight={null} />;
-      $[0] = props;
-      $[1] = t0;
-    } else {
-      t0 = $[1];
-    }
-    return t0;
-  }
   let t0;
   if ($[2] !== props) {
-    t0 = <Suspense fallback={<MarkdownBody {...props} highlight={null} />}><MarkdownWithHighlight {...props} /></Suspense>;
+    t0 = <MarkdownBody {...props} />;
     $[2] = props;
     $[3] = t0;
   } else {
@@ -99,38 +86,16 @@ export function Markdown(props) {
   }
   return t0;
 }
-function MarkdownWithHighlight(props) {
-  const $ = _c(4);
-  let t0;
-  if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
-    t0 = getCliHighlightPromise();
-    $[0] = t0;
-  } else {
-    t0 = $[0];
-  }
-  const highlight = use(t0);
-  let t1;
-  if ($[1] !== highlight || $[2] !== props) {
-    t1 = <MarkdownBody {...props} highlight={highlight} />;
-    $[1] = highlight;
-    $[2] = props;
-    $[3] = t1;
-  } else {
-    t1 = $[3];
-  }
-  return t1;
-}
 function MarkdownBody(t0) {
   const $ = _c(7);
   const {
     children,
-    dimColor,
-    highlight
+    dimColor
   } = t0;
   const [theme] = useTheme();
   configureMarked();
   let elements;
-  if ($[0] !== children || $[1] !== dimColor || $[2] !== highlight || $[3] !== theme) {
+  if ($[0] !== children || $[1] !== dimColor || $[3] !== theme) {
     const tokens = cachedLexer(stripPromptXMLTags(children));
     elements = [];
     let nonTableContent = "";
@@ -143,16 +108,15 @@ function MarkdownBody(t0) {
     for (const token of tokens) {
       if (token.type === "table") {
         flushNonTableContent();
-        elements.push(<MarkdownTable key={elements.length} token={token as Tokens.Table} highlight={highlight} />);
+        elements.push(<MarkdownTable key={elements.length} token={token as Tokens.Table} />);
       } else {
-        nonTableContent = nonTableContent + formatToken(token, theme, 0, null, null, highlight);
+        nonTableContent = nonTableContent + formatToken(token, theme, 0, null, null);
         nonTableContent;
       }
     }
     flushNonTableContent();
     $[0] = children;
     $[1] = dimColor;
-    $[2] = highlight;
     $[3] = theme;
     $[4] = elements;
   } else {

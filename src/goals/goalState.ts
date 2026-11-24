@@ -225,7 +225,9 @@ function activeGoalFromLocalCommandOutput(
 
 function messageToText(message: Message): string {
   if (message.type === 'system') {
-    return typeof message.content === 'string' ? message.content : ''
+    return 'content' in message && typeof message.content === 'string'
+      ? message.content
+      : ''
   }
   if (!('message' in message)) return ''
   const content = message.message?.content

@@ -241,7 +241,7 @@ describe('Skills API', () => {
 
     expect(res.status).toBe(200)
     const body = await res.json() as {
-      detail: { files: Array<{ path: string; state: string; content: string; body?: string }> }
+      detail: { files: Array<{ path: string; state: string; content: string; body?: string; language?: string }> }
     }
     const byPath = new Map(body.detail.files.map((file) => [file.path, file]))
 

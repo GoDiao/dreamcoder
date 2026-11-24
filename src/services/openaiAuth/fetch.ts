@@ -23,7 +23,7 @@ export function shouldUseOpenAICodexAuth(): boolean {
 export function buildOpenAICodexFetch(
   fetchOverride: ClientOptions['fetch'],
   source: string | undefined,
-): ClientOptions['fetch'] {
+): NonNullable<ClientOptions['fetch']> {
   const inner = fetchOverride ?? globalThis.fetch
 
   return async (input, init) => {
@@ -143,7 +143,7 @@ async function readAnthropicBody(
   }
 
   if (directBody instanceof Uint8Array || directBody instanceof ArrayBuffer) {
-    return JSON.parse(Buffer.from(directBody).toString('utf8')) as AnthropicRequest
+    return JSON.parse(new TextDecoder().decode(directBody)) as AnthropicRequest
   }
 
   if (input instanceof Request) {

@@ -28,15 +28,13 @@ const CODE_QUIPS = [
   'Ship it!',
 ]
 
-function pickQuip(messages: Message[]): string | undefined {
-  const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant')
+export function pickQuip(messages: Message[]): string | undefined {
+  const lastAssistant = messages.findLast(m => m.type === 'assistant')
   if (!lastAssistant) return undefined
 
-  const content = Array.isArray(lastAssistant.content)
-    ? lastAssistant.content.map(c => (typeof c === 'string' ? c : c.type === 'text' ? c.text : '')).join('')
-    : typeof lastAssistant.content === 'string'
-      ? lastAssistant.content
-      : ''
+  const content = lastAssistant.message.content
+    .map(block => (block.type === 'text' ? block.text : ''))
+    .join('')
 
   if (!content) return undefined
 

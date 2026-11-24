@@ -48,7 +48,7 @@ type AttachmentRef = {
 }
 
 type SessionProcess = {
-  proc: ReturnType<typeof Bun.spawn>
+  proc: Bun.Subprocess<'pipe', 'pipe', 'pipe'>
   generation: number
   outputCallbacks: Array<(msg: any) => void>
   workDir: string
@@ -311,7 +311,7 @@ export class ConversationService {
 
     const childEnv = await this.buildChildEnv(launchWorkDir, sdkUrl, options, sessionId)
 
-    let proc: ReturnType<typeof Bun.spawn>
+    let proc: Bun.Subprocess<'pipe', 'pipe', 'pipe'>
     try {
       proc = Bun.spawn(args, {
         cwd: launchWorkDir,

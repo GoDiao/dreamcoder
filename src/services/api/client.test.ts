@@ -94,15 +94,19 @@ describe('getAnthropicClient', () => {
     delete process.env.ANTHROPIC_API_KEY
 
     try {
+      const requests: Headers[] = []
       const client = await getAnthropicClient({
         maxRetries: 0,
         model: 'claude-sonnet-4-6',
+        fetchOverride: async (_input, init) => {
+          requests.push(new Headers(init?.headers))
+          return Response.json({ data: [], has_more: false, first_id: null, last_id: null })
+        },
       })
+      await client.models.list()
 
       expect(client.apiKey).toBeNull()
-      expect(client._options.defaultHeaders).toMatchObject({
-        Authorization: 'Bearer provider-bearer-token',
-      })
+      expect(requests[0]?.get('authorization')).toBe('Bearer provider-bearer-token')
     } finally {
       if (originalAuthToken === undefined) delete process.env.ANTHROPIC_AUTH_TOKEN
       else process.env.ANTHROPIC_AUTH_TOKEN = originalAuthToken

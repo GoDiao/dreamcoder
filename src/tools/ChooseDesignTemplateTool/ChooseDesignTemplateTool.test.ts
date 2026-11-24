@@ -7,7 +7,7 @@ import { ALL_AGENT_DISALLOWED_TOOLS } from '../../constants/tools.js'
 import { drainSdkEvents } from '../../utils/sdkEventQueue.js'
 import { templateRecord, writeTemplates } from '../../utils/__tests__/designTemplateFixtures.js'
 import { CHOOSE_DESIGN_TEMPLATE_TOOL_NAME } from './constants.js'
-import { ChooseDesignTemplateTool } from './ChooseDesignTemplateTool.js'
+import { ChooseDesignTemplateTool, type Output } from './ChooseDesignTemplateTool.js'
 
 const originalCwd = getOriginalCwd()
 const originalAppRoot = process.env.CLAUDE_APP_ROOT
@@ -47,8 +47,8 @@ afterEach(async () => {
 })
 
 const exists = (path: string) => stat(path).then(() => true, () => false)
-const validate = (input: Record<string, unknown>) => ChooseDesignTemplateTool.validateInput!(input as never, {} as never)
-const run = (input: Record<string, unknown>) => ChooseDesignTemplateTool.call(input as never, {} as never, undefined as never, undefined as never)
+const validate = (input: Record<string, unknown>) => ChooseDesignTemplateTool.validateInput!(input as never)
+const run = (input: Record<string, unknown>): Promise<{ data: Output }> => ChooseDesignTemplateTool.call(input as never)
 
 describe('ChooseDesignTemplate validation and permission', () => {
   test('accepts templates that are in the catalog', async () => {
@@ -79,7 +79,7 @@ describe('ChooseDesignTemplate validation and permission', () => {
   })
 
   test('always asks the user and is excluded from sub-agents', async () => {
-    expect((await ChooseDesignTemplateTool.checkPermissions({ candidates } as never, {} as never)).behavior).toBe('ask')
+    expect((await ChooseDesignTemplateTool.checkPermissions({ candidates } as never)).behavior).toBe('ask')
     expect(ChooseDesignTemplateTool.requiresUserInteraction?.()).toBe(true)
     expect(ALL_AGENT_DISALLOWED_TOOLS.has(CHOOSE_DESIGN_TEMPLATE_TOOL_NAME)).toBe(true)
   })

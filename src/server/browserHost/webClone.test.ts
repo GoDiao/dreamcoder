@@ -46,20 +46,21 @@ class FakeChannel {
 type FakeSocket = ServerWebSocket<WebCloneSocketData> & { sent: Array<Record<string, any>>; closed: Array<{ code?: number; reason?: string }> }
 
 function fakeSocket(data: WebCloneSocketData): FakeSocket {
-  return {
+  const socket = {
     data,
     readyState: 1,
-    sent: [],
-    closed: [],
+    sent: [] as FakeSocket['sent'],
+    closed: [] as FakeSocket['closed'],
     send(payload: string) {
-      this.sent.push(JSON.parse(payload))
+      socket.sent.push(JSON.parse(payload))
       return payload.length
     },
     close(code?: number, reason?: string) {
-      this.closed.push({ code, reason })
-      this.readyState = 3
+      socket.closed.push({ code, reason })
+      socket.readyState = 3
     },
-  } as unknown as FakeSocket
+  }
+  return socket as unknown as FakeSocket
 }
 
 let channel: FakeChannel

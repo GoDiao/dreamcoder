@@ -68,7 +68,7 @@ export async function handleProvidersApi(
 
     if (action === 'test') {
       if (req.method !== 'POST') throw methodNotAllowed(req.method)
-      let overrides: { baseUrl?: string; modelId?: string; apiFormat?: string; authStrategy?: string } | undefined
+      let overrides: Parameters<typeof providerService.testProvider>[1]
       try {
         const body = await req.json()
         if (body && typeof body === 'object') overrides = body as typeof overrides

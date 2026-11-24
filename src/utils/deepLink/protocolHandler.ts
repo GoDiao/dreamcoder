@@ -20,7 +20,6 @@ import {
 import { jsonStringify } from '../slowOperations.js'
 import { readLastFetchTime } from './banner.js'
 import { parseDeepLink } from './parseDeepLink.js'
-import { MACOS_BUNDLE_ID } from './registerProtocol.js'
 import { launchInTerminal } from './terminalLauncher.js'
 
 /**
@@ -72,36 +71,6 @@ export async function handleDeepLinkUri(uri: string): Promise<number> {
   }
 
   return 0
-}
-
-/**
- * Handle the case where claude was launched as the app bundle's executable
- * by macOS (via URL scheme). Uses the NAPI module to receive the URL from
- * the Apple Event, then handles it normally.
- *
- * @returns exit code (0 = success, 1 = error, null = not a URL launch)
- */
-export async function handleUrlSchemeLaunch(): Promise<number | null> {
-  // LaunchServices overwrites __CFBundleIdentifier with the launching bundle's
-  // ID. This is a precise positive signal — it's set to our exact bundle ID
-  // if and only if macOS launched us via the URL handler .app bundle.
-  // (`open` from a terminal passes the caller's env through, so negative
-  // heuristics like !TERM don't work — the terminal's TERM leaks in.)
-  if (process.env.__CFBundleIdentifier !== MACOS_BUNDLE_ID) {
-    return null
-  }
-
-  try {
-    const { waitForUrlEvent } = await import('url-handler-napi')
-    const url = waitForUrlEvent(5000)
-    if (!url) {
-      return null
-    }
-    return await handleDeepLinkUri(url)
-  } catch {
-    // NAPI module not available, or handleDeepLinkUri rejected — not a URL launch
-    return null
-  }
 }
 
 /**

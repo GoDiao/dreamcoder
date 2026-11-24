@@ -35,7 +35,6 @@ import {
   getIsNonInteractiveSession,
   getRegisteredHooks,
   getStatsStore,
-  addToTurnHookDuration,
   getOriginalCwd,
   getMainThreadAgentType,
 } from '../bootstrap/state.js'
@@ -2070,7 +2069,6 @@ async function* executeHooks({
     }
     const totalDurationMs = Date.now() - batchStartTime
     getStatsStore()?.observe('hook_duration_ms', totalDurationMs)
-    addToTurnHookDuration(totalDurationMs)
     logEvent(`tengu_repl_hook_finished`, {
       hookName:
         hookName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -2948,7 +2946,6 @@ async function* executeHooks({
 
   const totalDurationMs = Date.now() - batchStartTime
   getStatsStore()?.observe('hook_duration_ms', totalDurationMs)
-  addToTurnHookDuration(totalDurationMs)
 
   logEvent(`tengu_repl_hook_finished`, {
     hookName:

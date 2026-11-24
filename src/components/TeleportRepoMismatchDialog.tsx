@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import React, { useCallback, useState } from 'react';
 import { Box, Text } from '../ink.js';

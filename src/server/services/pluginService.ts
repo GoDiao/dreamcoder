@@ -5,10 +5,13 @@ import {
   disablePluginOp,
   enablePluginOp,
   type InstallableScope,
+  isInstallableScope,
   uninstallPluginOp,
   updatePluginOp,
+  VALID_INSTALLABLE_SCOPES,
 } from '../../services/plugins/pluginOperations.js'
 import { getAgentDefinitionsWithOverrides } from '../../tools/AgentTool/loadAgentsDir.js'
+import { getCwd } from '../../utils/cwd.js'
 import type { LoadedPlugin, PluginError } from '../../types/plugin.js'
 import { getPluginErrorMessage } from '../../types/plugin.js'
 import { clearAllCaches } from '../../utils/plugins/cacheUtils.js'
@@ -21,6 +24,7 @@ import {
 } from '../../utils/plugins/marketplaceManager.js'
 import { loadPluginLspServers } from '../../utils/plugins/lspPluginIntegration.js'
 import { loadPluginMcpServers } from '../../utils/plugins/mcpPluginIntegration.js'
+import { resolveMarketplaceAutoUpdate } from '../../utils/plugins/pluginAutoupdate.js'
 import { parsePluginIdentifier } from '../../utils/plugins/pluginIdentifier.js'
 import { loadAllPlugins } from '../../utils/plugins/pluginLoader.js'
 import { loadPluginHooks } from '../../utils/plugins/loadPluginHooks.js'
@@ -148,6 +152,15 @@ type HydratedPluginState = {
   errors: PluginError[]
 }
 
+function requireInstallableScope(
+  scope: PluginScope | undefined,
+): InstallableScope | undefined {
+  if (scope === undefined || isInstallableScope(scope)) return scope
+  throw ApiError.badRequest(
+    `Invalid scope "${scope}". Must be one of: ${VALID_INSTALLABLE_SCOPES.join(', ')}`,
+  )
+}
+
 export class PluginService {
   async listPlugins(cwd?: string): Promise<ApiPluginListResponse> {
     const { plugins, marketplaces } = await this.collectPluginState(cwd)
@@ -179,9 +192,9 @@ export class PluginService {
 
   async enablePlugin(
     pluginId: string,
-    scope?: InstallableScope,
+    scope?: PluginScope,
   ): Promise<ApiPluginActionResponse> {
-    const result = await enablePluginOp(pluginId, scope)
+    const result = await enablePluginOp(pluginId, requireInstallableScope(scope))
     if (!result.success) {
       throw ApiError.badRequest(result.message)
     }
@@ -190,9 +203,9 @@ export class PluginService {
 
   async disablePlugin(
     pluginId: string,
-    scope?: InstallableScope,
+    scope?: PluginScope,
   ): Promise<ApiPluginActionResponse> {
-    const result = await disablePluginOp(pluginId, scope)
+    const result = await disablePluginOp(pluginId, requireInstallableScope(scope))
     if (!result.success) {
       throw ApiError.badRequest(result.message)
     }
@@ -201,14 +214,15 @@ export class PluginService {
 
   async uninstallPlugin(
     pluginId: string,
-    scope?: InstallableScope,
+    scope?: PluginScope,
     keepData = false,
   ): Promise<ApiPluginActionResponse> {
-    if (!scope) {
+    const installableScope = requireInstallableScope(scope)
+    if (!installableScope) {
       throw ApiError.badRequest('Plugin uninstall requires a scope')
     }
 
-    const result = await uninstallPluginOp(pluginId, scope, keepData)
+    const result = await uninstallPluginOp(pluginId, installableScope, keepData)
     if (!result.success) {
       throw ApiError.badRequest(result.message)
     }
@@ -240,7 +254,7 @@ export class PluginService {
 
     const [skills, agentDefinitions] = await Promise.all([
       getPluginSkills(),
-      getAgentDefinitionsWithOverrides(cwd),
+      getAgentDefinitionsWithOverrides(cwd ?? getCwd()),
     ])
 
     const hookCount = await this.getHookCount(enabled)
@@ -318,12 +332,12 @@ export class PluginService {
       this.toSummary(detail),
     )
 
-    const marketplaces = Object.entries(marketplaceConfig.marketplaces ?? {})
+    const marketplaces = Object.entries(marketplaceConfig)
       .map(([name, entry]) => ({
         name,
         source: getMarketplaceSourceDisplay(entry.source),
         lastUpdated: entry.lastUpdated,
-        autoUpdate: entry.autoUpdate !== false,
+        autoUpdate: resolveMarketplaceAutoUpdate(name, entry),
         installedCount: plugins.filter((plugin) => plugin.marketplace === name).length,
       }))
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -687,8 +701,10 @@ export class PluginService {
         return hook.prompt
       case 'http':
         return hook.url
-      default:
-        return hook.type
+      default: {
+        const unknownHook: { type: string } = hook
+        return unknownHook.type
+      }
     }
   }
 

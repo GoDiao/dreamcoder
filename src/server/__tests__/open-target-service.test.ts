@@ -18,7 +18,7 @@ function createService(
     dirNames?: Record<string, string[]>
     textFiles?: Record<string, string | null>
     launchResult?: { code: number; stdout: string; stderr: string }
-    iconData?: Uint8Array
+    iconData?: Uint8Array<ArrayBuffer>
     ttlMs?: number
     now?: { value: number }
   } = {},

@@ -192,16 +192,6 @@ function getEnvOverrides(): Record<string, unknown> | null {
 }
 
 /**
- * Check if a feature has an env-var override (CLAUDE_INTERNAL_FC_OVERRIDES).
- * When true, _CACHED_MAY_BE_STALE will return the override without touching
- * disk or network — callers can skip awaiting init for that feature.
- */
-export function hasGrowthBookEnvOverride(feature: string): boolean {
-  const overrides = getEnvOverrides()
-  return overrides !== null && feature in overrides
-}
-
-/**
  * Local config overrides set via /config Gates tab (ant-only). Checked after
  * env-var overrides — env wins so eval harnesses remain deterministic. Unlike
  * getEnvOverrides this is not memoized: the user can change overrides at

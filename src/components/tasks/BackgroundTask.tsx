@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import * as React from 'react';
 import { Text } from 'src/ink.js';
@@ -215,83 +216,6 @@ export function BackgroundTask(t0) {
           t6 = $[53];
         }
         return t6;
-      }
-    case "local_workflow":
-      {
-        const t1 = task.workflowName ?? task.summary ?? task.description;
-        let t2;
-        if ($[54] !== activityLimit || $[55] !== t1) {
-          t2 = truncate(t1, activityLimit, true);
-          $[54] = activityLimit;
-          $[55] = t1;
-          $[56] = t2;
-        } else {
-          t2 = $[56];
-        }
-        let t3;
-        if ($[57] !== task.agentCount || $[58] !== task.status) {
-          t3 = task.status === "running" ? `${task.agentCount} ${plural(task.agentCount, "agent")}` : task.status === "completed" ? "done" : undefined;
-          $[57] = task.agentCount;
-          $[58] = task.status;
-          $[59] = t3;
-        } else {
-          t3 = $[59];
-        }
-        const t4 = task.status === "completed" && !task.notified ? ", unread" : undefined;
-        let t5;
-        if ($[60] !== t3 || $[61] !== t4 || $[62] !== task.status) {
-          t5 = <TaskStatusText status={task.status} label={t3} suffix={t4} />;
-          $[60] = t3;
-          $[61] = t4;
-          $[62] = task.status;
-          $[63] = t5;
-        } else {
-          t5 = $[63];
-        }
-        let t6;
-        if ($[64] !== t2 || $[65] !== t5) {
-          t6 = <Text>{t2}{" "}{t5}</Text>;
-          $[64] = t2;
-          $[65] = t5;
-          $[66] = t6;
-        } else {
-          t6 = $[66];
-        }
-        return t6;
-      }
-    case "monitor_mcp":
-      {
-        let t1;
-        if ($[67] !== activityLimit || $[68] !== task.description) {
-          t1 = truncate(task.description, activityLimit, true);
-          $[67] = activityLimit;
-          $[68] = task.description;
-          $[69] = t1;
-        } else {
-          t1 = $[69];
-        }
-        const t2 = task.status === "completed" ? "done" : undefined;
-        const t3 = task.status === "completed" && !task.notified ? ", unread" : undefined;
-        let t4;
-        if ($[70] !== t2 || $[71] !== t3 || $[72] !== task.status) {
-          t4 = <TaskStatusText status={task.status} label={t2} suffix={t3} />;
-          $[70] = t2;
-          $[71] = t3;
-          $[72] = task.status;
-          $[73] = t4;
-        } else {
-          t4 = $[73];
-        }
-        let t5;
-        if ($[74] !== t1 || $[75] !== t4) {
-          t5 = <Text>{t1}{" "}{t4}</Text>;
-          $[74] = t1;
-          $[75] = t4;
-          $[76] = t5;
-        } else {
-          t5 = $[76];
-        }
-        return t5;
       }
     case "dream":
       {

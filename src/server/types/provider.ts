@@ -131,7 +131,7 @@ export type ProviderListItem = SavedProvider & {
   resolvedModels?: Record<string, ResolvedModelRulesView>
 }
 export type ProvidersIndex = z.infer<typeof ProvidersIndexSchema>
-export type CreateProviderInput = z.infer<typeof CreateProviderSchema>
+export type CreateProviderInput = z.input<typeof CreateProviderSchema>
 export type UpdateProviderInput = z.infer<typeof UpdateProviderSchema>
 export type TestProviderInput = z.infer<typeof TestProviderSchema>
 export type DiscoverProviderModelsInput = z.infer<typeof DiscoverProviderModelsSchema>

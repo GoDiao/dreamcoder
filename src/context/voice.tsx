@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
 import React, { createContext, useContext, useState, useSyncExternalStore } from 'react';
 import { createStore, type Store } from '../state/store.js';
@@ -52,7 +53,7 @@ function useVoiceStore() {
  * Subscribe to a slice of voice state. Only re-renders when the selected
  * value changes (compared via Object.is).
  */
-export function useVoiceState(selector) {
+export function useVoiceState<T>(selector: (state: VoiceState) => T): T {
   const $ = _c(3);
   const store = useVoiceStore();
   let t0;

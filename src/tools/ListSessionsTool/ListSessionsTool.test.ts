@@ -6,16 +6,16 @@ import { ListSessionsTool } from './ListSessionsTool.js'
 afterEach(() => setHostRequester(null))
 
 const sessions = [
-  { sessionId: 'a', title: 'A', project: '/p', relation: 'child', running: true, parentSessionId: 'me' },
-  { sessionId: 'b', title: 'B', project: '/q', relation: 'none', running: false },
+  { sessionId: 'a', title: 'A', project: '/p', relation: 'child' as const, running: true, parentSessionId: 'me' },
+  { sessionId: 'b', title: 'B', project: '/q', relation: 'none' as const, running: false },
 ]
 const run = (input: Record<string, unknown>) =>
-  ListSessionsTool.call(ListSessionsTool.inputSchema.parse(input), {} as never, undefined as never, undefined as never)
+  ListSessionsTool.call(ListSessionsTool.inputSchema.parse(input))
 
 describe('ListSessions', () => {
   test('is read-only and needs no permission prompt', async () => {
-    expect(ListSessionsTool.isReadOnly({})).toBe(true)
-    expect((await ListSessionsTool.checkPermissions({}, {} as never)).behavior).toBe('allow')
+    expect(ListSessionsTool.isReadOnly()).toBe(true)
+    expect((await ListSessionsTool.checkPermissions({})).behavior).toBe('allow')
   })
 
   test('sends session_list without a project and returns the rows', async () => {

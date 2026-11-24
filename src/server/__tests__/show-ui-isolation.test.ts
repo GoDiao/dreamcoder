@@ -199,7 +199,7 @@ describe('page frame isolation in a real browser', () => {
       hostname: '127.0.0.1',
       fetch(req, server) {
         beaconHits.push(new URL(req.url).pathname)
-        if (server.upgrade(req)) return undefined
+        if (server.upgrade(req, { data: undefined })) return undefined
         return new Response('beacon', { headers: { 'Access-Control-Allow-Origin': '*' } })
       },
       websocket: { message() {} },

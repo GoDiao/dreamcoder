@@ -2,11 +2,6 @@ import { feature } from 'bun:bundle'
 import type { UUID } from 'crypto'
 import uniqBy from 'lodash-es/uniqBy.js'
 
-/* eslint-disable @typescript-eslint/no-require-imports */
-const sessionTranscriptModule = feature('KAIROS')
-  ? (require('../sessionTranscript/sessionTranscript.js') as typeof import('../sessionTranscript/sessionTranscript.js'))
-  : null
-
 import { APIUserAbortError } from '@anthropic-ai/sdk'
 import { markPostCompaction } from 'src/bootstrap/state.js'
 import { getInvokedSkillsForAgent } from '../../bootstrap/state.js'
@@ -26,7 +21,6 @@ import type {
   AttachmentMessage,
   HookResultMessage,
   Message,
-  PartialCompactDirection,
   SystemCompactBoundaryMessage,
   SystemMessage,
   UserMessage,
@@ -65,7 +59,6 @@ import {
   getAssistantMessageText,
   getLastAssistantMessage,
   getMessagesAfterCompactBoundary,
-  isCompactBoundaryMessage,
   normalizeMessagesForAPI,
 } from '../../utils/messages.js'
 import { expandPath } from '../../utils/path.js'
@@ -203,9 +196,9 @@ export function stripImagesFromMessages(messages: Message[]): Message[] {
 
 /**
  * Strip attachment types that are re-injected post-compaction anyway.
- * skill_discovery/skill_listing are re-surfaced after compaction
- * and by the next turn's discovery signal, so feeding them to the summarizer
- * wastes tokens and pollutes the summary with stale skill suggestions.
+ * skill_listing is re-surfaced after compaction, so feeding it to the
+ * summarizer wastes tokens and pollutes the summary with stale skill
+ * suggestions.
  *
  * No-op when EXPERIMENTAL_SKILL_SEARCH is off (the attachment types
  * don't exist on external builds).
@@ -214,11 +207,7 @@ export function stripReinjectedAttachments(messages: Message[]): Message[] {
   if (feature('EXPERIMENTAL_SKILL_SEARCH')) {
     return messages.filter(
       m =>
-        !(
-          m.type === 'attachment' &&
-          (m.attachment.type === 'skill_discovery' ||
-            m.attachment.type === 'skill_listing')
-        ),
+        !(m.type === 'attachment' && m.attachment.type === 'skill_listing'),
     )
   }
   return messages
@@ -391,7 +380,7 @@ export function annotateBoundaryWithPreservedSegment(
  * User instructions come first; hook instructions are appended.
  * Empty strings normalize to undefined.
  */
-export function mergeHookInstructions(
+function mergeHookInstructions(
   userInstructions: string | undefined,
   hookInstructions: string | undefined,
 ): string | undefined {
@@ -724,12 +713,6 @@ export async function compactConversation(
     // instead of the user-set session name.
     reAppendSessionMetadata()
 
-    // Write a reduced transcript segment for the pre-compaction messages
-    // (assistant mode only). Fire-and-forget — errors are logged internally.
-    if (feature('KAIROS')) {
-      void sessionTranscriptModule?.writeSessionTranscriptSegment(messages)
-    }
-
     context.onCompactProgress?.({
       type: 'hooks_start',
       hookType: 'post_compact',
@@ -780,8 +763,6 @@ export async function compactConversation(
  * Performs a partial compaction around the selected message index.
  * Direction 'from': summarizes messages after the index, keeps earlier ones.
  *   Prompt cache for kept (earlier) messages is preserved.
- * Direction 'up_to': summarizes messages before the index, keeps later ones.
- *   Prompt cache is invalidated since the summary precedes the kept messages.
  */
 export async function partialCompactConversation(
   allMessages: Message[],
@@ -789,36 +770,15 @@ export async function partialCompactConversation(
   context: ToolUseContext,
   cacheSafeParams: CacheSafeParams,
   userFeedback?: string,
-  direction: PartialCompactDirection = 'from',
 ): Promise<CompactionResult> {
   try {
-    const messagesToSummarize =
-      direction === 'up_to'
-        ? allMessages.slice(0, pivotIndex)
-        : allMessages.slice(pivotIndex)
-    // 'up_to' must strip old compact boundaries/summaries: for 'up_to',
-    // summary_B sits BEFORE kept, so a stale boundary_A in kept wins
-    // findLastCompactBoundaryIndex's backward scan and drops summary_B.
-    // 'from' keeps them: summary_B sits AFTER kept (backward scan still
-    // works), and removing an old summary would lose its covered history.
-    const messagesToKeep =
-      direction === 'up_to'
-        ? allMessages
-            .slice(pivotIndex)
-            .filter(
-              m =>
-                m.type !== 'progress' &&
-                !isCompactBoundaryMessage(m) &&
-                !(m.type === 'user' && m.isCompactSummary),
-            )
-        : allMessages.slice(0, pivotIndex).filter(m => m.type !== 'progress')
+    const messagesToSummarize = allMessages.slice(pivotIndex)
+    const messagesToKeep = allMessages
+      .slice(0, pivotIndex)
+      .filter(m => m.type !== 'progress')
 
     if (messagesToSummarize.length === 0) {
-      throw new Error(
-        direction === 'up_to'
-          ? 'Nothing to summarize before the selected message.'
-          : 'Nothing to summarize after the selected message.',
-      )
+      throw new Error('Nothing to summarize after the selected message.')
     }
 
     const preCompactTokenCount = tokenCountWithEstimation(allMessages)
@@ -851,7 +811,7 @@ export async function partialCompactConversation(
     context.setResponseLength?.(() => 0)
     context.onCompactProgress?.({ type: 'compact_start' })
 
-    const compactPrompt = getPartialCompactPrompt(customInstructions, direction)
+    const compactPrompt = getPartialCompactPrompt(customInstructions)
     const summaryRequest = createUserMessage({
       content: compactPrompt,
     })
@@ -859,17 +819,13 @@ export async function partialCompactConversation(
     const failureMetadata = {
       preCompactTokenCount,
       direction:
-        direction as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        'from' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       messagesSummarized: messagesToSummarize.length,
     }
 
-    // 'up_to' prefix hits cache directly; 'from' sends all (tail wouldn't cache).
     // PTL retry breaks the cache prefix but unblocks the user (CC-1180).
-    let apiMessages = direction === 'up_to' ? messagesToSummarize : allMessages
-    let retryCacheSafeParams =
-      direction === 'up_to'
-        ? { ...cacheSafeParams, forkContextMessages: messagesToSummarize }
-        : cacheSafeParams
+    let apiMessages = allMessages
+    let retryCacheSafeParams = cacheSafeParams
     let summaryResponse: AssistantMessage
     let summary: string | null
     let ptlAttempts = 0
@@ -1006,7 +962,7 @@ export async function partialCompactConversation(
       messagesKept: messagesToKeep.length,
       messagesSummarized: messagesToSummarize.length,
       direction:
-        direction as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        'from' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       hasUserFeedback: !!userFeedback,
       trigger:
         'message_selector' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -1017,13 +973,7 @@ export async function partialCompactConversation(
         compactionUsage?.cache_creation_input_tokens ?? 0,
     })
 
-    // Progress messages aren't loggable, so forkSessionImpl would null out
-    // a logicalParentUuid pointing at one. Both directions skip them.
-    const lastPreCompactUuid =
-      direction === 'up_to'
-        ? allMessages.slice(0, pivotIndex).findLast(m => m.type !== 'progress')
-            ?.uuid
-        : messagesToKeep.at(-1)?.uuid
+    const lastPreCompactUuid = messagesToKeep.at(-1)?.uuid
     const boundaryMarker = createCompactBoundaryMessage(
       'manual',
       preCompactTokenCount ?? 0,
@@ -1050,7 +1000,7 @@ export async function partialCompactConversation(
               summarizeMetadata: {
                 messagesSummarized: messagesToSummarize.length,
                 userContext: userFeedback,
-                direction,
+                direction: 'from',
               },
             }
           : { isVisibleInTranscriptOnly: true as const }),
@@ -1069,12 +1019,6 @@ export async function partialCompactConversation(
     // the 16KB tail window that readLiteMetadata reads for --resume display.
     reAppendSessionMetadata()
 
-    if (feature('KAIROS')) {
-      void sessionTranscriptModule?.writeSessionTranscriptSegment(
-        messagesToSummarize,
-      )
-    }
-
     context.onCompactProgress?.({
       type: 'hooks_start',
       hookType: 'post_compact',
@@ -1087,15 +1031,10 @@ export async function partialCompactConversation(
       context.abortController.signal,
     )
 
-    // 'from': prefix-preserving → boundary; 'up_to': suffix → last summary
-    const anchorUuid =
-      direction === 'up_to'
-        ? (summaryMessages.at(-1)?.uuid ?? boundaryMarker.uuid)
-        : boundaryMarker.uuid
     return {
       boundaryMarker: annotateBoundaryWithPreservedSegment(
         boundaryMarker,
-        anchorUuid,
+        boundaryMarker.uuid,
         messagesToKeep,
       ),
       summaryMessages,

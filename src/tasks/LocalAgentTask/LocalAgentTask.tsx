@@ -150,15 +150,6 @@ export function isLocalAgentTask(task: unknown): task is LocalAgentTaskState {
   return typeof task === 'object' && task !== null && 'type' in task && task.type === 'local_agent';
 }
 
-/**
- * A local_agent task that the CoordinatorTaskPanel manages (not main-session).
- * For ants, these render in the panel instead of the background-task pill.
- * This is the ONE predicate that all pill/panel filters must agree on — if
- * the gate changes, change it here.
- */
-export function isPanelAgentTask(t: unknown): t is LocalAgentTaskState {
-  return isLocalAgentTask(t) && t.agentType !== 'main-session';
-}
 export function queuePendingMessage(taskId: string, msg: string, setAppState: (f: (prev: AppState) => AppState) => void): void {
   updateTaskState<LocalAgentTaskState>(taskId, setAppState, task => ({
     ...task,

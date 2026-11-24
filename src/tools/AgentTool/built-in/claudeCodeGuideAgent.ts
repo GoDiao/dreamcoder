@@ -118,8 +118,9 @@ export const CLAUDE_CODE_GUIDE_AGENT: BuiltInAgentDefinition = {
   baseDir: 'built-in',
   model: 'haiku',
   permissionMode: 'dontAsk',
-  getSystemPrompt({ toolUseContext }) {
-    const commands = toolUseContext.options.commands
+  getSystemPrompt(params) {
+    const options = params?.toolUseContext.options
+    const commands = options?.commands ?? []
 
     // Build context sections
     const contextSections: string[] = []
@@ -137,9 +138,9 @@ export const CLAUDE_CODE_GUIDE_AGENT: BuiltInAgentDefinition = {
 
     // 2. Custom agents from .claude/agents/
     const customAgents =
-      toolUseContext.options.agentDefinitions.activeAgents.filter(
+      options?.agentDefinitions.activeAgents.filter(
         (a: AgentDefinition) => a.source !== 'built-in',
-      )
+      ) ?? []
     if (customAgents.length > 0) {
       const agentList = customAgents
         .map((a: AgentDefinition) => `- ${a.agentType}: ${a.whenToUse}`)
@@ -150,7 +151,7 @@ export const CLAUDE_CODE_GUIDE_AGENT: BuiltInAgentDefinition = {
     }
 
     // 3. MCP servers
-    const mcpClients = toolUseContext.options.mcpClients
+    const mcpClients = options?.mcpClients
     if (mcpClients && mcpClients.length > 0) {
       const mcpList = mcpClients
         .map((client: { name: string }) => `- ${client.name}`)
@@ -170,7 +171,7 @@ export const CLAUDE_CODE_GUIDE_AGENT: BuiltInAgentDefinition = {
     }
 
     // 5. User settings
-    const settings = getSettings_DEPRECATED()
+    const settings = options ? getSettings_DEPRECATED() : {}
     if (Object.keys(settings).length > 0) {
       // eslint-disable-next-line no-restricted-syntax -- human-facing UI, not tool_result
       const settingsJson = jsonStringify(settings, null, 2)

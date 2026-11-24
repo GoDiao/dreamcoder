@@ -128,7 +128,7 @@ describe('the lock the sidecar holds while the user edits an artifact', () => {
     await locks.hold(deckDir, 'tab')
     const { requestHost } = await import('../../utils/hostRequests.js')
     const inside = requestHost({ subtype: 'artifact_edit_wait', path: slidePath('cover') }, null as never)
-    expect(await requestHost({ subtype: 'artifact_edit_wait', path: path.join(root, 'repo', 'README.md') }, null as never)).toEqual({ files: [] })
+    expect(await requestHost<{ files: string[] }>({ subtype: 'artifact_edit_wait', path: path.join(root, 'repo', 'README.md') }, null as never)).toEqual({ files: [] })
     expect(await settled(inside)).toBe(false)
     await locks.release(deckDir, 'tab')
     expect(await inside).toEqual({ files: [] })

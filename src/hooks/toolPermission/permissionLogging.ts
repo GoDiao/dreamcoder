@@ -9,7 +9,6 @@ import {
 import { sanitizeToolNameForAnalytics } from 'src/services/analytics/metadata.js'
 import { getCodeEditToolDecisionCounter } from '../../bootstrap/state.js'
 import type { Tool as ToolType, ToolUseContext } from '../../Tool.js'
-import { getLanguageName } from '../../utils/cliHighlight.js'
 import { SandboxManager } from '../../utils/sandbox/sandbox-adapter.js'
 import { logOTelEvent } from '../../utils/telemetry/events.js'
 import type {
@@ -38,12 +37,12 @@ function isCodeEditingTool(toolName: string): boolean {
 
 // Builds OTel counter attributes for code editing tools, enriching with
 // language when the tool's target file path can be extracted from input
-async function buildCodeEditToolAttributes(
+function buildCodeEditToolAttributes(
   tool: ToolType,
   input: unknown,
   decision: 'accept' | 'reject',
   source: string,
-): Promise<Record<string, string>> {
+): Record<string, string> {
   // Derive language from file path if the tool exposes one (e.g., Edit, Write)
   let language: string | undefined
   if (tool.getPath && input) {
@@ -51,7 +50,7 @@ async function buildCodeEditToolAttributes(
     if (parseResult.success) {
       const filePath = tool.getPath(parseResult.data)
       if (filePath) {
-        language = await getLanguageName(filePath)
+        language = 'unknown'
       }
     }
   }
@@ -212,8 +211,9 @@ function logPermissionDecision(
 
   // Track code editing tool metrics
   if (isCodeEditingTool(tool.name)) {
-    void buildCodeEditToolAttributes(tool, input, decision, sourceString).then(
-      attributes => getCodeEditToolDecisionCounter()?.add(1, attributes),
+    getCodeEditToolDecisionCounter()?.add(
+      1,
+      buildCodeEditToolAttributes(tool, input, decision, sourceString),
     )
   }
 

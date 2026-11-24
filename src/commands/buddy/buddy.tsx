@@ -1,6 +1,9 @@
 import * as React from 'react'
 import { Box, Text } from '../../ink.js'
-import type { LocalJSXCommandCall } from '../../types/command.js'
+import type {
+  LocalJSXCommandCall,
+  LocalJSXCommandOnDone,
+} from '../../types/command.js'
 import {
   getCompanion,
   roll,
@@ -21,7 +24,7 @@ function CompanionCard({
   args,
   setAppState,
 }: {
-  onDone: (result?: string, options?: { display?: string }) => void
+  onDone: LocalJSXCommandOnDone
   args: string
   setAppState: (updater: (prev: any) => any) => void
 }) {

@@ -1,30 +1,60 @@
-// @generated stub from scan-missing-imports
-const __target = function noop() {}
-const __handler: ProxyHandler<any> = {
-  get(_t, prop) {
-    if (prop === '__esModule') return true
-    if (prop === 'default') return new Proxy(__target, __handler)
-    if (prop === Symbol.toPrimitive) return () => undefined
-    if (prop === Symbol.iterator) return function* () {}
-    if (prop === Symbol.asyncIterator) return async function* () {}
-    if (prop === 'then') return undefined
-    return new Proxy(__target, __handler)
-  },
-  apply() {
-    return new Proxy(__target, __handler)
-  },
-  construct() {
-    return new Proxy(__target, __handler)
-  },
+import type {
+  ConfigScope,
+  McpClaudeAIProxyServerConfig,
+  McpHTTPServerConfig,
+  McpSSEServerConfig,
+  McpStdioServerConfig,
+  MCPServerConnection,
+} from '../../services/mcp/types.js'
+
+type BaseServerInfo = {
+  name: string
+  client: MCPServerConnection
+  scope: ConfigScope
 }
-const stub: any = new Proxy(__target, __handler)
-export default stub
-export const __stubMissing = true
-export const createCachedMCState = stub
-export const isCachedMicrocompactEnabled = stub
-export const isModelSupportedForCacheEditing = stub
-export const getCachedMCConfig = stub
-export const markToolsSentToAPI = stub
-export const resetCachedMCState = stub
-export const checkProtectedNamespace = stub
-export const getCoordinatorUserContext = stub
+
+export type StdioServerInfo = BaseServerInfo & {
+  transport: 'stdio'
+  config: McpStdioServerConfig
+}
+
+export type SSEServerInfo = BaseServerInfo & {
+  transport: 'sse'
+  isAuthenticated: boolean | undefined
+  config: McpSSEServerConfig
+}
+
+export type HTTPServerInfo = BaseServerInfo & {
+  transport: 'http'
+  isAuthenticated: boolean | undefined
+  config: McpHTTPServerConfig
+}
+
+export type ClaudeAIServerInfo = BaseServerInfo & {
+  transport: 'claudeai-proxy'
+  isAuthenticated: boolean | undefined
+  config: McpClaudeAIProxyServerConfig
+}
+
+export type ServerInfo =
+  | StdioServerInfo
+  | SSEServerInfo
+  | HTTPServerInfo
+  | ClaudeAIServerInfo
+
+export type AgentMcpServerInfo = {
+  name: string
+  sourceAgents: string[]
+  transport: 'stdio' | 'sse' | 'http' | 'ws'
+  command?: string
+  url?: string
+  needsAuth: boolean
+  isAuthenticated?: boolean
+}
+
+export type MCPViewState =
+  | { type: 'list'; defaultTab?: string }
+  | { type: 'server-menu'; server: ServerInfo }
+  | { type: 'server-tools'; server: ServerInfo }
+  | { type: 'server-tool-detail'; server: ServerInfo; toolIndex: number }
+  | { type: 'agent-server-menu'; agentServer: AgentMcpServerInfo }

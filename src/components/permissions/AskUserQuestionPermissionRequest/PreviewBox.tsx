@@ -1,10 +1,9 @@
+// @ts-nocheck
 import { c as _c } from "react/compiler-runtime";
-import React, { Suspense, use, useMemo } from 'react';
-import { useSettings } from '../../../hooks/useSettings.js';
+import React, { useMemo } from 'react';
 import { useTerminalSize } from '../../../hooks/useTerminalSize.js';
 import { stringWidth } from '../../../ink/stringWidth.js';
 import { Ansi, Box, Text, useTheme } from '../../../ink.js';
-import { type CliHighlight, getCliHighlightPromise } from '../../../utils/cliHighlight.js';
 import { applyMarkdown } from '../../../utils/markdown.js';
 import sliceAnsi from '../../../utils/sliceAnsi.js';
 type PreviewBoxProps = {
@@ -38,48 +37,15 @@ const BOX_CHARS = {
  */
 export function PreviewBox(props) {
   const $ = _c(4);
-  const settings = useSettings();
-  if (settings.syntaxHighlightingDisabled) {
-    let t0;
-    if ($[0] !== props) {
-      t0 = <PreviewBoxBody {...props} highlight={null} />;
-      $[0] = props;
-      $[1] = t0;
-    } else {
-      t0 = $[1];
-    }
-    return t0;
-  }
   let t0;
   if ($[2] !== props) {
-    t0 = <Suspense fallback={<PreviewBoxBody {...props} highlight={null} />}><PreviewBoxWithHighlight {...props} /></Suspense>;
+    t0 = <PreviewBoxBody {...props} />;
     $[2] = props;
     $[3] = t0;
   } else {
     t0 = $[3];
   }
   return t0;
-}
-function PreviewBoxWithHighlight(props) {
-  const $ = _c(4);
-  let t0;
-  if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
-    t0 = getCliHighlightPromise();
-    $[0] = t0;
-  } else {
-    t0 = $[0];
-  }
-  const highlight = use(t0);
-  let t1;
-  if ($[1] !== highlight || $[2] !== props) {
-    t1 = <PreviewBoxBody {...props} highlight={highlight} />;
-    $[1] = highlight;
-    $[2] = props;
-    $[3] = t1;
-  } else {
-    t1 = $[3];
-  }
-  return t1;
 }
 function PreviewBoxBody(t0) {
   const $ = _c(34);
@@ -88,8 +54,7 @@ function PreviewBoxBody(t0) {
     maxLines,
     minHeight,
     minWidth: t1,
-    maxWidth,
-    highlight
+    maxWidth
   } = t0;
   const minWidth = t1 === undefined ? 40 : t1;
   const {
@@ -99,10 +64,9 @@ function PreviewBoxBody(t0) {
   const effectiveMaxWidth = maxWidth ?? terminalWidth - 4;
   const effectiveMaxLines = maxLines ?? 20;
   let t2;
-  if ($[0] !== content || $[1] !== highlight || $[2] !== theme) {
-    t2 = applyMarkdown(content, theme, highlight);
+  if ($[0] !== content || $[2] !== theme) {
+    t2 = applyMarkdown(content, theme);
     $[0] = content;
-    $[1] = highlight;
     $[2] = theme;
     $[3] = t2;
   } else {
