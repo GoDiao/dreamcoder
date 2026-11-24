@@ -125,7 +125,7 @@ import { handlePromptSubmit, type PromptInputHelpers } from '../utils/handleProm
 import { useQueueProcessor } from '../hooks/useQueueProcessor.js';
 import { useMailboxBridge } from '../hooks/useMailboxBridge.js';
 import { queryCheckpoint, logQueryProfileReport } from '../utils/queryProfiler.js';
-import type { Message as MessageType, UserMessage, ProgressMessage, HookResultMessage, PartialCompactDirection } from '../types/message.js';
+import type { Message as MessageType, UserMessage, ProgressMessage, HookResultMessage } from '../types/message.js';
 import { query } from '../query.js';
 import { mergeClients, useMergedClients } from '../hooks/useMergedClients.js';
 import { getQuerySourceForREPL } from '../utils/promptCategory.js';
@@ -582,7 +582,6 @@ export function REPL({
   const tasks = useAppState(s => s.tasks);
   const workerSandboxPermissions = useAppState(s => s.workerSandboxPermissions);
   const elicitation = useAppState(s => s.elicitation);
-  const ultraplanPendingChoice = useAppState(s => s.ultraplanPendingChoice);
   const viewingAgentTaskId = useAppState(s => s.viewingAgentTaskId);
   const setAppState = useSetAppState();
 
@@ -1372,16 +1371,6 @@ export function REPL({
   const [isSearchingHistory, setIsSearchingHistory] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
-  // showBashesDialog is REPL-level so it survives PromptInput unmounting.
-  // When ultraplan approval fires while the pill dialog is open, PromptInput
-  // unmounts (focusedInputDialog → 'ultraplan-choice') but this stays true;
-  // after accepting, PromptInput remounts into an empty "No tasks" dialog
-  // (the completed ultraplan task has been filtered out). Close it here.
-  useEffect(() => {
-    if (ultraplanPendingChoice && showBashesDialog) {
-      setShowBashesDialog(false);
-    }
-  }, [ultraplanPendingChoice, showBashesDialog]);
   const isTerminalFocused = useTerminalFocus();
   const terminalFocusRef = useRef(isTerminalFocused);
   terminalFocusRef.current = isTerminalFocused;
@@ -4458,7 +4447,7 @@ export function REPL({
                 fileHistory: updater(prev.fileHistory)
               }));
             }, message.uuid);
-          }} onSummarize={async (message: UserMessage, feedback?: string, direction: PartialCompactDirection = 'from') => {
+          }} onSummarize={async (message: UserMessage, feedback?: string) => {
             // Project snipped messages so the compact model
             // doesn't summarize content that was intentionally removed.
             const compactMessages = getMessagesAfterCompactBoundary(messages);
@@ -4489,16 +4478,12 @@ export function REPL({
               systemContext,
               toolUseContext: context,
               forkContextMessages: compactMessages
-            }, feedback, direction);
+            }, feedback);
             const kept = result.messagesToKeep ?? [];
-            const ordered = direction === 'up_to' ? [...result.summaryMessages, ...kept] : [...kept, ...result.summaryMessages];
-            const postCompact = [result.boundaryMarker, ...ordered, ...result.attachments, ...result.hookResults];
-            // Fullscreen 'from' keeps scrollback; 'up_to' must not
-            // (old[0] unchanged + grown array means incremental
-            // useLogMessages path, so boundary never persisted).
+            const postCompact = [result.boundaryMarker, ...kept, ...result.summaryMessages, ...result.attachments, ...result.hookResults];
             // Find by uuid since old is raw REPL history and snipped
             // entries can shift the projected messageIndex.
-            if (isFullscreenEnvEnabled() && direction === 'from') {
+            if (isFullscreenEnvEnabled()) {
               setMessages(old => {
                 const rawIdx = old.findIndex(m => m.uuid === message.uuid);
                 return [...old.slice(0, rawIdx === -1 ? 0 : rawIdx), ...postCompact];
@@ -4508,12 +4493,10 @@ export function REPL({
             }
             setConversationId(randomUUID());
             runPostCompactCleanup(context.options.querySource);
-            if (direction === 'from') {
-              const r = textForResubmit(message);
-              if (r) {
-                setInputValue(r.text);
-                setInputMode(r.mode);
-              }
+            const r = textForResubmit(message);
+            if (r) {
+              setInputValue(r.text);
+              setInputMode(r.mode);
             }
 
             // Show notification with ctrl+o hint

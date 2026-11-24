@@ -12,7 +12,7 @@ import { logError } from 'src/utils/log.js';
 import { useExitOnCtrlCDWithKeybindings } from '../hooks/useExitOnCtrlCDWithKeybindings.js';
 import { Box, Text } from '../ink.js';
 import { useKeybinding, useKeybindings } from '../keybindings/useKeybinding.js';
-import type { Message, PartialCompactDirection, UserMessage } from '../types/message.js';
+import type { Message, UserMessage } from '../types/message.js';
 import { stripDisplayTags } from '../utils/displayTags.js';
 import { createUserMessage, extractTag, isEmptyMessageText, isSyntheticMessage, isToolUseResultMessage } from '../utils/messages.js';
 import { type OptionWithDescription, Select } from './CustomSelect/select.js';
@@ -38,7 +38,7 @@ type Props = {
   onPreRestore: () => void;
   onRestoreMessage: (message: UserMessage) => Promise<void>;
   onRestoreCode: (message: UserMessage) => Promise<void>;
-  onSummarize: (message: UserMessage, feedback?: string, direction?: PartialCompactDirection) => Promise<void>;
+  onSummarize: (message: UserMessage, feedback?: string) => Promise<void>;
   onClose: () => void;
   /** Skip pick-list, land on confirm. Caller ran skip-check first. Esc closes fully (no back-to-list). */
   preselectedMessage?: UserMessage;
@@ -185,7 +185,7 @@ export function MessageSelector({
       setError(undefined);
       try {
         const feedback = summarizeFromFeedback.trim() || undefined;
-        await onSummarize(messageToRestore, feedback, 'from');
+        await onSummarize(messageToRestore, feedback);
         setIsRestoring(false);
         setRestoringOption(null);
         setMessageToRestore(undefined);

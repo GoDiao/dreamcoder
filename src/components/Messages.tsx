@@ -499,8 +499,7 @@ const MessagesImpl = ({
     // Brief-only: SendUserMessage + user input only. Default: drop redundant
     // assistant text in turns where SendUserMessage was called (the model's
     // text is working-notes that duplicate the SendUserMessage content).
-    const briefToolNames = [BRIEF_TOOL_NAME];
-    const briefFiltered = !isTranscriptMode ? isBriefOnly ? filterForBriefTool(messagesToShowNotTruncated, briefToolNames) : dropTextInBriefTurns(messagesToShowNotTruncated, briefToolNames) : messagesToShowNotTruncated;
+    const briefFiltered = BRIEF_TOOL_NAME === null || isTranscriptMode ? messagesToShowNotTruncated : isBriefOnly ? filterForBriefTool(messagesToShowNotTruncated, [BRIEF_TOOL_NAME]) : dropTextInBriefTurns(messagesToShowNotTruncated, [BRIEF_TOOL_NAME]);
     const messagesToShow = shouldTruncate ? briefFiltered.slice(-MAX_MESSAGES_TO_SHOW_IN_TRANSCRIPT_MODE) : briefFiltered;
     const hasTruncatedMessages = shouldTruncate && briefFiltered.length > MAX_MESSAGES_TO_SHOW_IN_TRANSCRIPT_MODE;
     const {

@@ -18,7 +18,7 @@ type Props = {
     display?: CommandResultDisplay;
   }) => void;
   context: LocalJSXCommandContext;
-  defaultTab: 'Status' | 'Config' | 'Usage' | 'Gates';
+  defaultTab: 'Status' | 'Config' | 'Usage';
 };
 export function Settings(t0) {
   const $ = _c(25);
@@ -112,7 +112,7 @@ export function Settings(t0) {
     t8 = $[18];
   }
   const tabs = t8;
-  const t9 = defaultTab !== "Config" && defaultTab !== "Gates";
+  const t9 = defaultTab !== "Config";
   const t10 = tabsHidden || insideModal ? undefined : contentHeight;
   let t11;
   if ($[19] !== selectedTab || $[20] !== t10 || $[21] !== t9 || $[22] !== tabs || $[23] !== tabsHidden) {

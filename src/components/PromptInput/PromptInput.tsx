@@ -1765,10 +1765,6 @@ function PromptInput({
     },
     'footer:clearSelection': () => {
       selectFooterItem(null);
-    },
-    'footer:close': () => {
-      // Not handled — let 'x' fall through to type-to-exit
-      return false;
     }
   }, {
     context: 'Footer',
