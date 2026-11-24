@@ -28,8 +28,8 @@ All notable changes to DreamCoder will be documented in this file.
 - With models other than Claude, notes that arrive in the middle of a turn (messages from other sessions, board notifications, reminders) are sent as their own message instead of being appended to the last tool result (#270).
 - The notice for a file that changed after the agent read it no longer claims you or a linter changed it or asks the agent to keep it from you, and shows at most about 2 KB of the change (#270).
 - **Fewer wasted steps when the agent reads and edits files.** Reading a file that is too large returns the first lines that fit and says which lines they are, instead of an error; a file attached with @ is cut the same way instead of at 2,000 lines. An edit still applies when the text the agent quotes differs from the file only in line-number prefixes, whitespace at the end of lines, indentation or written-out escapes, and the approval prompt shows the text that will actually be written. After such a partial read the agent can edit the file but cannot overwrite it, and a successful edit or write tells the agent not to read the file back (#299).
-- The agent settings show the system prompt of the built-in Claude Code Guide agent, like the other built-in agents. The prompt shown there leaves out your settings (#300).
-- CI also type-checks the server and CLI with `bun run typecheck` on every pull request (#300).
+- The agent settings show the system prompt of the built-in Claude Code Guide agent, like the other built-in agents. The prompt shown there leaves out your settings (#304).
+- CI also type-checks the server and CLI with `bun run typecheck` on every pull request (#304).
 
 ### Fixed
 
@@ -54,10 +54,10 @@ All notable changes to DreamCoder will be documented in this file.
 - When the output limit cuts off a tool call in the middle of its arguments, the agent no longer runs the tool with missing arguments; the model is told the call was cut off and retries with smaller pieces (#263).
 - **A reply that breaks off in the middle is retried as a stream.** When a provider's stream fails partway, the agent removes the half-finished reply from the conversation, the app and the session history, and asks again with streaming, instead of switching to a slower request without streaming that long answers could not finish within the timeout. Retries before and during a stream share one limit (#263).
 - **Reloading plugins counts your own agents.** Reloading plugins without a project open now includes the agents in your user folder in the count (#301).
-- The plugins page lists the marketplaces you have added and shows whether each one updates automatically; before, the list was always empty (#300).
-- Enabling, disabling or uninstalling a plugin in the scope your organization manages now returns an error that lists the scopes you can change, instead of a server error (#300).
-- An installed plugin with no recorded version no longer makes all installed plugins disappear (#300).
-- Installing a plugin from an MCP bundle (`.mcpb`) no longer fails when the manifest is checked (#300).
+- The plugins page lists the marketplaces you have added and shows whether each one updates automatically; before, the list was always empty (#304).
+- Enabling, disabling or uninstalling a plugin in the scope your organization manages now returns an error that lists the scopes you can change, instead of a server error (#304).
+- An installed plugin with no recorded version no longer makes all installed plugins disappear (#304).
+- Installing a plugin from an MCP bundle (`.mcpb`) no longer fails when the manifest is checked (#304).
 
 ### Removed
 
