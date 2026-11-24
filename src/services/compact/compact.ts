@@ -21,7 +21,6 @@ import type {
   AttachmentMessage,
   HookResultMessage,
   Message,
-  PartialCompactDirection,
   SystemCompactBoundaryMessage,
   SystemMessage,
   UserMessage,
@@ -60,7 +59,6 @@ import {
   getAssistantMessageText,
   getLastAssistantMessage,
   getMessagesAfterCompactBoundary,
-  isCompactBoundaryMessage,
   normalizeMessagesForAPI,
 } from '../../utils/messages.js'
 import { expandPath } from '../../utils/path.js'
@@ -765,8 +763,6 @@ export async function compactConversation(
  * Performs a partial compaction around the selected message index.
  * Direction 'from': summarizes messages after the index, keeps earlier ones.
  *   Prompt cache for kept (earlier) messages is preserved.
- * Direction 'up_to': summarizes messages before the index, keeps later ones.
- *   Prompt cache is invalidated since the summary precedes the kept messages.
  */
 export async function partialCompactConversation(
   allMessages: Message[],
@@ -774,36 +770,15 @@ export async function partialCompactConversation(
   context: ToolUseContext,
   cacheSafeParams: CacheSafeParams,
   userFeedback?: string,
-  direction: PartialCompactDirection = 'from',
 ): Promise<CompactionResult> {
   try {
-    const messagesToSummarize =
-      direction === 'up_to'
-        ? allMessages.slice(0, pivotIndex)
-        : allMessages.slice(pivotIndex)
-    // 'up_to' must strip old compact boundaries/summaries: for 'up_to',
-    // summary_B sits BEFORE kept, so a stale boundary_A in kept wins
-    // findLastCompactBoundaryIndex's backward scan and drops summary_B.
-    // 'from' keeps them: summary_B sits AFTER kept (backward scan still
-    // works), and removing an old summary would lose its covered history.
-    const messagesToKeep =
-      direction === 'up_to'
-        ? allMessages
-            .slice(pivotIndex)
-            .filter(
-              m =>
-                m.type !== 'progress' &&
-                !isCompactBoundaryMessage(m) &&
-                !(m.type === 'user' && m.isCompactSummary),
-            )
-        : allMessages.slice(0, pivotIndex).filter(m => m.type !== 'progress')
+    const messagesToSummarize = allMessages.slice(pivotIndex)
+    const messagesToKeep = allMessages
+      .slice(0, pivotIndex)
+      .filter(m => m.type !== 'progress')
 
     if (messagesToSummarize.length === 0) {
-      throw new Error(
-        direction === 'up_to'
-          ? 'Nothing to summarize before the selected message.'
-          : 'Nothing to summarize after the selected message.',
-      )
+      throw new Error('Nothing to summarize after the selected message.')
     }
 
     const preCompactTokenCount = tokenCountWithEstimation(allMessages)
@@ -836,7 +811,7 @@ export async function partialCompactConversation(
     context.setResponseLength?.(() => 0)
     context.onCompactProgress?.({ type: 'compact_start' })
 
-    const compactPrompt = getPartialCompactPrompt(customInstructions, direction)
+    const compactPrompt = getPartialCompactPrompt(customInstructions)
     const summaryRequest = createUserMessage({
       content: compactPrompt,
     })
@@ -844,17 +819,13 @@ export async function partialCompactConversation(
     const failureMetadata = {
       preCompactTokenCount,
       direction:
-        direction as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        'from' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       messagesSummarized: messagesToSummarize.length,
     }
 
-    // 'up_to' prefix hits cache directly; 'from' sends all (tail wouldn't cache).
     // PTL retry breaks the cache prefix but unblocks the user (CC-1180).
-    let apiMessages = direction === 'up_to' ? messagesToSummarize : allMessages
-    let retryCacheSafeParams =
-      direction === 'up_to'
-        ? { ...cacheSafeParams, forkContextMessages: messagesToSummarize }
-        : cacheSafeParams
+    let apiMessages = allMessages
+    let retryCacheSafeParams = cacheSafeParams
     let summaryResponse: AssistantMessage
     let summary: string | null
     let ptlAttempts = 0
@@ -991,7 +962,7 @@ export async function partialCompactConversation(
       messagesKept: messagesToKeep.length,
       messagesSummarized: messagesToSummarize.length,
       direction:
-        direction as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        'from' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       hasUserFeedback: !!userFeedback,
       trigger:
         'message_selector' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -1002,13 +973,7 @@ export async function partialCompactConversation(
         compactionUsage?.cache_creation_input_tokens ?? 0,
     })
 
-    // Progress messages aren't loggable, so forkSessionImpl would null out
-    // a logicalParentUuid pointing at one. Both directions skip them.
-    const lastPreCompactUuid =
-      direction === 'up_to'
-        ? allMessages.slice(0, pivotIndex).findLast(m => m.type !== 'progress')
-            ?.uuid
-        : messagesToKeep.at(-1)?.uuid
+    const lastPreCompactUuid = messagesToKeep.at(-1)?.uuid
     const boundaryMarker = createCompactBoundaryMessage(
       'manual',
       preCompactTokenCount ?? 0,
@@ -1035,7 +1000,7 @@ export async function partialCompactConversation(
               summarizeMetadata: {
                 messagesSummarized: messagesToSummarize.length,
                 userContext: userFeedback,
-                direction,
+                direction: 'from',
               },
             }
           : { isVisibleInTranscriptOnly: true as const }),
@@ -1066,15 +1031,10 @@ export async function partialCompactConversation(
       context.abortController.signal,
     )
 
-    // 'from': prefix-preserving → boundary; 'up_to': suffix → last summary
-    const anchorUuid =
-      direction === 'up_to'
-        ? (summaryMessages.at(-1)?.uuid ?? boundaryMarker.uuid)
-        : boundaryMarker.uuid
     return {
       boundaryMarker: annotateBoundaryWithPreservedSegment(
         boundaryMarker,
-        anchorUuid,
+        boundaryMarker.uuid,
         messagesToKeep,
       ),
       summaryMessages,

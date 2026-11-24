@@ -354,11 +354,7 @@ async function* queryLoop(
 
     // Apply microcompact before autocompact
     queryCheckpoint('query_microcompact_start')
-    const microcompactResult = await deps.microcompact(
-      messagesForQuery,
-      querySource,
-    )
-    messagesForQuery = microcompactResult.messages
+    messagesForQuery = deps.microcompact(messagesForQuery, querySource)
     queryCheckpoint('query_microcompact_end')
 
     const fullSystemPrompt = asSystemPrompt(

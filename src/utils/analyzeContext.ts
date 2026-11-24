@@ -901,7 +901,7 @@ async function approximateMessageTokens(
   messages: Message[],
   estimateOnly = false,
 ): Promise<MessageBreakdown> {
-  const microcompactResult = await microcompactMessages(messages)
+  const compactedMessages = microcompactMessages(messages)
 
   // Initialize tracking
   const breakdown: MessageBreakdown = {
@@ -918,7 +918,7 @@ async function approximateMessageTokens(
 
   // Build a map of tool_use_id to tool_name for easier lookup
   const toolUseIdToName = new Map<string, string>()
-  for (const msg of microcompactResult.messages) {
+  for (const msg of compactedMessages) {
     if (msg.type === 'assistant') {
       for (const block of msg.message.content) {
         if ('type' in block && block.type === 'tool_use') {
@@ -934,7 +934,7 @@ async function approximateMessageTokens(
   }
 
   // Process each message for detailed breakdown
-  for (const msg of microcompactResult.messages) {
+  for (const msg of compactedMessages) {
     if (msg.type === 'assistant') {
       processAssistantMessage(msg, breakdown)
     } else if (msg.type === 'user') {
@@ -946,7 +946,7 @@ async function approximateMessageTokens(
 
   // Calculate total tokens using the API for accuracy
   const approximateMessageTokens = await countTokensWithFallback(
-    normalizeMessagesForAPI(microcompactResult.messages).map(_ => {
+    normalizeMessagesForAPI(compactedMessages).map(_ => {
       if (_.type === 'assistant') {
         return {
           // Important: strip out fields like id, etc. -- the counting API errors if they're present

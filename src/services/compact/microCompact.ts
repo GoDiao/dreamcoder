@@ -116,10 +116,6 @@ export function estimateMessageTokens(messages: Message[]): number {
   return Math.ceil(totalTokens * (4 / 3))
 }
 
-export type MicrocompactResult = {
-  messages: Message[]
-}
-
 /**
  * Walk messages and collect tool_use IDs whose tool name is in
  * COMPACTABLE_TOOLS, in encounter order.
@@ -148,10 +144,10 @@ function isMainThreadSource(querySource: QuerySource | undefined): boolean {
   return !querySource || querySource.startsWith('repl_main_thread')
 }
 
-export async function microcompactMessages(
+export function microcompactMessages(
   messages: Message[],
   querySource?: QuerySource,
-): Promise<MicrocompactResult> {
+): Message[] {
   // Clear suppression flag at start of new microcompact attempt
   clearCompactWarningSuppression()
 
@@ -159,12 +155,7 @@ export async function microcompactMessages(
   // last assistant message exceeds the threshold, the server cache has expired
   // and the full prefix will be rewritten regardless — so content-clear old
   // tool results now, before the request, to shrink what gets rewritten.
-  const timeBasedResult = maybeTimeBasedMicrocompact(messages, querySource)
-  if (timeBasedResult) {
-    return timeBasedResult
-  }
-
-  return { messages }
+  return maybeTimeBasedMicrocompact(messages, querySource) ?? messages
 }
 
 /**
@@ -212,7 +203,7 @@ export function evaluateTimeBasedTrigger(
 function maybeTimeBasedMicrocompact(
   messages: Message[],
   querySource: QuerySource | undefined,
-): MicrocompactResult | null {
+): Message[] | null {
   const trigger = evaluateTimeBasedTrigger(messages, querySource)
   if (!trigger) {
     return null
@@ -286,5 +277,5 @@ function maybeTimeBasedMicrocompact(
     notifyCacheDeletion(querySource)
   }
 
-  return { messages: result }
+  return result
 }

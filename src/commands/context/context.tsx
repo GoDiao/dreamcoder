@@ -19,9 +19,7 @@ export async function call(onDone: LocalJSXCommandOnDone, context: LocalJSXComma
   const apiView = getMessagesAfterCompactBoundary(messages);
 
   // Apply microcompact to get accurate representation of messages sent to API
-  const {
-    messages: compactedMessages
-  } = await microcompactMessages(apiView);
+  const compactedMessages = microcompactMessages(apiView);
 
   // Get terminal width for responsive sizing
   const terminalWidth = process.stdout.columns || 80;
