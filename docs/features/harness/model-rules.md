@@ -1001,7 +1001,7 @@ anthropic 格式那几行的「输出上限字段」是从 apiFormat 层继承�
 - 前缀边界挡不住同一系列里的非推理模型：`gpt-5-chat-latest` 在 models.dev 的 `openai` 下没有（只在第三方服务商下），按最长前缀落到 `gpt-5`，被当成 `effort` 模型。模型层条目在 models.dev 层之下，修正按命中的 id（`gpt-5`）查，两者都改不了它；需要时用用户覆盖，或在对应站点加带 `modelPrefix` 的条目（站点层在 models.dev 之上）。
 - CLI 的 Codex 登录路径（`src/services/openaiAuth/fetch.ts`）本来就 import 代理的 Responses 转换函数。转换函数现在必须带规则，这条路径用 `resolveModelRules({ baseUrl: Codex 端点, apiFormat: 'openai_responses' }, 模型)` 取内置表的规则，于是多 import 了一个 server 模块。思考档位按请求里的 `output_config.effort` 写进 `reasoning.effort`，不再按 thinking budget 换算。这条路径去掉 `max_output_tokens`：main 上它从不发这个字段，ChatGPT 的 Codex 后端是否接受没有核实。和下一条属于同一类已有的分层问题。
 - `src/utils/managedEnv.ts:4` 现在就 import 了 server 代码（`mergeActiveProviderManagedEnv`），这是已有的分层问题，不是本设计引入的；本设计删掉的是同文件 `:12, 108` 对 `providerManagedEnvCompat` 的引用。
-- 一批关思考的内部调用不走 `auxiliary`：`compact.ts:1301`、`awaySummary.ts:44`、`execPromptHook.ts:71`、`execAgentHook.ts:134`、`apiQueryHookHelper.ts:88`、`skillImprovement.ts:236`、`generateAgent.ts:152`、insights 的 `queryWithModel`。toggle 类模型照样发 disabled；`effort`/`always` 模型带 `defaultEffort` 换算后的档位，不是最弱一档。不在维护者列的辅助调用范围内，接受。
+- 一批关思考的内部调用不走 `auxiliary`：`compact.ts:1301`、`awaySummary.ts:44`、`execPromptHook.ts:71`、`execAgentHook.ts:134`、`generateAgent.ts:152`、insights 的 `queryWithModel`。toggle 类模型照样发 disabled；`effort`/`always` 模型带 `defaultEffort` 换算后的档位，不是最弱一档。不在维护者列的辅助调用范围内，接受。
 - 官方地址不生成规则变量：会话和全局都没选档位时仍不发 effort（API 默认 high），界面显示 medium，和「档位从哪里来」里不改原逻辑的取舍一致。
 - 「没有规则变量的请求」里「终端路径的主对话也带明确档位」只对名字像 Claude 的模型成立；终端里用 `deepseek-v4-pro` 时 CLI 不发 thinking 也不发 effort，代理归为未指定。
 - `none` 模型在 `anthropic_disable_only` 写法下（例如 Kimi Code 上的 `kimi-for-coding`）按模型摘要显示「不能思考」，但上游默认开着思考。思考开关是全局的，只影响显示。
