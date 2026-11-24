@@ -462,9 +462,7 @@ export async function initReplBridge(
 
   const workerType = 'claude_code'
 
-  // 6. Delegate. BridgeCoreHandle is a structural superset of
-  // ReplBridgeHandle (adds writeSdkMessages which REPL callers don't use),
-  // so no adapter needed — just the narrower type on the way out.
+  // 6. Delegate.
   return initBridgeCore({
     dir: getOriginalCwd(),
     machineName: hostname(),

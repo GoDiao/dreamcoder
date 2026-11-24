@@ -209,18 +209,6 @@ type BridgeCoreParams = {
 }
 
 /**
- * Superset of ReplBridgeHandle. Adds getSSESequenceNum for daemon callers
- * that persist the SSE seq-num across process restarts.
- */
-export type BridgeCoreHandle = ReplBridgeHandle & {
-  /**
-   * Current SSE sequence-number high-water mark. Updates as transports
-   * swap. Daemon callers persist this on shutdown.
-   */
-  getSSESequenceNum(): number
-}
-
-/**
  * Poll error recovery constants. When the work poll starts failing (e.g.
  * server 500s), we use exponential backoff and give up after this timeout.
  * This is deliberately long — the server is the authority on when a session
@@ -245,7 +233,7 @@ let initSequence = 0
  */
 export async function initBridgeCore(
   params: BridgeCoreParams,
-): Promise<BridgeCoreHandle | null> {
+): Promise<ReplBridgeHandle | null> {
   const {
     dir,
     machineName,
@@ -718,11 +706,7 @@ export async function initBridgeCore(
 
     currentSessionId = newSessionId
     // Reset per-session transport state IMMEDIATELY after the session swap,
-    // before any await. If this runs after `await writeBridgePointer` below,
-    // there's a window where handle.bridgeSessionId already returns session B
-    // but getSSESequenceNum() still returns session A's seq — a daemon
-    // persistState() in that window writes {bridgeSessionId: B, seq: OLD_A},
-    // which PASSES the session-ID validation check and defeats it entirely.
+    // before any await.
     //
     // The SSE seq-num is scoped to the session's event stream — carrying it
     // over leaves the transport's lastSequenceNum stuck high (seq only
@@ -1481,19 +1465,6 @@ export async function initBridgeCore(
     pollController.abort()
     logForDebugging('[bridge:repl] Teardown: poll loop aborted')
 
-    // Capture the live transport's seq BEFORE close() — close() is sync
-    // (just aborts the SSE fetch) and does NOT invoke onClose, so the
-    // setOnClose capture path never runs for explicit teardown.
-    // Without this, getSSESequenceNum() after teardown returns the stale
-    // lastTransportSequenceNum (captured at the last transport swap), and
-    // daemon callers persisting that value lose all events since then.
-    if (transport) {
-      const finalSeq = transport.getLastSequenceNum()
-      if (finalSeq > lastTransportSequenceNum) {
-        lastTransportSequenceNum = finalSeq
-      }
-    }
-
     // Fire the result message, then archive, THEN close. transport.write()
     // only enqueues (SerialBatchEventUploader resolves on buffer-add); the
     // stopWork/archive latency (~200-500ms) is the drain window for the
@@ -1560,14 +1531,6 @@ export async function initBridgeCore(
     },
     get environmentId() {
       return environmentId
-    },
-    getSSESequenceNum() {
-      // lastTransportSequenceNum only updates when a transport is CLOSED
-      // (captured at swap/onClose). During normal operation the CURRENT
-      // transport's live seq isn't reflected there. Merge both so callers
-      // (e.g. daemon persistState()) get the actual high-water mark.
-      const live = transport?.getLastSequenceNum() ?? 0
-      return Math.max(lastTransportSequenceNum, live)
     },
     sessionIngressUrl,
     writeMessages(messages) {
