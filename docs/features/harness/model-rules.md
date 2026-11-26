@@ -854,7 +854,7 @@ anthropic 格式那几行的「输出上限字段」是从 apiFormat 层继承�
 
 ### 发现的问题，作为后续处理
 
-- 预设里引用的模型有的已经弃用或成了别名：Kimi 预设只有 `kimi-k2.6`；Qwen 预设的快速模型 `qwen-turbo` 在官方页面上已经找不到；DeepSeek 的 `deepseek-v4-flash` 成了别名。更新预设是另一件事，这次不改，另开 issue 跟踪。
+- 预设里引用的模型有的已经弃用或成了别名：Kimi 预设只有 `kimi-k2.6`；Qwen 预设的快速模型 `qwen-turbo` 在官方页面上已经找不到；DeepSeek 的 `deepseek-v4-flash` 成了别名。更新预设是另一件事，这次不改，由 [#284](https://github.com/GoDiao/dreamcoder/issues/284) 处理：DeepSeek 改用 `deepseek-flash`，Qwen 的快速模型改用 `qwen3.8-flash`，Kimi 改用 Kimi Code 端点接受的 `k3.1-pro` 和 `kimi-for-coding`。
 - 我们现在的窗口数字有几处和官方不一致：DeepSeek 是 1,048,576 不是 1,000,000；`gpt-5.4` 和 `gpt-5.5` 是 1,050,000；MiniMax M2 的 204,800 没核实到。并进新表时一起改，另开 issue 跟踪。#291 之后这些数字来自 models.dev，不再由我们维护。
 
 ## #264 各项怎样落到表上

@@ -13,6 +13,7 @@ All notable changes to DreamCoder will be documented in this file.
 ### Changed
 
 - **New app icon.** The app, Dock, taskbar and tray icons and the logo inside the app are redrawn: a warm-white crescent prompt and an amber star on an ink-blue tile. On macOS the menu bar icon is now a template image, so it follows the light or dark menu bar. The interface colors are unchanged. (#292)
+- **Provider presets use current model ids.** DeepSeek's fast model is now `deepseek-flash` (`deepseek-v4-flash` is only routed to it for now); Qwen's fast model is `qwen3.8-flash` instead of `qwen-turbo`, which Alibaba Cloud retired on 2026-10-10; Kimi lists `k3.1-pro` and `kimi-for-coding`, the ids the Kimi Code endpoint accepts, instead of `kimi-k2.6`. Saved providers keep their models (#284).
 - Thinking text in a streaming reply is batched like the reply text, so a long thinking block updates the conversation once per 50 ms instead of on every chunk (#258). Thanks @iruzen-dono.
 - **Providers in OpenAI format reuse their prompt cache.** Later turns of a session now hit the cache for about 99% of the input (measured on OpenRouter with GPT-4.1 mini and GLM-4.6), and cache hits that DeepSeek and Moonshot report are counted as cache reads (#262).
 - Providers in OpenAI format can run several tool calls in one step and get tool definitions without schema fields they do not use, and replies show the model you chose instead of the dated version the provider reports (#262).
