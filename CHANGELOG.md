@@ -34,6 +34,7 @@ All notable changes to DreamCoder will be documented in this file.
 ### Fixed
 
 - The main session now tells the agent when its memory index is empty or has not been created yet (#296). Thanks @Benson-BS.
+- When an OpenAI Responses provider returns a reasoning summary, the conversation now shows it as thinking text (#297). Thanks @jay23606.
 - Asking the agent to change a setting no longer fails: the `update-config` skill builds its settings reference again (#293). Thanks @KingEmma7.
 - The agent can continue a subagent it started when agent teams are off. Teammate names still need agent teams (#298). Thanks @jay23606.
 - **Saving a memory no longer asks for approval every time.** Writes to the project's memory folder are allowed like the instructions say, also in bypass mode (#270).

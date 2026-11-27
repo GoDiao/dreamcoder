@@ -139,18 +139,18 @@ describe('proxy reasoning dialects', () => {
   test('responses_reasoning: gpt-6-luna turns thinking off with none and gpt-6.1-sol never sends none', () => {
     const luna = rulesFor('https://gateway.example.com/v1', 'openai_responses', 'gpt-6-luna')
     expect(thinkingFields(responses(luna, 'gpt-6-luna', off))).toEqual({ reasoning: { effort: 'none' } })
-    expect(thinkingFields(responses(luna, 'gpt-6-luna', level('max')))).toEqual({ reasoning: { effort: 'max' } })
+    expect(thinkingFields(responses(luna, 'gpt-6-luna', level('max')))).toEqual({ reasoning: { effort: 'max', summary: 'auto' } })
     const sol = rulesFor('https://gateway.example.com/v1', 'openai_responses', 'gpt-6.1-sol')
-    expect(thinkingFields(responses(sol, 'gpt-6.1-sol', off, 'medium'))).toEqual({ reasoning: { effort: 'medium' } })
-    expect(thinkingFields(responses(sol, 'gpt-6.1-sol', level('max')))).toEqual({ reasoning: { effort: 'max' } })
+    expect(thinkingFields(responses(sol, 'gpt-6.1-sol', off, 'medium'))).toEqual({ reasoning: { effort: 'medium', summary: 'auto' } })
+    expect(thinkingFields(responses(sol, 'gpt-6.1-sol', level('max')))).toEqual({ reasoning: { effort: 'max', summary: 'auto' } })
   })
 
-  test('responses_reasoning: Responses writes reasoning.effort and asks for encrypted reasoning', () => {
+  test('responses_reasoning: Responses writes reasoning.effort and summary and asks for encrypted reasoning', () => {
     const rules = rulesFor('https://api.openai.com/v1', 'openai_responses', 'gpt-5.1')
     expect(thinkingFields(responses(rules, 'gpt-5.1', off))).toEqual({ reasoning: { effort: 'none' } })
-    expect(thinkingFields(responses(rules, 'gpt-5.1', level('max')))).toEqual({ reasoning: { effort: 'high' } })
-    expect(thinkingFields(responses(rules, 'gpt-5.1', effortOnly('low')))).toEqual({ reasoning: { effort: 'low' } })
-    expect(thinkingFields(responses(rules, 'gpt-5.1', on, 'medium'))).toEqual({ reasoning: { effort: 'medium' } })
+    expect(thinkingFields(responses(rules, 'gpt-5.1', level('max')))).toEqual({ reasoning: { effort: 'high', summary: 'auto' } })
+    expect(thinkingFields(responses(rules, 'gpt-5.1', effortOnly('low')))).toEqual({ reasoning: { effort: 'low', summary: 'auto' } })
+    expect(thinkingFields(responses(rules, 'gpt-5.1', on, 'medium'))).toEqual({ reasoning: { effort: 'medium', summary: 'auto' } })
     expect(thinkingFields(responses(rules, 'gpt-5.1', {}))).toEqual({})
     expect(responses(rules, 'gpt-5.1', level('low')).include).toEqual(['reasoning.encrypted_content'])
 

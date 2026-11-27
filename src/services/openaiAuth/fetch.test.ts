@@ -117,7 +117,7 @@ describe('buildOpenAICodexFetch', () => {
       }),
     })
 
-    expect(bodies[0].reasoning).toEqual({ effort: 'high' })
+    expect(bodies[0].reasoning).toEqual({ effort: 'high', summary: 'auto' })
     expect(bodies[0]).not.toHaveProperty('max_output_tokens')
   })
 
