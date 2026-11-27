@@ -53,9 +53,19 @@ function sessionTargetId(to: string): string {
   return to.slice(SESSION_ADDRESS_PREFIX.length).trim()
 }
 
+function resolveSubagentId(to: string, context: ToolUseContext): string | null {
+  const appState = context.getAppState()
+  return appState.agentNameRegistry.get(to) ?? toAgentId(to)
+}
+
 function describeRecipient(): string {
+  if (!isAgentSwarmsEnabled()) {
+    const subagent = 'a subagent id or a registered name for a background agent started with a name'
+    return isSessionLinksEnabled()
+      ? `Recipient: ${subagent}, or "${SESSION_ADDRESS_PREFIX}<id>" for another session (use ListSessions to discover)`
+      : `Recipient: ${subagent}`
+  }
   const sessionAddress = `"${SESSION_ADDRESS_PREFIX}<id>" for another session (use ListSessions to discover)`
-  if (!isAgentSwarmsEnabled()) return `Recipient: ${sessionAddress}`
   return isSessionLinksEnabled()
     ? `Recipient: teammate name, "*" for broadcast to all teammates, or ${sessionAddress}`
     : 'Recipient: teammate name, or "*" for broadcast to all teammates'
@@ -645,7 +655,7 @@ export const SendMessageTool: Tool<InputSchema, SendMessageToolOutput> =
       return { behavior: 'allow' as const, updatedInput: input }
     },
 
-    async validateInput(input, _context) {
+    async validateInput(input, context) {
       if (input.to.trim().length === 0) {
         return {
           result: false,
@@ -653,10 +663,14 @@ export const SendMessageTool: Tool<InputSchema, SendMessageToolOutput> =
           errorCode: 9,
         }
       }
-      if (!isSessionAddress(input.to) && !isAgentSwarmsEnabled()) {
+      if (
+        !isSessionAddress(input.to) &&
+        !isAgentSwarmsEnabled() &&
+        (typeof input.message !== 'string' || !resolveSubagentId(input.to, context))
+      ) {
         return {
           result: false,
-          message: `to must be a session address: "${SESSION_ADDRESS_PREFIX}<id>"`,
+          message: `to must be a session address: "${SESSION_ADDRESS_PREFIX}<id>", a subagent id, or a registered background-agent name`,
           errorCode: 9,
         }
       }
@@ -779,10 +793,9 @@ export const SendMessageTool: Tool<InputSchema, SendMessageToolOutput> =
       // Route to in-process subagent by name or raw agentId before falling
       // through to ambient-team resolution. Stopped agents are auto-resumed.
       if (typeof input.message === 'string' && input.to !== '*') {
-        const appState = context.getAppState()
-        const registered = appState.agentNameRegistry.get(input.to)
-        const agentId = registered ?? toAgentId(input.to)
+        const agentId = resolveSubagentId(input.to, context)
         if (agentId) {
+          const appState = context.getAppState()
           const task = appState.tasks[agentId]
           if (isLocalAgentTask(task) && !isMainSessionTask(task)) {
             if (task.status === 'running') {

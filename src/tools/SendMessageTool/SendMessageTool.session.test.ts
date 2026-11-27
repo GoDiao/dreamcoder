@@ -15,7 +15,10 @@ afterEach(() => {
   teams.restore()
 })
 
-const validate = (input: Record<string, unknown>) => SendMessageTool.validateInput!(input as never, {} as never)
+const validate = (input: Record<string, unknown>) =>
+  SendMessageTool.validateInput!(input as never, {
+    getAppState: () => ({ agentNameRegistry: new Map(), tasks: {} }),
+  } as never)
 const run = (input: Record<string, unknown>) =>
   SendMessageTool.call(input as never, {} as never, undefined as never, undefined as never)
 
@@ -112,7 +115,7 @@ describe('SendMessage to a session', () => {
     expect(SendMessageTool.isEnabled()).toBe(true)
   })
 
-  test('accepts only session addresses without agent teams', async () => {
+  test('rejects unregistered recipients without agent teams', async () => {
     teams.disable()
     env.enable()
     const result = await validate({ to: 'researcher', summary: 's', message: 'hello' })
