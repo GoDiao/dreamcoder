@@ -59,6 +59,7 @@ describe('provider presets API', () => {
     const deepseek = PROVIDER_PRESETS.find((preset) => preset.id === 'deepseek')
     const zhipu = PROVIDER_PRESETS.find((preset) => preset.id === 'zhipuglm')
     const kimi = PROVIDER_PRESETS.find((preset) => preset.id === 'kimi')
+    const qwen = PROVIDER_PRESETS.find((preset) => preset.id === 'qwen')
 
     expect(lmstudio?.baseUrl).toBe('http://localhost:1234')
     expect(lmstudio?.apiFormat).toBe('anthropic')
@@ -71,10 +72,16 @@ describe('provider presets API', () => {
     expect(deepseek?.authStrategy).toBe('auth_token')
     expect(deepseek?.defaultModels).toEqual([
       { id: 'deepseek-v4-pro' },
-      { id: 'deepseek-v4-flash' },
+      { id: 'deepseek-flash' },
     ])
-    expect(deepseek?.defaultFastModel).toBe('deepseek-v4-flash')
+    expect(deepseek?.defaultFastModel).toBe('deepseek-flash')
     expect(deepseek?.defaultEnv).toBeUndefined()
+    expect(qwen?.defaultModels).toEqual([
+      { id: 'qwen-max' },
+      { id: 'qwen-plus' },
+      { id: 'qwen3.8-flash' },
+    ])
+    expect(qwen?.defaultFastModel).toBe('qwen3.8-flash')
     expect(zhipu?.authStrategy).toBe('auth_token')
     expect(zhipu?.defaultModels).toEqual([
       { id: 'glm-5.1' },
@@ -84,7 +91,10 @@ describe('provider presets API', () => {
     expect(zhipu?.defaultFastModel).toBe('glm-4.5-air')
     expect(kimi?.baseUrl).toBe('https://api.kimi.com/coding')
     expect(kimi?.authStrategy).toBe('auth_token')
-    expect(kimi?.defaultModels).toEqual([{ id: 'kimi-k2.6' }])
+    expect(kimi?.defaultModels).toEqual([
+      { id: 'k3.1-pro' },
+      { id: 'kimi-for-coding' },
+    ])
     expect(kimi?.defaultEnv).toBeUndefined()
     expect(zhipu?.defaultEnv).toBeUndefined()
   })

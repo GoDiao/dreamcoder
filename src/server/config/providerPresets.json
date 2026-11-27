@@ -6,9 +6,9 @@
     "apiFormat": "anthropic",
     "defaultModels": [
       { "id": "deepseek-v4-pro" },
-      { "id": "deepseek-v4-flash" }
+      { "id": "deepseek-flash" }
     ],
-    "defaultFastModel": "deepseek-v4-flash",
+    "defaultFastModel": "deepseek-flash",
     "needsApiKey": true,
     "websiteUrl": "https://platform.deepseek.com",
     "apiKeyUrl": "https://platform.deepseek.com/api_keys",
@@ -22,9 +22,9 @@
     "defaultModels": [
       { "id": "qwen-max" },
       { "id": "qwen-plus" },
-      { "id": "qwen-turbo" }
+      { "id": "qwen3.8-flash" }
     ],
-    "defaultFastModel": "qwen-turbo",
+    "defaultFastModel": "qwen3.8-flash",
     "needsApiKey": true,
     "websiteUrl": "https://dashscope.console.aliyun.com",
     "authStrategy": "api_key"
@@ -35,7 +35,8 @@
     "baseUrl": "https://api.kimi.com/coding",
     "apiFormat": "anthropic",
     "defaultModels": [
-      { "id": "kimi-k2.6" }
+      { "id": "k3.1-pro" },
+      { "id": "kimi-for-coding" }
     ],
     "needsApiKey": true,
     "websiteUrl": "https://platform.moonshot.cn",
