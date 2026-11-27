@@ -3096,7 +3096,7 @@ async function getTodoReminderAttachments(
   return []
 }
 
-function getTaskReminderTurnCounts(messages: Message[]): {
+export function getTaskReminderTurnCounts(messages: Message[]): {
   turnsSinceLastTaskManagement: number
   turnsSinceLastReminder: number
 } {
@@ -3104,6 +3104,7 @@ function getTaskReminderTurnCounts(messages: Message[]): {
   let lastReminderIndex = -1
   let assistantTurnsSinceTaskManagement = 0
   let assistantTurnsSinceReminder = 0
+  const seenRequestIds = new Set<string>()
 
   // Iterate backwards to find most recent events
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -3114,6 +3115,10 @@ function getTaskReminderTurnCounts(messages: Message[]): {
         // Skip thinking messages
         continue
       }
+
+      const isNewResponse =
+        !message.requestId || !seenRequestIds.has(message.requestId)
+      if (message.requestId) seenRequestIds.add(message.requestId)
 
       // Check for TaskCreate or TaskUpdate usage BEFORE incrementing counter
       if (
@@ -3128,11 +3133,14 @@ function getTaskReminderTurnCounts(messages: Message[]): {
         )
       ) {
         lastTaskManagementIndex = i
+        if (!isNewResponse) assistantTurnsSinceTaskManagement--
       }
 
       // Count assistant turns before finding events
-      if (lastTaskManagementIndex === -1) assistantTurnsSinceTaskManagement++
-      if (lastReminderIndex === -1) assistantTurnsSinceReminder++
+      if (isNewResponse) {
+        if (lastTaskManagementIndex === -1) assistantTurnsSinceTaskManagement++
+        if (lastReminderIndex === -1) assistantTurnsSinceReminder++
+      }
     } else if (
       lastReminderIndex === -1 &&
       message?.type === 'attachment' &&
