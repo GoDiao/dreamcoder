@@ -1,3 +1,4 @@
+import { formatFileSize } from '../../utils/format.js'
 import { getMainLoopModel } from '../../utils/model/model.js'
 import { getCliModelRules } from '../../utils/model/modelRules.js'
 import { isPDFSupported } from '../../utils/pdfUtils.js'
@@ -37,15 +38,13 @@ export function readTruncatedRange(
     : null
 }
 
-export const MAX_LINES_TO_READ = 2000
-
 export const DESCRIPTION = 'Read a file from the local filesystem.'
 
 export const LINE_FORMAT_INSTRUCTION =
   '- Results are returned using cat -n format, with line numbers starting at 1'
 
 export const OFFSET_INSTRUCTION_DEFAULT =
-  "- You can optionally specify a line offset and limit (especially handy for long files), but it's recommended to read the whole file by not providing these parameters"
+  "- You can optionally specify a line offset and limit (especially handy for long files)"
 
 export const OFFSET_INSTRUCTION_TARGETED =
   '- When you already know which part of the file you need, only read that part. This can be important for larger files.'
@@ -54,6 +53,13 @@ export const OFFSET_INSTRUCTION_TARGETED =
  * Renders the Read tool prompt template.  The caller (FileReadTool) supplies
  * the runtime-computed parts.
  */
+export function readSizeInstruction(
+  maxSizeBytes: number,
+  maxTokens: number,
+): string {
+  return `. A read without a limit stops at ${formatFileSize(maxSizeBytes)} and any read stops at ${maxTokens.toLocaleString('en-US')} tokens: it returns the lines that fit and says which lines they are, so use offset and limit to read the rest`
+}
+
 export function renderPromptTemplate(
   lineFormat: string,
   maxSizeInstruction: string,
@@ -64,7 +70,7 @@ Assume this tool is able to read all files on the machine. If the User provides 
 
 Usage:
 - The file_path parameter must be an absolute path, not a relative path
-- By default, it reads up to ${MAX_LINES_TO_READ} lines starting from the beginning of the file${maxSizeInstruction}
+- By default, it reads the whole file${maxSizeInstruction}
 ${offsetInstruction}
 ${lineFormat}
 ${getMediaInstructions()}

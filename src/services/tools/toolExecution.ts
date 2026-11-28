@@ -121,8 +121,10 @@ import {
   McpAuthError,
   McpToolCallError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
 } from '../mcp/client.js'
-import { mcpInfoFromString } from '../mcp/mcpStringUtils.js'
-import { normalizeNameForMCP } from '../mcp/normalization.js'
+import {
+  getMcpServerSegment,
+  mcpInfoFromString,
+} from '../mcp/mcpStringUtils.js'
 import type { MCPServerConnection } from '../mcp/types.js'
 import {
   getLoggingSafeMcpBaseUrl,
@@ -302,7 +304,7 @@ function findMcpServerConnection(
   // mcpInfo.serverName is normalized (e.g., "claude_ai_Slack"), but client.name
   // is the original name (e.g., "claude.ai Slack"). Normalize both for comparison.
   return mcpClients.find(
-    client => normalizeNameForMCP(client.name) === mcpInfo.serverName,
+    client => getMcpServerSegment(client.name) === mcpInfo.serverName,
   )
 }
 

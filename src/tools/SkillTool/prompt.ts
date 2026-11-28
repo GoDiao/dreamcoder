@@ -175,15 +175,14 @@ export const getPrompt = memoize(async (_cwd: string): Promise<string> => {
 
 When users ask you to perform tasks, check if any of the available skills match. Skills provide specialized capabilities and domain knowledge.
 
-When users reference a "slash command" or "/<something>" (e.g., "/commit", "/review-pr"), they are referring to a skill. Use this tool to invoke it.
+When users reference a "slash command" or "/<something>", they are referring to a skill. Use this tool to invoke it.
 
 How to invoke:
 - Use this tool with the skill name and optional arguments
 - Examples:
-  - \`skill: "pdf"\` - invoke the pdf skill
-  - \`skill: "commit", args: "-m 'Fix bug'"\` - invoke with arguments
-  - \`skill: "review-pr", args: "123"\` - invoke with arguments
-  - \`skill: "ms-office-suite:pdf"\` - invoke using fully qualified name
+  - \`skill: "<name>"\` - invoke a skill
+  - \`skill: "<name>", args: "<arguments>"\` - invoke with arguments
+  - \`skill: "<plugin>:<name>"\` - invoke using fully qualified name
 
 Important:
 - Available skills are listed in system-reminder messages in the conversation

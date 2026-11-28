@@ -21,7 +21,6 @@ function getEnvMaxTokens(): number | undefined {
 export type FileReadingLimits = {
   maxTokens: number
   maxSizeBytes: number
-  includeMaxSizeInPrompt?: boolean
   targetedRangeNudge?: boolean
 }
 
@@ -59,11 +58,6 @@ export const getDefaultFileReadingLimits = memoize((): FileReadingLimits => {
       ? override.maxTokens
       : DEFAULT_MAX_OUTPUT_TOKENS)
 
-  const includeMaxSizeInPrompt =
-    typeof override?.includeMaxSizeInPrompt === 'boolean'
-      ? override.includeMaxSizeInPrompt
-      : undefined
-
   const targetedRangeNudge =
     typeof override?.targetedRangeNudge === 'boolean'
       ? override.targetedRangeNudge
@@ -72,7 +66,6 @@ export const getDefaultFileReadingLimits = memoize((): FileReadingLimits => {
   return {
     maxSizeBytes,
     maxTokens,
-    includeMaxSizeInPrompt,
     targetedRangeNudge,
   }
 })

@@ -2,6 +2,7 @@ import { feature } from 'bun:bundle'
 import { APIUserAbortError } from '@anthropic-ai/sdk'
 import type { CanUseToolFn } from '../../hooks/useCanUseTool.js'
 import {
+  buildUnshortenedMcpToolName,
   getToolNameForPermissionCheck,
   mcpInfoFromString,
 } from '../../services/mcp/mcpStringUtils.js'
@@ -251,21 +252,31 @@ function toolMatchesRule(
   // builtins should not match their MCP replacements.
   const nameForRuleMatch = getToolNameForPermissionCheck(tool)
 
+  const namesForRuleMatch = tool.mcpInfo
+    ? [
+        nameForRuleMatch,
+        buildUnshortenedMcpToolName(
+          tool.mcpInfo.serverName,
+          tool.mcpInfo.toolName,
+        ),
+      ]
+    : [nameForRuleMatch]
+
   // Direct tool name match
-  if (rule.ruleValue.toolName === nameForRuleMatch) {
+  if (namesForRuleMatch.includes(rule.ruleValue.toolName)) {
     return true
   }
 
   // MCP server-level permission: rule "mcp__server1" matches tool "mcp__server1__tool1"
   // Also supports wildcard: rule "mcp__server1__*" matches all tools from server1
   const ruleInfo = mcpInfoFromString(rule.ruleValue.toolName)
-  const toolInfo = mcpInfoFromString(nameForRuleMatch)
 
   return (
     ruleInfo !== null &&
-    toolInfo !== null &&
     (ruleInfo.toolName === undefined || ruleInfo.toolName === '*') &&
-    ruleInfo.serverName === toolInfo.serverName
+    namesForRuleMatch.some(
+      name => mcpInfoFromString(name)?.serverName === ruleInfo.serverName,
+    )
   )
 }
 

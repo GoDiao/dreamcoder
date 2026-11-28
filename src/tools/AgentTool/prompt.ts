@@ -2,6 +2,9 @@ import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../services/analytics/gr
 import { getSubscriptionType } from '../../utils/auth.js'
 import { hasEmbeddedSearchTools } from '../../utils/embeddedTools.js'
 import { isEnvDefinedFalsy, isEnvTruthy } from '../../utils/envUtils.js'
+import { getAgentModel } from '../../utils/model/agent.js'
+import { MODEL_FAMILY_ALIASES } from '../../utils/model/aliases.js'
+import { getMainLoopModel } from '../../utils/model/model.js'
 import { isTeammate } from '../../utils/teammate.js'
 import { isInProcessTeammate } from '../../utils/teammateContext.js'
 import { FILE_READ_TOOL_NAME } from '../FileReadTool/prompt.js'
@@ -11,6 +14,14 @@ import { SEND_MESSAGE_TOOL_NAME } from '../SendMessageTool/constants.js'
 import { AGENT_TOOL_NAME } from './constants.js'
 import { isForkSubagentEnabled } from './forkSubagent.js'
 import type { AgentDefinition } from './loadAgentsDir.js'
+
+function getModelParameterDescription(): string {
+  const parentModel = getMainLoopModel()
+  const mapping = MODEL_FAMILY_ALIASES.map(
+    alias => `${alias} = ${getAgentModel(undefined, parentModel, alias)}`,
+  ).join(', ')
+  return `The \`model\` parameter picks one of the configured models: ${mapping}.`
+}
 
 function getToolsDescription(agent: AgentDefinition): string {
   const { tools, disallowedTools } = agent
@@ -209,7 +220,9 @@ ${
   forkEnabled
     ? `When using the ${AGENT_TOOL_NAME} tool, specify a subagent_type to use a specialized agent, or omit it to fork yourself — a fork inherits your full conversation context.`
     : `When using the ${AGENT_TOOL_NAME} tool, specify a subagent_type parameter to select which agent type to use. If omitted, the general-purpose agent is used.`
-}`
+}
+
+${getModelParameterDescription()}`
 
   // Coordinator mode gets the slim prompt -- the coordinator system prompt
   // already covers usage notes, examples, and when-not-to-use guidance.

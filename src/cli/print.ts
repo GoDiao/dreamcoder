@@ -5536,7 +5536,7 @@ export async function reconcileMcpServers(
     // Remove old dynamic tools
     const nonDynamicTools = prev.mcp.tools.filter(t => {
       for (const serverName of allDynamicServerNames) {
-        if (t.name.startsWith(`mcp__${serverName}__`)) {
+        if (t.name.startsWith(getMcpPrefix(serverName))) {
           return false
         }
       }
