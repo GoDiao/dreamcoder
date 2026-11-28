@@ -14,7 +14,7 @@ import {
 } from '../../utils/settings/settings.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
 import { getEnterpriseMcpFilePath, getMcpConfigByName } from './config.js'
-import { mcpInfoFromString } from './mcpStringUtils.js'
+import { getMcpPrefix, mcpInfoFromString } from './mcpStringUtils.js'
 import { normalizeNameForMCP } from './normalization.js'
 import {
   type ConfigScope,
@@ -37,7 +37,7 @@ import {
  * @returns Tools belonging to the specified server
  */
 export function filterToolsByServer(tools: Tool[], serverName: string): Tool[] {
-  const prefix = `mcp__${normalizeNameForMCP(serverName)}__`
+  const prefix = getMcpPrefix(serverName)
   return tools.filter(tool => tool.name?.startsWith(prefix))
 }
 
@@ -57,7 +57,8 @@ export function commandBelongsToServer(
   const name = command.name
   if (!name) return false
   return (
-    name.startsWith(`mcp__${normalized}__`) || name.startsWith(`${normalized}:`)
+    name.startsWith(getMcpPrefix(serverName)) ||
+    name.startsWith(`${normalized}:`)
   )
 }
 
@@ -116,7 +117,7 @@ export function excludeToolsByServer(
   tools: Tool[],
   serverName: string,
 ): Tool[] {
-  const prefix = `mcp__${normalizeNameForMCP(serverName)}__`
+  const prefix = getMcpPrefix(serverName)
   return tools.filter(tool => !tool.name?.startsWith(prefix))
 }
 

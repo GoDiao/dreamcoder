@@ -4,7 +4,26 @@
  * consumers that only need string parsing (e.g., permissionValidation).
  */
 
+import { createHash } from 'crypto'
 import { normalizeNameForMCP } from './normalization.js'
+
+const MAX_MCP_TOOL_NAME_LENGTH = 64
+const MAX_MCP_SERVER_SEGMENT_LENGTH = 40
+const NAME_HASH_LENGTH = 8
+
+function shortenName(name: string, maxLength: number): string {
+  const normalized = normalizeNameForMCP(name)
+  if (normalized.length <= maxLength) return normalized
+  const hash = createHash('sha1')
+    .update(name)
+    .digest('hex')
+    .slice(0, NAME_HASH_LENGTH)
+  return `${normalized.slice(0, maxLength - hash.length - 1)}_${hash}`
+}
+
+export function getMcpServerSegment(serverName: string): string {
+  return shortenName(serverName, MAX_MCP_SERVER_SEGMENT_LENGTH)
+}
 
 /*
  * Extracts MCP server information from a tool name string
@@ -37,7 +56,7 @@ export function mcpInfoFromString(toolString: string): {
  * @returns The prefix string
  */
 export function getMcpPrefix(serverName: string): string {
-  return `mcp__${normalizeNameForMCP(serverName)}__`
+  return `mcp__${getMcpServerSegment(serverName)}__`
 }
 
 /**
@@ -48,7 +67,15 @@ export function getMcpPrefix(serverName: string): string {
  * @returns The fully qualified name, e.g., "mcp__server__tool"
  */
 export function buildMcpToolName(serverName: string, toolName: string): string {
-  return `${getMcpPrefix(serverName)}${normalizeNameForMCP(toolName)}`
+  const prefix = getMcpPrefix(serverName)
+  return `${prefix}${shortenName(toolName, MAX_MCP_TOOL_NAME_LENGTH - prefix.length)}`
+}
+
+export function buildUnshortenedMcpToolName(
+  serverName: string,
+  toolName: string,
+): string {
+  return `mcp__${normalizeNameForMCP(serverName)}__${normalizeNameForMCP(toolName)}`
 }
 
 /**
@@ -76,8 +103,7 @@ export function getMcpDisplayName(
   fullName: string,
   serverName: string,
 ): string {
-  const prefix = `mcp__${normalizeNameForMCP(serverName)}__`
-  return fullName.replace(prefix, '')
+  return fullName.replace(getMcpPrefix(serverName), '')
 }
 
 /**

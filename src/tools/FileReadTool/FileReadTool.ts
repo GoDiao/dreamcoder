@@ -88,6 +88,7 @@ import {
   LINE_FORMAT_INSTRUCTION,
   OFFSET_INSTRUCTION_DEFAULT,
   OFFSET_INSTRUCTION_TARGETED,
+  readSizeInstruction,
   readTruncatedNote,
   renderPromptTemplate,
 } from './prompt.js'
@@ -356,15 +357,12 @@ export const FileReadTool = buildTool({
   },
   async prompt() {
     const limits = getDefaultFileReadingLimits()
-    const maxSizeInstruction = limits.includeMaxSizeInPrompt
-      ? `. A read larger than ${formatFileSize(limits.maxSizeBytes)} returns the lines that fit; use offset and limit to read the rest`
-      : ''
     const offsetInstruction = limits.targetedRangeNudge
       ? OFFSET_INSTRUCTION_TARGETED
       : OFFSET_INSTRUCTION_DEFAULT
     return renderPromptTemplate(
       pickLineFormatInstruction(),
-      maxSizeInstruction,
+      readSizeInstruction(limits.maxSizeBytes, limits.maxTokens),
       offsetInstruction,
     )
   },

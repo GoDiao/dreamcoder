@@ -107,7 +107,7 @@ import {
   runElicitationHooks,
   runElicitationResultHooks,
 } from './elicitationHandler.js'
-import { buildMcpToolName } from './mcpStringUtils.js'
+import { buildMcpToolName, getMcpPrefix } from './mcpStringUtils.js'
 import { normalizeNameForMCP } from './normalization.js'
 import { createMcpEnvironmentRedactor } from './redactEnvironment.js'
 import { getLoggingSafeMcpBaseUrl } from './utils.js'
@@ -1946,7 +1946,7 @@ export const fetchCommandsForClient = memoizeWithLRU(
         const argNames = Object.values(prompt.arguments ?? {}).map(k => k.name)
         return {
           type: 'prompt' as const,
-          name: 'mcp__' + normalizeNameForMCP(client.name) + '__' + prompt.name,
+          name: getMcpPrefix(client.name) + prompt.name,
           description: prompt.description ?? '',
           hasUserSpecifiedDescription: !!prompt.description,
           contentLength: 0, // Dynamic MCP content

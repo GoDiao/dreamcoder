@@ -12,6 +12,7 @@ All notable changes to DreamCoder will be documented in this file.
 
 ### Changed
 
+- Tool descriptions and schemas match what the tools do: the Read tool states that it reads the whole file and gives its size and token limits, the Agent tool says which configured model `sonnet`, `opus` and `haiku` stand for, the Skill tool no longer names skills that do not exist, and parameters with a default are no longer marked required. MCP tool names longer than 64 characters are shortened with a hash, as are server names longer than 40 characters; permission rules written with the full name still match (#273).
 - **New app icon.** The app, Dock, taskbar and tray icons and the logo inside the app are redrawn: a warm-white crescent prompt and an amber star on an ink-blue tile. On macOS the menu bar icon is now a template image, so it follows the light or dark menu bar. The interface colors are unchanged. (#292)
 - Thinking text in a streaming reply is batched like the reply text, so a long thinking block updates the conversation once per 50 ms instead of on every chunk (#258). Thanks @iruzen-dono.
 - **Providers in OpenAI format reuse their prompt cache.** Later turns of a session now hit the cache for about 99% of the input (measured on OpenRouter with GPT-4.1 mini and GLM-4.6), and cache hits that DeepSeek and Moonshot report are counted as cache reads (#262).
